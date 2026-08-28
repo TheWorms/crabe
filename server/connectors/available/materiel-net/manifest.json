@@ -1,0 +1,55 @@
+{
+  "id": "materiel-net",
+  "name": "Materiel.net",
+  "category": "shopping",
+  "site": "www.materiel.net",
+  "implementation": "scraping",
+  "initialStatus": "pending",
+  "description": "Récupère automatiquement les factures de vos commandes de matériel informatique.",
+  "technicalNote": "LOT 30 (14/08/2026) — ÉCRIT MAIS JAMAIS EXÉCUTÉ CONTRE UN VRAI COMPTE. D'où « initialStatus »: « pending » : installable par l'administrateur seul, invisible pour les autres. Il passera « available » le jour où une facture réelle aura été récupérée, et pas avant.\n\nRECONNAISSANCE (voir docs/reconnaissance-lot30.md, §1). VERDICT : PRATICABLE. L'ADRESSE DE CONNEXION N'EST PAS CELLE QU'ON DEVINE : www.materiel.net/client/connexion/ rend une redirection permanente vers l'accueil, /client/ et /login/ rendent 404. C'est le sous-domaine secure.materiel.net qui porte l'espace client, et https://secure.materiel.net/ redirige de lui-même vers /Login/Login?returnUrl=%2F.\n\nMESURÉ EN PRODUCTION, deux chargements, vrai Chromium piloté, agent utilisateur réaliste : HTTP 200 aux deux passages, titre « Connexion », en-tête « server: MATNET ». TROIS cookies seulement — Session, __SecureRequestVerificationToken, cookiespreferences — et AUCUN marqueur de bot-management : ni datadome, ni __cf_bm, ni _px*, ni incap_ses*, ni _abck. AUCUN script tiers anti-robot. ZÉRO iframe, ZÉRO captcha rendu. C'est ce qui distingue ce service de PayByPhone et de Hello Bank! mesurés le même jour.\n\nFORMULAIRE relevé sur le site : input[type=email] id=Email name=Email maxlength=60, input[type=password] id=Password name=Password, input[type=checkbox] id=LongAuthenticationDuration (le « rester connecté »), et un <button type=submit class=\"button o-btn o-btn--external\"> dont le texte est « Connexion ». ⚠ UN AUTRE BOUTON EST ÉCRIT AVANT LUI DANS LE DOM : <button type=button class=\"toggle-password\"> — l'œil qui montre le mot de passe. Un sélecteur de bouton mal ajusté le cliquerait à sa place et n'enverrait rien, exactement la panne qui a immobilisé L'Atelier du Portable. D'où la soumission par la touche Entrée depuis le champ mot de passe, qui ne désigne aucun bouton. Le site s'identifie par ADRESSE ÉLECTRONIQUE, pas par un identifiant : le champ déclare « identification »: « email ». Une seule étape, pas de clavier virtuel, aucune authentification forte visible — ce dernier point reste SUPPOSÉ pour l'après-connexion, qu'aucune mesure sans compte ne peut atteindre.\n\nPROTECTION ANTI-REJEU ASP.NET : un champ caché __RequestVerificationToken doublé du cookie __SecureRequestVerificationToken. Le formulaire est donc SOUMIS TEL QUE LA PAGE LE SERT (remplissage des deux champs puis touche Entrée) et jamais reconstruit à la main : une requête POST fabriquée perdrait le jeton et serait refusée sans que rien ne l'explique. Le refus d'identifiants se lit dans <span data-valmsg-for=\"LoginError\"> — le conteneur que le site remplit lui-même —, et à défaut dans le simple fait d'être encore sur le formulaire. La case « Rester connecté » (input#LongAuthenticationDuration) est COCHÉE : elle allonge la session côté serveur, donc espace les soumissions du formulaire, donc éloigne le captcha conditionnel.\n\n⚠ CAPTCHA CONDITIONNEL — la seule vraie fragilité. Le formulaire porte data-captcha-url=\"/Login/PartialCaptchaByIpOrEmail\" : le site sait afficher un captcha et décide de le faire SELON L'ADRESSE IP OU L'ADRESSE ÉLECTRONIQUE. Appelé le 13/08/2026, en GET comme en POST, ce fragment rend 200 AVEC UN CORPS VIDE — donc pas de captcha pour cette adresse ce jour-là. Il se rendrait dans <div class=\"captcha-placeholder\"></div>, présent et VIDE dans le formulaire : c'est ce conteneur que le connecteur inspecte pour savoir si un captcha est apparu, et il s'arrête alors avec un message qui dit quoi faire plutôt que d'insister. Sa NATURE N'EST PAS ÉTABLIE puisqu'il ne s'est pas déclenché : la politique de sécurité de la page autorise à la fois *.google.com et *.gstatic.com (reCAPTCHA) ET *.cloudflare.com (qui couvre challenges.cloudflare.com, donc un Turnstile). C'est POUR CETTE RAISON que le connecteur se connecte le moins souvent possible : profil de navigateur persistant conservé entre deux exécutions, case « rester connecté » cochée, et la page des commandes tentée AVANT toute soumission du formulaire. Un connecteur qui se reconnecterait à chaque passage finirait par le déclencher.\n\nBANDEAU DE COOKIES : présent, générique, quatre boutons (« J'accepte », « Paramétrer », « Refuser », « Enregistrer mes choix »). Il INTERCEPTE LES CLICS et doit être fermé avant toute interaction. C'est ce geste qui fait apparaître le cookie cookiespreferences, absent d'une mesure faite en ligne de commande puisqu'aucun script n'y tourne. Le connecteur clique « Refuser » — le strict nécessaire pour dégager la page, sans accepter de pistage.\n\nROUTES DE L'ESPACE CLIENT, mesurées, la sonde DISCRIMINANT bien (une adresse inventée rend 404, pas une redirection) : /Account, /Account/Index, /Orders et /Orders/Index rendent 302 vers /Login/Login?returnUrl=… donc EXISTENT ; /Orders/Details, /Orders/Invoice, /Orders/DownloadInvoice, /Invoice, /Facture, /Bill, /Account/Invoices et /Account/Profile rendent tous 404 donc N'EXISTENT PAS. Témoins : /Orders/ceci-nexiste-pas-42 et /Account/ceci-nexiste-pas-42 → 404.\n\nCONSÉQUENCE DIRECTE : l'adresse de téléchargement d'une facture N'EST PAS CONSTRUCTIBLE, contrairement à L'Atelier du Portable où le schéma est fixe. Seize noms ont été tentés, tous en 404. Elle vit donc DANS la page des commandes, et le connecteur la LIT plutôt que de la deviner : liens et boutons dont le texte ou l'adresse parlent de facture. C'est le seul choix honnête tant qu'aucun compte n'a permis de voir la page.\n\nNATURE DU DOCUMENT, établie par la source officielle (www.materiel.net/faq-informations/q152-obtenir-une-facture/) : Espace Client → « Mes commandes » (menu de gauche) → « Détails » → bouton « Télécharger ma facture ». La facture est créée quand TOUS LES COLIS de la commande sont préparés, puis envoyée par courriel le soir même. Elle reste disponible DIX ANS sur un compte actif. ⚠ LES COMMANDES MARKETPLACE FONT EXCEPTION : la facture vient du vendeur-partenaire, dans le colis ou par messagerie, et Materiel.net ne la sert pas — un tel document sera simplement absent, ce n'est pas une panne.\n\n⚠ LE FORMAT N'EST PAS ÉTABLI : l'aide écrit « Télécharger ma facture » et jamais « PDF ». Le connecteur ne s'y fie donc pas et vérifie le CONTENU du fichier reçu (les cinq octets %PDF-), jamais le type annoncé. Un document qui n'est pas un PDF est ignoré avec sa raison au journal — comme une commande pas encore facturée, ou une commande Marketplace.\n\nCE QUI N'EST JAMAIS FAIT : aucune deuxième tentative de connexion. Des identifiants refusés arrêtent le connecteur — insister sur un formulaire peut faire bloquer le compte, et déclencherait à coup sûr le captcha conditionnel.\n\nCE QUI N'EST PAS VÉRIFIÉ, faute de compte : la structure exacte de la page des commandes, le libellé réel du lien de facture, le format du numéro de commande, la présence d'une pagination au-delà d'un certain nombre de commandes, et ce que le site demande APRÈS une connexion réussie.",
+  "fields": [
+    {
+      "key": "email",
+      "identification": "email",
+      "type": "email",
+      "required": true,
+      "help": "L'adresse avec laquelle vous vous connectez sur Materiel.net. C'est celle qui reçoit vos confirmations de commande."
+    },
+    {
+      "key": "motDePasse",
+      "label": "Mot de passe du site",
+      "type": "password",
+      "required": true,
+      "help": "Le mot de passe de votre compte Materiel.net. Si vous l'avez oublié, refaites-en un depuis « Mot de passe oublié » sur la page de connexion du site, puis recopiez-le ici. Il est chiffré et ne sert qu'à ouvrir votre espace client."
+    },
+    {
+      "key": "historique",
+      "label": "Historique à récupérer",
+      "type": "history",
+      "default": "depuis",
+      "help": "Materiel.net garde vos factures dix ans. crabe reprend tout une première fois, puis ne suit plus que l'année en cours."
+    }
+  ],
+  "permissions": [
+    {
+      "key": "factures",
+      "scope": "read-write",
+      "description": "Télécharge les factures de vos commandes de matériel informatique et les dépose sur vos destinations de stockage, dans un dossier par année. Elles portent le détail du matériel commandé, son prix et votre adresse de livraison."
+    },
+    {
+      "key": "identifiants",
+      "scope": "read",
+      "description": "Votre adresse électronique et votre mot de passe Materiel.net, chiffrés au repos. Ils n'ouvrent que votre espace client, pour y prendre vos factures, ne sont transmis qu'au site lui-même, et n'apparaissent dans aucun journal. La connexion ouverte est gardée sur le serveur d'une fois sur l'autre, pour éviter de retaper le formulaire à chaque passage."
+    },
+    {
+      "key": "operations-bancaires",
+      "scope": "read",
+      "description": "Les numéros, les dates et les états de vos commandes, tels que Materiel.net les affiche dans « Mes commandes ». Ils servent à nommer et à dater vos factures, et à savoir lesquelles ont déjà été rangées."
+    },
+    {
+      "key": "informations-compte",
+      "scope": "read",
+      "description": "Votre adresse électronique, telle qu'elle apparaît sur votre espace client, pour nommer le dossier de vos documents. Ni votre nom, ni votre adresse postale, ni votre moyen de paiement ne sont lus."
+    }
+  ]
+}

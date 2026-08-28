@@ -1,0 +1,60 @@
+# Publication de l'image Docker sur GHCR.
+#
+# Se déclenche sur un tag `v*` (v0.1.0, v1.2.3…) : construit l'image pour
+# amd64 et arm64, la pousse sur ghcr.io/<propriétaire>/crabe avec le numéro
+# de version et `latest`. Aucun secret à configurer : GITHUB_TOKEN suffit.
+#
+# Ce fichier est inactif tant que le dépôt n'est pas sur GitHub — il ne coûte
+# rien de le livrer prêt.
+
+name: docker
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  publier:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Récupérer les sources
+        uses: actions/checkout@v4
+
+      - name: Préparer l'émulation multi-architecture
+        uses: docker/setup-qemu-action@v3
+
+      - name: Préparer Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Se connecter à GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Calculer les étiquettes de l'image
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/crabe
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest
+
+      - name: Construire et publier
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

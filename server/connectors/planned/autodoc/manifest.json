@@ -1,0 +1,8 @@
+{
+  "id": "autodoc",
+  "name": "AutoDoc",
+  "category": "shopping",
+  "site": "www.autodoc.fr",
+  "description": "Récupère automatiquement les factures de vos achats de pièces auto AutoDoc.",
+  "status": "planned"
+}

@@ -1,0 +1,56 @@
+{
+  "id": "caf",
+  "name": "CAF",
+  "category": "public",
+  "color": "#0b3d91",
+  "letters": "CAF",
+  "site": "www.caf.fr",
+  "implementation": "scraping",
+  "description": "Récupère automatiquement vos attestations de paiement et de quotient familial de la CAF.",
+  "fields": [
+    {
+      "key": "username",
+      "identification": "identifiant",
+      "label": "Numéro allocataire",
+      "type": "text",
+      "required": true,
+      "help": "Votre numéro d'allocataire, celui qui figure sur vos courriers de la Caf."
+    },
+    {
+      "key": "password",
+      "label": "Code confidentiel",
+      "type": "password",
+      "required": true,
+      "help": "Le code personnel de votre compte Caf. Il est chiffré ici, jamais réaffiché, et ne sert qu'à ouvrir votre espace pour y prendre vos attestations."
+    },
+    {
+      "key": "historique",
+      "label": "Historique à récupérer",
+      "type": "history",
+      "default": "depuis",
+      "help": "La Caf garde plusieurs années d'attestations et de paiements. crabe reprend tout une première fois, puis ne suit plus que l'année en cours."
+    }
+  ],
+  "permissions": [
+    {
+      "key": "factures",
+      "scope": "read-write",
+      "description": "Télécharge vos attestations de paiement de la CAF, puis les dépose sur vos destinations de stockage."
+    },
+    {
+      "key": "identifiants",
+      "scope": "read",
+      "description": "Votre numéro d'allocataire et votre mot de passe CAF, chiffrés au repos, utilisés uniquement pour la connexion à caf.fr."
+    },
+    {
+      "key": "documents-contractuels",
+      "scope": "read-write",
+      "description": "Récupère votre attestation de quotient familial et la dépose avec vos autres documents CAF."
+    },
+    {
+      "key": "operations-bancaires",
+      "scope": "read",
+      "description": "Les montants et dates des prestations versées, tels qu'ils figurent sur les attestations de paiement."
+    }
+  ]
+}

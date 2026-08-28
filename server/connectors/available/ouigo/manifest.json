@@ -1,0 +1,47 @@
+{
+  "id": "ouigo",
+  "name": "OUIGO",
+  "category": "voyage",
+  "color": "#e50278",
+  "letters": "OU",
+  "site": "www.ouigo.com",
+  "description": "Récupère automatiquement les justificatifs de vos réservations OUIGO passées.",
+  "technicalNote": "LOT 45 (22/08/2026) — PUBLIÉ : la condition qui tenait l'attente est levée. Le 20/08/2026, en production, le connecteur a récupéré 5 billets sur 5 réservations passées d'un compte réel (lignes 885 à 889 de la base, dépôt « ok » sur les trois destinations pour chacune). L'identifiant distant est l'empreinte stable du document (lot 44) : deux passages n'écrivent qu'une ligne. « initialStatus » est retiré — comme Bitstamp à la migration 27 — et la migration 41 aligne la ligne de catalogue posée quand le connecteur était en attente ; « published_at » reste une décision humaine que rien ici ne signe. Les paragraphes qui suivent racontent le chemin : ils datent d'avant la validation et restent comme mesure.\n\nLOT 43 (20/08/2026) — L'ONGLET « PASSÉS » N'EST PLUS VIDE, MESURÉ PAR SONDE (session réelle, lecture seule) : 5 réservations affichées. Chaque réservation est une CARTE ouvrant sur « N° de réservation <réf> » — le seul marqueur textuel stable (les classes CSS du site sont générées et changent à chaque build) ; son seul cliquable est un bouton SANS libellé (chevron) qui ouvre le détail (/fr-FR/after-sale/<réf>). L'ancien comptage (« voir le détail ») rendait 0, et le motif « billet » matchait les liens marketing du PIED DE PAGE (« Billets Paris Lyon ») : le journal se contredisait. Le compte se fait désormais sur les cartes « N° de réservation » : le nombre annoncé est le nombre vu. AUCUN téléchargement direct sur la liste : dans le détail, « Accéder à vos billets » bascule sur un écran « Téléchargement des billets » où le bouton au NOM du passager sert le billet en PDF dans un onglet (adresse CDN en .pdf) — même mécanisme que le justificatif SNCF Connect. Ce parcours n'est PAS encore joué par le connecteur : le journal le dit à chaque passage. AUTRE FAIT MESURÉ : la navigation directe vers /user/bookings/past-bookings est PARFOIS renvoyée vers l'accueil /fr-FR alors que la session est valide (deux sondes à quelques minutes d'écart : une renvoyée, une servie) ; le rattrapage est le geste de l'utilisateur — « Mes voyages » puis l'onglet « PASSÉS » (`ramenerSurLesPasses`). Ce même aléa peut toucher la page de contrôle (« verifyUrlTient ») : une session valide peut être renvoyée vers l'accueil au moment de la vérification — à surveiller si des refus d'enregistrement reviennent.\n\nLOT 40 (19/08/2026) — LE CONTRÔLE DE SESSION EST DÉCLARÉ : le 19/08 à 15:31:11, la session ouverte à la main a été refusée (« Session OUIGO NON enregistrée : aucune page de contrôle déclarée par le connecteur ») — le manifeste n'avait ni verifyUrl ni marker, et depuis le hotfix du 18/08 « sans contrôle » ne vaut plus acceptation. Le signe de session était pourtant déjà mesuré (14/08, ci-dessous) : hors session, la page des réservations passées REDIRIGE vers l'accueil. Aucun marqueur générique ne capte ça — d'où « verifyUrl »: /fr-FR/user/bookings/past-bookings et « verifyUrlTient »: true : rester sur cette adresse EST la preuve, une redirection vers l'accueil est un refus.\n\nLOT 31 (14/08/2026) — ÉCRIT MAIS JAMAIS VALIDÉ, ET IL NE PEUT PAS L'ÊTRE AUJOURD'HUI : l'onglet « PASSÉS » du compte de reconnaissance est VIDE (« Vous n'avez pas de réservation passée. », relevé d'écran du 14/08). La forme d'une réservation passée et de ses documents n'a JAMAIS été vue. « initialStatus »: « pending », sans exception — un connecteur ne se déclare pas validé sur une liste vide.\n\nMESURÉ le 14/08/2026 (navigateur réel du CT, sans identifiants) : ventes.ouigo.com se rend entièrement en navigateur automatisé (pas de mur comme sncf-connect.com) ; hors session, /fr-FR/user/bookings/past-bookings REDIRIGE vers l'accueil /fr-FR — rester sur la page des réservations est donc un signe de session ; le bandeau de cookies (« Bienvenue chez OUIGO ! », « Accepter & Fermer » / « Continuer sans accepter → ») bloque la page ET SE REMONTE après fermeture — le module partagé fait plusieurs passages de fermeture, en refusant.\n\nAUTHENTIFICATION : « Mon Identifiant SNCF » (auth.monidentifiant.sncf), la même que SNCF Connect — module partagé connectors/auth-sncf.js, deux écrans mesurés (adresse puis mot de passe). Profil de navigateur persistant PROPRE à OUIGO : l'identité est commune aux deux services mais chaque application garde ses cookies — une session SNCF Connect ne vaut pas pour OUIGO, l'identité commune évite au plus de retaper le mot de passe.\n\nLISTE VIDE ≠ SUCCÈS GRATUIT : etatDesReservations() n'accepte « 0 réservation » que si la page des réservations a été SERVIE À CE COMPTE — l'adresse /user/bookings/ a tenu (elle redirige hors session, mesuré), aucun bouton « Se connecter » n'est affiché, et la page écrit mot pour mot qu'il n'y a pas de réservation passée. Tout autre écran est un échec explicite, jamais un « aucune nouvelle facture ».\n\nQUAND DES RÉSERVATIONS EXISTERONT : les déclencheurs de téléchargement directs sont pris (texte « télécharger/justificatif/reçu », e-mail exclu par texte avant tout clic — aucun envoi d'e-mail n'est jamais déclenché), contenu vérifié %PDF-, identifiant distant = empreinte SHA-256 du document. Si la liste montre des réservations sans déclencheur reconnu, le journal le dit pour préparer l'adaptation sur le premier compte qui a voyagé.\n\nOÙ SONT LES JUSTIFICATIFS OUIGO : non établi par la mesure. Il est possible qu'ils n'existent que par e-mail à la réservation, ou côté SNCF Connect pour les trajets achetés là-bas — le premier voyage passé le dira.",
+  "fields": [
+    {
+      "key": "session",
+      "label": "Connexion à OUIGO",
+      "type": "session",
+      "required": false,
+      "accept": "application/json,.json",
+      "help": "Le bouton « Se connecter à OUIGO » ouvre une fenêtre de navigateur dans crabe : fermez le bandeau de cookies, cliquez « Se connecter » et suivez les deux écrans (votre adresse e-mail, puis votre mot de passe — c'est « Mon Identifiant SNCF », le même identifiant que SNCF Connect). La connexion est conservée dans un profil de navigateur sur le serveur et n'est jamais réaffichée."
+    },
+    {
+      "key": "historique",
+      "label": "Historique à récupérer",
+      "type": "history",
+      "default": "depuis",
+      "help": "L'onglet « Passés » est relu en entier à chaque récupération ; les documents déjà déposés ne sont pas repris."
+    }
+  ],
+  "remoteLogin": {
+    "url": "https://ventes.ouigo.com/fr-FR",
+    "marker": "",
+    "verifyUrl": "https://ventes.ouigo.com/fr-FR/user/bookings/past-bookings",
+    "verifyUrlTient": true,
+    "persistent": true,
+    "hint": "Fermez d'abord le bandeau de cookies (« Continuer sans accepter »), puis cliquez « Se connecter » en haut à droite : votre adresse e-mail sur le premier écran, votre mot de passe sur le second. Quand la page OUIGO se raffiche avec votre compte, enregistrez la connexion."
+  },
+  "permissions": [
+    {
+      "key": "factures",
+      "scope": "read-write",
+      "description": "Parcourt vos réservations OUIGO passées et télécharge leurs justificatifs quand le site en propose, puis les dépose sur vos destinations de stockage. Aucun envoi d'e-mail n'est jamais déclenché."
+    },
+    {
+      "key": "identifiants",
+      "scope": "read",
+      "description": "Votre connexion OUIGO (Mon Identifiant SNCF), conservée dans un profil de navigateur chiffré sur le serveur, utilisée pour la seule lecture de vos réservations."
+    }
+  ]
+}

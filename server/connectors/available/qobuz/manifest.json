@@ -1,0 +1,55 @@
+{
+  "id": "qobuz",
+  "name": "Qobuz",
+  "category": "divertissement",
+  "color": "#10069f",
+  "letters": "QB",
+  "site": "www.qobuz.com",
+  "implementation": "scraping",
+  "initialStatus": "pending",
+  "description": "Récupère automatiquement vos factures d'abonnement et d'achats Qobuz.",
+  "caveat": "Un abonnement Qobuz souscrit via l'App Store ou Google Play est facturé par cette boutique : ses reçus ne sont pas sur qobuz.com, et ce connecteur ne les verra pas.",
+  "technicalNote": "LOT 36 (17/08/2026) — ÉCRIT MAIS JAMAIS EXERCÉ CONTRE UN COMPTE RÉEL. « initialStatus »: « pending ». Reconnaissance dans docs/reconnaissance-lot36.md §3.\n\nRECONNAISSANCE DU 17/08/2026, vrai Chromium du socle, aucun identifiant : (1) les routes « évidentes » étaient FAUSSES — www.qobuz.com/fr-fr/signin rend 404, /my-profile rend 404 à l'anonyme. La vraie route de connexion, révélée par le clic « Se connecter » de play.qobuz.com/login, est WWW.QOBUZ.COM/SIGNIN (sans préfixe de langue) : formulaire natif Symfony (email:_username, password:_password, jeton _token), boutons Google/Apple/Facebook À CÔTÉ, reCAPTCHA chargé (scripts google.com/gstatic) SANS challenge visible — un score invisible au pire, traversé par l'humain à la capture. Bandeau Didomi présent. (2) LE DOCUMENT EST DOCUMENTÉ (help.qobuz.com, article 10198 « Puis-je obtenir une facture ? ») : www.qobuz.com → nom en haut à droite → « Mon profil » → onglet « MES REÇUS DE PAIEMENT » → « télécharger vos différents reçus ». Reçu au nom du particulier. Les achats d'albums (Qobuz est aussi une boutique) vivent au même endroit.\n\nCE QUI N'EST PAS VÉRIFIÉ, faute de compte : l'adresse exacte du profil derrière une session (le /my-profile anonyme rend un 404 APPLICATIF, titre « Page introuvable – Erreur 404 » — c'est peut-être la bonne adresse une fois connecté, peut-être pas). Le connecteur part de /my-profile, DISTINGUE trois issues — redirection vers la connexion = session expirée ; page 404 = adresse morte, dite comme telle, jamais confondue avec une session tombée ; page rendue = relevé — puis rejoint l'onglet des reçus par son libellé et relève les liens aux indices génériques, en journalisant ce que la page montre quand il ne reconnaît rien. Le FORMAT des reçus téléchargés n'est pas prouvé : %PDF- vérifié sur ce qui descend, et dit clairement quand ce n'en est pas un.\n\nPOURQUOI UNE SESSION CAPTURÉE : le reCAPTCHA de connexion et le jeton CSRF Symfony sont l'affaire d'un humain dans la fenêtre visible, une fois. keepDomains = [qobuz.com] : les cookies d'un éventuel passage par Google/Apple/Facebook sont écartés avant chiffrement.\n\nSTATUT : chargé et installable, mais « pending » (invisible aux comptes ordinaires) tant qu'un reçu n'a pas été récupéré pour de bon sur le compte réel mesuré.",
+  "remoteLogin": {
+    "url": "https://www.qobuz.com/signin",
+    "verifyUrl": "https://www.qobuz.com/my-profile",
+    "keepDomains": [
+      "qobuz.com"
+    ],
+    "hint": "Connectez-vous à Qobuz avec votre adresse e-mail et votre mot de passe (bouton « Connexion » sous les champs), pas par « Google », « Apple » ni « Facebook » : ces voies ne fonctionnent pas dans une fenêtre pilotée par un programme. Fermez d'abord la fenêtre des cookies si elle s'affiche. Laissez la page finir de s'afficher avant d'enregistrer."
+  },
+  "fields": [
+    {
+      "key": "session",
+      "label": "Connexion à Qobuz",
+      "type": "session",
+      "required": false,
+      "accept": "application/json,.json",
+      "help": "Le bouton « Se connecter à Qobuz » ouvre une fenêtre de navigateur dans crabe : connectez-vous avec votre adresse e-mail et votre mot de passe Qobuz, et la connexion est enregistrée d'elle-même.\nAttention : la connexion par « Google », « Apple » ou « Facebook » ne fonctionne pas dans cette fenêtre — utilisez le formulaire e-mail.\nCette connexion vaut vos identifiants : elle est chiffrée ici et n'est jamais réaffichée. Elle finira par expirer, et crabe vous demandera alors de la rouvrir."
+    },
+    {
+      "key": "historique",
+      "label": "Historique à récupérer",
+      "type": "history",
+      "default": "depuis",
+      "help": "Combien d'années remonter dans vos reçus d'abonnement et d'achats. crabe reprend tout une première fois, puis ne va plus chercher que les nouveautés."
+    }
+  ],
+  "permissions": [
+    {
+      "key": "factures",
+      "scope": "read-write",
+      "description": "Ouvre l'onglet « Mes reçus de paiement » de votre profil Qobuz pour y lister et télécharger vos reçus d'abonnement et d'achats, puis les dépose sur vos destinations de stockage, dans un dossier par année."
+    },
+    {
+      "key": "identifiants",
+      "scope": "read",
+      "description": "La connexion de navigateur que vous avez ouverte vous-même : les cookies de session de qobuz.com, chiffrés au repos, rejoués uniquement pour ouvrir votre profil. Aucun mot de passe n'est stocké ici."
+    },
+    {
+      "key": "operations-bancaires",
+      "scope": "read",
+      "description": "Les dates et les montants de vos paiements Qobuz, tels que la page des reçus les affiche. Ils servent à nommer et à dater vos reçus, et à savoir lesquels ont déjà été récupérés."
+    }
+  ]
+}

@@ -1,0 +1,1089 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Crabe — gestionnaire de factures</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css">
+<link rel="icon" href="/crabe.svg" type="image/svg+xml">
+</head>
+<body>
+
+<div id="app" style="display:flex;">
+  <div class="topbar">
+    <div class="tb-logo" onclick="showView('home')">
+      <svg class="tb-crab" viewBox="0 0 40 40" fill="none"><circle cx="20" cy="22" r="12" fill="#e0693a"/><path d="M8 18 L2 12 M8 14 L1 20" stroke="#e0693a" stroke-width="2.5" stroke-linecap="round"/><path d="M32 18 L38 12 M32 14 L39 20" stroke="#e0693a" stroke-width="2.5" stroke-linecap="round"/><circle cx="15" cy="19" r="1.6" fill="#14161a"/><circle cx="25" cy="19" r="1.6" fill="#14161a"/></svg>
+      <span>Crabe</span>
+    </div>
+    <div class="tb-right tb-desktop-only">
+      <button class="tb-btn" id="tb-documents" onclick="showView('documents')" title="Mes documents">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>
+      </button>
+      <button class="tb-btn" id="tb-store" onclick="showView('store')" title="Store">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+      </button>
+      <button class="tb-btn" id="tb-admin" onclick="showView('admin')" title="Paramètres (administration)" style="display:none;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.34 1.87l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.7 1.7 0 00-1.87-.34 1.7 1.7 0 00-1 1.55V21a2 2 0 11-4 0v-.09a1.7 1.7 0 00-1-1.55 1.7 1.7 0 00-1.87.34l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.7 1.7 0 00.34-1.87 1.7 1.7 0 00-1.55-1H3a2 2 0 110-4h.09a1.7 1.7 0 001.55-1 1.7 1.7 0 00-.34-1.87l-.06-.06a2 2 0 112.83-2.83l.06.06a1.7 1.7 0 001.87.34H9a1.7 1.7 0 001-1.55V3a2 2 0 114 0v.09a1.7 1.7 0 001 1.55 1.7 1.7 0 001.87-.34l.06-.06a2 2 0 112.83 2.83l-.06.06a1.7 1.7 0 00-.34 1.87V9a1.7 1.7 0 001.55 1H21a2 2 0 110 4h-.09a1.7 1.7 0 00-1.55 1z"/></svg>
+        <span class="tb-dot" id="tb-admin-dot" style="display:none;"></span>
+      </button>
+      <div class="tb-sep"></div>
+      <button class="tb-btn" onclick="toggleTheme()" title="Changer de thème">
+        <svg id="icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none;"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+        <svg id="icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1111.2 3 7 7 0 0021 12.8z"/></svg>
+      </button>
+      <div class="tb-sep"></div>
+      <button class="tb-btn" id="tb-profil" onclick="showView('profil')" title="Profil">
+        <span class="tb-avatar" id="tb-avatar"><span id="tb-initials">··</span></span>
+      </button>
+      <button class="tb-btn" onclick="logout()" title="Déconnexion">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+      </button>
+    </div>
+
+    <!-- Sous 640 px, les cinq icônes ne tiennent pas côte à côte : elles
+         passent dans un panneau latéral (voir docs/accueil-reference.html). -->
+    <button class="tb-btn tb-mobile-btn" id="tb-mobile-btn" onclick="toggleMobileMenu()"
+            aria-label="Ouvrir le menu" aria-expanded="false">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+    </button>
+  </div>
+
+  <div class="tb-scrim" id="tb-scrim" onclick="closeMobileMenu()"></div>
+  <div class="tb-mobile-menu" id="tb-mobile-menu">
+    <div class="tb-mobile-head">
+      <span>Menu</span>
+      <button class="tb-mobile-close" onclick="closeMobileMenu()" aria-label="Fermer le menu">✕</button>
+    </div>
+    <button class="tb-mobile-item" onclick="closeMobileMenu(); showView('home');">Accueil</button>
+    <button class="tb-mobile-item" onclick="closeMobileMenu(); showView('documents');">Mes documents</button>
+    <button class="tb-mobile-item" onclick="closeMobileMenu(); showView('store');">Store</button>
+    <button class="tb-mobile-item" id="tb-mobile-admin" style="display:none;"
+            onclick="closeMobileMenu(); showView('admin');">Paramètres</button>
+    <button class="tb-mobile-item" onclick="toggleTheme()">Changer de thème</button>
+    <button class="tb-mobile-item" onclick="closeMobileMenu(); showView('profil');">Profil</button>
+    <button class="tb-mobile-item" onclick="logout()">Déconnexion</button>
+  </div>
+
+  <!-- Bandeau des opérations (lot 59, refondu au lot 65) : dans l'en-tête,
+       au-dessus de toutes les vues — une opération longue (renommage,
+       synchronisation, récupération, optimisation) s'y annonce, orange tant
+       qu'elle tourne, vert ou rouge à la fin, et le clic mène à son écran.
+       UNE seule pastille centrée : plusieurs opérations donnent une ligne
+       agrégée que le clic déplie. Vide et invisible le reste du temps
+       (voir majBandeauOperations, web/app.js). -->
+  <div id="op-banner" class="op-banner"></div>
+
+  <div class="content">
+
+    <!-- ================= Accueil (tableau de bord configurable) =========
+         Structure reprise de docs/accueil-reference.html, validée : en-tête
+         avatar + salutation + date, bouton « Personnaliser l'accueil » à
+         droite, puis la grille de blocs. -->
+    <div class="view" id="view-home">
+      <div class="home-head">
+        <div class="home-avatar" id="home-avatar">··</div>
+        <div class="home-head-text">
+          <div class="home-greeting" id="home-greeting">Bonjour</div>
+          <div class="home-date" id="home-date">—</div>
+        </div>
+        <!-- Icône seule à toutes les largeurs : le libellé est porté par
+             `title` et `aria-label`, mis à jour par renderCustomizeButton(). -->
+        <button class="btn-customize" id="btn-customize" onclick="openHomePanel()"
+                title="Personnaliser l'accueil" aria-label="Personnaliser l'accueil">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 21v-7M4 10V3M12 21v-11M12 6V3M20 21v-5M20 12V3M1 14h6M9 6h6M17 16h6"/></svg>
+        </button>
+      </div>
+      <!-- Bandeau d'alerte, au-dessus des blocs et avant tout le reste : plus
+           aucun espace de stockage actif arrête les récupérations, et l'écran
+           Stockage qui le dirait n'est visible que des administrateurs. Vide et
+           masqué le reste du temps (voir renderAlerteStockage, web/app.js). -->
+      <div id="home-alert" hidden></div>
+      <div class="widgets" id="home-widgets"></div>
+    </div>
+
+    <!-- ================= Mes documents =================
+         Rétabli au lot 7. Le lot 3 avait retiré la vue « Stockage local » en même
+         temps que « Mes Papiers », et l'utilisateur s'est retrouvé sans aucun
+         moyen de VOIR ses documents depuis crabe. Écran de consultation
+         seulement : on regarde et on télécharge, on ne supprime rien. -->
+    <div class="view" id="view-documents">
+      <div class="page-title">Mes documents</div>
+      <div class="page-sub">Tout ce que crabe a récupéré et rangé pour vous</div>
+      <div id="docs-content"></div>
+    </div>
+
+    <!-- ================= Store =================
+         Depuis le lot 11, le Store montre DEUX choses : les services que crabe
+         sait atteindre, et ceux qui sont annoncés — visibles, mais pas encore
+         installables. Le sous-titre en donne le compte exact, et la case
+         « Seulement les services disponibles » sert à celui qui vient installer
+         plutôt que parcourir.
+
+         La recherche est arrivée avec eux : cinq pastilles suffisaient pour
+         quatorze tuiles, pas pour quatre-vingts. -->
+    <div class="view" id="view-store">
+      <div class="page-title">Store de connecteurs</div>
+      <div class="page-sub" id="store-count">Installez et configurez les sources de vos factures</div>
+
+      <div class="toolbar">
+        <div class="search-box">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+          <input id="store-search" placeholder="Rechercher un service" oninput="renderStoreGrid()">
+        </div>
+        <label class="toolbar-check"
+               title="Masque les services annoncés, ceux dont la connexion n'existe pas encore.">
+          <input type="checkbox" id="store-available-only" onchange="setStoreAvailableOnly(this.checked)">
+          Seulement les services disponibles
+        </label>
+      </div>
+
+      <div class="pill-row" id="store-pills"></div>
+      <div id="store-grid"></div>
+    </div>
+
+    <!-- ================= Profil ================= -->
+    <div class="view" id="view-profil">
+      <div class="page-title">Profil</div>
+      <div class="page-sub">Réglages personnels — indépendants des autres comptes crabe</div>
+
+      <button class="settings-menu-btn" onclick="toggleSettingsMenu('profil')" aria-controls="profil-sidebar">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+        Menu du profil — <span class="settings-menu-current" id="profil-menu-label">Général</span>
+      </button>
+
+      <div class="settings-shell">
+        <div class="settings-sidebar" id="profil-sidebar">
+          <div class="settings-nav-item active" data-ppage="general" onclick="showProfilPage('general', this)">Général</div>
+          <div class="settings-nav-item" data-ppage="stockage" onclick="showProfilPage('stockage', this)">Stockage</div>
+          <div class="settings-nav-item" data-ppage="fichiers" onclick="showProfilPage('fichiers', this)">Fichiers</div>
+          <div class="settings-nav-item" data-ppage="connecteurs" onclick="showProfilPage('connecteurs', this)">Connecteurs installés</div>
+          <div class="settings-nav-item" data-ppage="permissions" onclick="showProfilPage('permissions', this)">Permissions</div>
+          <div class="settings-nav-item" data-ppage="compte" onclick="showProfilPage('compte', this)">Compte</div>
+          <div class="settings-nav-item" data-ppage="contact" onclick="showProfilPage('contact', this)">Nous contacter</div>
+        </div>
+
+        <div class="settings-content">
+
+          <div class="settings-page active" id="ppage-general">
+            <div class="profil-layout">
+              <div class="profil-main">
+                <div class="profil-avatar-row">
+                  <div class="profil-avatar" id="profil-avatar">··</div>
+                  <div>
+                    <button class="profil-btn" onclick="openAvatarPicker()">Modifier l'avatar</button>
+                    <div class="profil-desc" id="profil-avatar-note" style="margin:8px 0 0;"></div>
+                  </div>
+                </div>
+
+                <div class="profil-field">
+                  <div class="profil-label">Accueil</div>
+                  <div class="profil-desc">
+                    Il n'existe qu'un accueil : le tableau de bord. Ses blocs s'activent,
+                    se désactivent, se réordonnent et changent de largeur depuis
+                    « Personnaliser l'accueil », et le réglage est enregistré sur votre
+                    compte — il vous suit d'un appareil à l'autre.
+                  </div>
+                  <button class="profil-btn" id="profil-home-open"
+                          onclick="showView('home'); openHomePanel();">
+                    Personnaliser l'accueil
+                  </button>
+                </div>
+
+                <!-- « Figer mon accueil » vivait ici jusqu'au lot 26. Il a
+                     rejoint le panneau « Personnaliser l'accueil », avec les
+                     autres réglages de disposition : c'est le même genre de
+                     décision, et la chercher dans un autre écran que celui où
+                     on réorganise ses blocs n'avait pas de sens. Le bouton
+                     ci-dessus y mène. -->
+
+                <div class="profil-field">
+                  <div class="profil-label">Nom d'usage</div>
+                  <div class="profil-value"><span id="profil-username">—</span><span class="badge-pill gray" id="profil-role">—</span></div>
+                </div>
+
+                <div class="profil-field">
+                  <div class="profil-label">E-mail</div>
+                  <div class="profil-desc">
+                    Utilisé pour les notifications d'échec de synchronisation. Un changement
+                    d'adresse est confirmé par e-mail avant d'être appliqué.
+                  </div>
+                  <div class="profil-value"><span id="profil-email">—</span></div>
+                  <div id="email-pending"></div>
+                  <button class="profil-btn" style="margin-top:10px;" onclick="openEmailModal()">Modifier l'e-mail</button>
+                </div>
+
+                <!-- Être prévenu qu'une récupération planifiée a échoué (lot 26).
+                     Deux canaux, réglés par compte : rempli par
+                     renderNotificationsReglage() dans web/app.js. -->
+                <div class="profil-field" id="profil-notifications"></div>
+
+                <div class="profil-field">
+                  <div class="profil-label">Téléphone</div>
+                  <div class="profil-desc">Utilisé pour la récupération de compte.</div>
+                  <div class="field" style="margin-bottom:0;">
+                    <input type="text" id="profil-phone" placeholder="+33 6 00 00 00 00" onchange="saveProfilField('phone', this.value)">
+                  </div>
+                </div>
+
+                <div class="profil-field">
+                  <div class="profil-label">Mot de passe</div>
+                  <div class="profil-desc" id="profil-password-rule"></div>
+                  <button class="profil-btn" onclick="openPasswordModal()">Modifier le mot de passe</button>
+                </div>
+
+                <div class="profil-field">
+                  <div class="profil-label" style="display:flex;align-items:center;gap:10px;">
+                    <span style="flex:1;">Double authentification</span>
+                    <span class="badge-pill" id="profil-2fa-badge">—</span>
+                    <div class="toggle" id="profil-2fa-toggle" onclick="toggleOwn2fa()"><div class="knob"></div></div>
+                  </div>
+                  <div class="profil-desc" id="profil-2fa-desc"></div>
+                </div>
+              </div>
+
+              <div class="profil-side">
+                <div class="sec-block">
+                  <div class="sec-block-title">
+                    <span class="sec-block-icon">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 4v6c0 5-3.4 8.4-8 10-4.6-1.6-8-5-8-10V6z"/></svg>
+                    </span>
+                    Sécurité du compte
+                  </div>
+                  <div id="security-block"></div>
+                  <button class="profil-btn" style="width:100%;margin-top:6px;"
+                          onclick="showProfilPage('contact', document.querySelector('[data-ppage=contact]'))">
+                    Signaler un problème
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-page" id="ppage-stockage">
+            <div class="page-sub">Vos données consommées — la configuration des destinations est gérée par l'administrateur</div>
+            <!-- Grand chiffre, espace disponible, barre, puis répartition :
+                 rendu entièrement par renderProfilStorage(). -->
+            <div class="quota-card" id="my-storage-quota"></div>
+            <div class="storage-rows" id="my-storage-rows"></div>
+          </div>
+
+          <div class="settings-page" id="ppage-fichiers">
+            <div class="page-sub">Comment vos documents sont nommés sur le stockage — et le renommage de ceux déjà déposés</div>
+            <!-- Deux blocs (un par convention), l'état du mélange, puis le
+                 chantier de renommage : rendu par renderProfilFichiers(). -->
+            <div id="fichiers-conventions"></div>
+            <div id="fichiers-harmonisation"></div>
+          </div>
+
+          <div class="settings-page" id="ppage-connecteurs">
+            <div class="block-head">
+              <div>
+                <div class="block-title">Connecteurs installés</div>
+                <div class="block-sub">Ce que crabe récupère pour vous, et son état</div>
+              </div>
+              <div class="view-switch" id="profil-connecteurs-view-switch"></div>
+            </div>
+            <div id="profil-conn-list"></div>
+          </div>
+
+          <div class="settings-page" id="ppage-permissions">
+            <div class="block-head">
+              <div>
+                <div class="block-title">Permissions</div>
+                <div class="block-sub">Ce que chaque service a le droit de lire et d'écrire</div>
+              </div>
+              <div class="view-switch" id="profil-permissions-view-switch"></div>
+            </div>
+            <div id="perm-list"></div>
+            <div id="perm-detail" style="display:none;"></div>
+          </div>
+
+          <div class="settings-page" id="ppage-compte">
+            <div class="page-sub">Fermer votre compte crabe et son accès aux connecteurs</div>
+            <div class="danger-zone" id="danger-zone-active" style="display:none;">
+              <div class="danger-zone-title">Supprimer mon compte</div>
+              <div class="danger-zone-desc" id="danger-zone-desc"></div>
+              <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text-dim);margin:12px 0;">
+                <input type="checkbox" id="want-export" checked style="width:16px;height:16px;">
+                Recevoir une copie de mes données (factures) au format .zip avant suppression
+              </label>
+              <button class="btn-danger" onclick="requestAccountDeletion()">Demander la suppression de mon compte</button>
+            </div>
+            <div class="danger-zone" id="danger-zone-pending" style="display:none;">
+              <div class="danger-zone-title">Suppression en cours de traitement</div>
+              <div class="danger-zone-desc" id="danger-zone-status-text"></div>
+              <button class="btn-mini" id="cancel-deletion-btn" onclick="cancelAccountDeletion()">Annuler ma demande</button>
+            </div>
+          </div>
+
+          <div class="settings-page" id="ppage-contact">
+            <div class="block-head">
+              <div>
+                <div class="block-title">Nouvelle demande</div>
+                <div class="block-sub">Décrivez votre problème : l'administrateur vous répondra ici même.</div>
+              </div>
+            </div>
+            <div class="ticket-form">
+              <div class="field"><label>Sujet</label><input type="text" id="ticket-subject" placeholder="Ex. Erreur de synchronisation OVH"></div>
+              <div class="field"><label>Message</label><textarea id="ticket-message" placeholder="Décrivez votre demande..."></textarea></div>
+              <button class="btn-primary" style="width:auto;padding:9px 18px;" onclick="submitTicket()">Envoyer la demande</button>
+            </div>
+
+            <div class="block-sep"></div>
+
+            <div class="block-head">
+              <div>
+                <div class="block-title">Historique de vos demandes</div>
+                <div class="block-sub">
+                  « Supprimer » retire la demande de votre historique uniquement :
+                  l'administrateur en conserve la trace et le fil complet.
+                </div>
+              </div>
+            </div>
+            <div id="my-tickets"></div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= Administration ================= -->
+    <div class="view" id="view-admin">
+      <div class="page-title">Paramètres</div>
+      <div class="page-sub">Administration système de crabe</div>
+
+      <button class="settings-menu-btn" onclick="toggleSettingsMenu('admin')" aria-controls="admin-sidebar">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+        Menu des paramètres — <span class="settings-menu-current" id="admin-menu-label">Utilisateurs</span>
+      </button>
+
+      <div class="settings-shell">
+        <div class="settings-sidebar" id="admin-sidebar">
+          <div class="settings-nav-item active" data-apage="users" data-perm="users.manage" onclick="showAdminPage('users', this)">Utilisateurs</div>
+          <div class="settings-nav-item" data-apage="apps" data-perm="apps.manage" onclick="showAdminPage('apps', this)">Applications</div>
+          <div class="settings-nav-item" data-apage="roles" data-perm="roles.manage" onclick="showAdminPage('roles', this)">Permissions</div>
+          <div class="settings-nav-item" data-apage="cron" data-perm="schedules.manage" onclick="showAdminPage('cron', this)">Automatisation</div>
+          <div class="settings-nav-item" data-apage="storage" data-perm="storage.manage" onclick="showAdminPage('storage', this)">Stockage</div>
+          <div class="settings-nav-item" data-apage="optimisation" data-perm="storage.manage" onclick="showAdminPage('optimisation', this)">Optimisation</div>
+          <div class="settings-nav-item" data-apage="securite" data-perm="security.manage" onclick="showAdminPage('securite', this)">Sécurité</div>
+          <div class="settings-nav-item" data-apage="smtp" data-perm="security.manage" onclick="showAdminPage('smtp', this)">SMTP</div>
+          <div class="settings-nav-item" data-apage="logs" data-perm="logs.read" onclick="showAdminPage('logs', this)">Logs</div>
+          <div class="settings-nav-item" data-apage="support" data-perm="support.reply" onclick="showAdminPage('support', this)">
+            Support <span class="nav-count" id="nav-support-count" style="display:none;">0</span>
+          </div>
+          <div class="settings-nav-item" data-apage="systeme" onclick="showAdminPage('systeme', this)">Système</div>
+        </div>
+
+        <div class="settings-content">
+
+          <!-- --- Utilisateurs --- -->
+          <div class="settings-page active" id="apage-users">
+            <div class="pill-row" id="users-subnav">
+              <button class="pill active" onclick="setUsersTab('comptes', this)">Comptes</button>
+              <button class="pill" onclick="setUsersTab('suppressions', this)">
+                Demandes de suppression
+                <span class="nav-count" id="users-deletion-count" style="display:none;">0</span>
+              </button>
+              <button class="pill" id="users-tab-avatars-pill" onclick="setUsersTab('avatars', this)">Avatars</button>
+            </div>
+
+            <div id="users-tab-comptes">
+              <div class="block-head">
+                <div>
+                  <div class="block-title">Comptes</div>
+                  <div class="block-sub">Activer, désactiver, éditer, révoquer ou supprimer un compte</div>
+                </div>
+                <div class="view-switch" id="users-view-switch"></div>
+                <button class="profil-btn" onclick="openNewUserModal()">+ Ajouter un utilisateur</button>
+              </div>
+
+              <div class="toolbar">
+                <div class="search-box">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+                  <input id="users-search" placeholder="Rechercher un compte" oninput="renderUsersList()">
+                </div>
+                <!-- Le même tri que les en-têtes du tableau, et le même
+                     réglage mémorisé : sous 768 px l'en-tête disparaît, ce
+                     sélecteur reste le seul chemin. -->
+                <label class="toolbar-field">Tri
+                  <select id="users-sort" onchange="sortUsers(this.value)">
+                    <option value="username">Identifiant</option>
+                    <option value="role">Rôle</option>
+                    <option value="status">Statut</option>
+                    <option value="lastLogin">Dernière connexion</option>
+                    <option value="invoices">Factures</option>
+                  </select>
+                </label>
+                <!-- Complément du verrou « Autoriser la personnalisation de
+                     l'accueil » : sans lui, chaque compte resterait figé sur
+                     SA disposition, et « homogène » ne voudrait rien dire. -->
+                <button class="btn-mini" onclick="applyHomeLayoutToAll()"
+                        title="Recopie votre accueil (ordre, blocs, largeurs) sur tous les autres comptes">
+                  Appliquer mon accueil à tous
+                </button>
+              </div>
+
+              <div id="users-list"></div>
+            </div>
+
+            <div id="users-tab-suppressions" style="display:none;">
+              <div class="block-head">
+                <div>
+                  <div class="block-title">Demandes de suppression de compte</div>
+                  <div class="block-sub">Export RGPD, révocation d'accès, puis suppression définitive</div>
+                </div>
+              </div>
+              <div id="deletion-requests"></div>
+            </div>
+
+            <div id="users-tab-avatars" style="display:none;">
+              <div class="block-head">
+                <div>
+                  <div class="block-title">Avatars</div>
+                  <div class="block-sub">Comment crabe illustre les comptes : initiales colorées, ou image Gravatar</div>
+                </div>
+              </div>
+              <div id="users-avatars-content"></div>
+            </div>
+          </div>
+
+          <!-- --- Applications --- -->
+          <div class="settings-page" id="apage-apps">
+            <div class="pill-row" id="apps-subnav">
+              <button class="pill active" id="apps-tab-catalogue" onclick="setAppsTab('catalogue')">Catalogue</button>
+              <button class="pill" id="apps-tab-logos" onclick="setAppsTab('logos')">Logos</button>
+              <!-- Onglet RÉSERVÉ À L'ADMINISTRATION (lot 14, §4). Les routes qui
+                   l'alimentent vivent derrière la permission « apps.manage » :
+                   un compte ordinaire ne voit ni cet onglet, ni les archives,
+                   ni même qu'il en existe. -->
+              <button class="pill" id="apps-tab-diagnostic" onclick="setAppsTab('diagnostic')">Diagnostic</button>
+            </div>
+
+            <div id="apps-pane-catalogue">
+            <div class="block-head">
+              <div>
+                <div class="block-title">Applications</div>
+                <div class="block-sub">Testez un connecteur avant de le proposer, et choisissez qui peut l'utiliser</div>
+              </div>
+              <div class="view-switch">
+                <button class="pill active" id="apps-view-cards" onclick="setAppsView('cards')">Cartes</button>
+                <button class="pill" id="apps-view-list" onclick="setAppsView('list')">Liste</button>
+              </div>
+            </div>
+            <div class="sec-note" style="max-width:660px;margin-bottom:18px;" id="apps-pending-note"></div>
+
+            <div class="toolbar">
+              <div class="search-box">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+                <input id="apps-search" placeholder="Rechercher une application" oninput="renderAppsList()">
+              </div>
+              <label class="toolbar-field">Catégorie
+                <select id="apps-category" onchange="renderAppsList()"></select>
+              </label>
+              <label class="toolbar-field">Statut
+                <select id="apps-status" onchange="renderAppsList()">
+                  <option value="all">Tous</option>
+                  <option value="available">Disponibles</option>
+                  <option value="maintenance">En maintenance</option>
+                  <option value="pending">En attente de test</option>
+                  <option value="planned">Bientôt disponibles</option>
+                </select>
+              </label>
+              <!-- S'ajoute aux filtres ci-dessus, ne les remplace pas.
+                   Mémorisé sur le compte administrateur, pas dans le navigateur. -->
+              <label class="toolbar-check"
+                     title="Une application est « active » si au moins un compte l'a installée, ou si elle a été mise à disposition explicitement dans le Store.">
+                <input type="checkbox" id="apps-hide-inactive"
+                       onchange="setAppsHideInactive(this.checked)">
+                Masquer les applications non actives
+              </label>
+            </div>
+
+            <div id="apps-list"></div>
+            </div><!-- /apps-pane-catalogue -->
+
+            <!-- --- Logos ---
+                 Les vrais logos des services, pris SUR LE SITE DU FOURNISSEUR
+                 et jamais chez un agrégateur : interroger un tiers pour le logo
+                 d'EDF reviendrait à lui annoncer que l'utilisateur a un compte
+                 EDF. Aucune récupération automatique : tout part d'un clic
+                 d'administrateur, ici et nulle part ailleurs. -->
+            <!-- Diagnostic : ce que le navigateur avait sous les yeux au moment
+                 de l'échec. Chaque échec de récupération coûtait jusqu'ici un
+                 aller-retour complet avec l'utilisateur pour deviner ce qu'affichait la
+                 page ; ces quatre fichiers y répondent d'avance. Ils ne
+                 contiennent aucun mot de passe, aucune valeur de cookie et
+                 aucun jeton — ils peuvent être transmis tels quels. -->
+            <div id="apps-pane-diagnostic" style="display:none;">
+              <div class="block-head">
+                <div>
+                  <div class="block-title">Diagnostic</div>
+                  <div class="block-sub">Ce que le navigateur voyait au moment de l'échec — sans aucun secret</div>
+                </div>
+              </div>
+              <div class="sec-note" style="max-width:720px;margin-bottom:18px;" id="diag-note"></div>
+              <div class="toolbar">
+                <label class="tb-label" for="diag-connector">Service</label>
+                <select id="diag-connector" onchange="renderDiagnostics()"></select>
+              </div>
+              <div id="diag-list"></div>
+            </div>
+
+            <div id="apps-pane-logos" style="display:none;">
+              <div class="block-head">
+                <div>
+                  <div class="block-title">Logos</div>
+                  <div class="block-sub">Le vrai logo de chaque service, récupéré sur son propre site — jamais chez un tiers</div>
+                </div>
+                <div class="view-switch" id="logos-view-switch"></div>
+              </div>
+              <div class="sec-note" style="max-width:720px;margin-bottom:18px;" id="logos-note"></div>
+
+              <!-- Avec logo / sans logo / tous.
+                   Le compteur du bloc annonce « 8 en place, 6 manquants » : sans
+                   ce filtre, il faut retrouver les six à l'œil parmi quatre-vingts
+                   services répartis sur deux groupes — alors qu'on n'ouvre cet
+                   écran que pour combler des manques. Le choix est mémorisé sur
+                   le compte, comme le tri et le mode d'affichage. -->
+              <div class="pill-row" id="logos-filter"></div>
+
+              <div class="toolbar">
+                <button class="btn-secondary" id="logos-fetch-missing" onclick="fetchMissingLogos()">
+                  Récupérer tous les logos manquants
+                </button>
+                <button class="btn-ghost" id="logos-refetch-all" onclick="refetchAllLogos()">
+                  Tout resynchroniser
+                </button>
+              </div>
+
+              <!-- Progression d'une récupération groupée : « 3 sur 85… ».
+                   Le bouton « Arrêter » est arrivé au lot 11 : quatre-vingt-cinq
+                   sujets espacés d'une seconde, c'est une demi-heure. Lancer
+                   quelque chose qu'on ne peut plus arrêter est un piège. -->
+              <div id="logos-progress" style="display:none;margin-bottom:16px;">
+                <div class="attente">
+                  <div class="attente-barre"><div class="attente-jauge"></div></div>
+                  <div class="attente-texte" id="logos-progress-text"></div>
+                </div>
+                <button class="btn-ghost" id="logos-stop" onclick="stopLogoFetch()"
+                        style="margin-top:10px;">Arrêter</button>
+              </div>
+
+              <!-- Compte rendu final : réussites, et une raison lisible par échec. -->
+              <div id="logos-report"></div>
+              <div id="logos-list"></div>
+
+              <!-- L'envoi manuel. Le champ est caché : c'est le bouton de la
+                   ligne du connecteur qui l'ouvre, pour ne pas répéter
+                   quatorze champs de fichier à l'écran. -->
+              <input type="file" id="logo-upload" accept="image/*" style="display:none;"
+                     onchange="uploadLogoFile(event)">
+            </div>
+          </div>
+
+          <!-- --- Permissions --- -->
+          <div class="settings-page" id="apage-roles">
+            <div class="pill-row" id="roles-subnav">
+              <button class="pill active" onclick="setRolesTab('roles', this)">Gestion des rôles</button>
+              <button class="pill" onclick="setRolesTab('matrix', this)">Permissions par utilisateur</button>
+            </div>
+            <div id="roles-note" class="sec-note" style="max-width:680px;margin-bottom:18px;"></div>
+            <div id="roles-tab-roles"></div>
+            <div id="roles-tab-matrix" style="display:none;"></div>
+          </div>
+
+          <!-- --- Automatisation --- -->
+          <div class="settings-page" id="apage-cron">
+            <div class="block-head">
+              <div>
+                <div class="block-title">Automatisation</div>
+                <div class="block-sub">Planification de la récupération automatique, par connecteur</div>
+              </div>
+              <div class="view-switch">
+                <button class="pill active" id="cron-view-cards" onclick="setCronView('cards')">Cartes</button>
+                <button class="pill" id="cron-view-list" onclick="setCronView('list')">Liste</button>
+              </div>
+            </div>
+            <div id="cron-banner"></div>
+
+            <div class="toolbar">
+              <label class="toolbar-field">Tri
+                <select id="cron-sort" onchange="sortCron(this.value)">
+                  <option value="name">Connecteur</option>
+                  <option value="user">Compte</option>
+                  <option value="frequency">Fréquence</option>
+                  <option value="next">Prochaine exécution</option>
+                  <option value="last">Dernier résultat</option>
+                </select>
+              </label>
+              <label class="toolbar-check">
+                <input type="checkbox" id="cron-select-all" onchange="toggleAllCron(this.checked)">
+                Tout sélectionner
+              </label>
+              <div class="bulk-bar" id="cron-bulk" style="display:none;">
+                <span id="cron-bulk-count">0 sélectionné</span>
+                <button class="btn-mini" onclick="bulkCron({ enabled: true })">Activer</button>
+                <button class="btn-mini" onclick="bulkCron({ enabled: false })">Désactiver</button>
+                <select id="cron-bulk-frequency" onchange="renderBulkDay()">
+                  <option value="">Fréquence inchangée</option>
+                  <option value="daily">Quotidien</option>
+                  <option value="weekly">Hebdomadaire</option>
+                  <option value="monthly">Mensuel</option>
+                  <option value="quarterly">Tous les 3 mois</option>
+                  <option value="half-yearly">Tous les 6 mois</option>
+                  <option value="disabled">Désactivée</option>
+                </select>
+                <select id="cron-bulk-day" title="Jour d'exécution"></select>
+                <input type="time" id="cron-bulk-time" title="Heure d'exécution">
+                <button class="btn-mini" onclick="applyBulkSchedule()">Appliquer à la sélection</button>
+                <button class="btn-mini" onclick="bulkRunNow()">Lancer maintenant</button>
+              </div>
+            </div>
+
+            <div id="cron-list"></div>
+          </div>
+
+          <!-- --- Stockage --- -->
+          <div class="settings-page" id="apage-storage">
+            <div class="block-head">
+              <div>
+                <div class="block-title">Stockage</div>
+                <div class="block-sub">Vue d'ensemble sur une ligne, puis les trois destinations côte à côte</div>
+              </div>
+            </div>
+            <div id="admin-storage-summary"></div>
+            <div id="admin-storage-warning"></div>
+            <!-- « Tout synchroniser vers les clouds » : rattrape ce que les
+                 destinations secondaires n'ont jamais reçu, pour tous les
+                 comptes. Aucun fournisseur n'est sollicité. -->
+            <div id="admin-storage-sync"></div>
+            <div class="dest-grid" id="admin-storage-list"></div>
+          </div>
+
+          <!-- --- Sécurité --- -->
+          <div class="settings-page" id="apage-securite">
+            <div class="pill-row" id="security-subnav">
+              <button class="pill active" onclick="setSecurityTab('connexion', this)">Connexion</button>
+              <button class="pill" onclick="setSecurityTab('logs', this)">Logs de connexion</button>
+            </div>
+            <div id="security-content"></div>
+          </div>
+
+          <!-- --- SMTP --- -->
+          <div class="settings-page" id="apage-smtp">
+            <div class="block-head">
+              <div>
+                <div class="block-title">SMTP</div>
+                <div class="block-sub">Serveur d'envoi et modèles des e-mails que crabe expédie</div>
+              </div>
+            </div>
+            <div class="split-2">
+              <div id="smtp-config"></div>
+              <div id="smtp-templates"></div>
+            </div>
+          </div>
+
+          <!-- --- Logs --- -->
+          <div class="settings-page" id="apage-logs">
+            <div class="pill-row" id="logs-subnav">
+              <button class="pill active" onclick="setLogsTab('connecteurs', this)">Connecteurs</button>
+              <button class="pill" onclick="setLogsTab('application', this)">Application</button>
+              <button class="pill" onclick="setLogsTab('stockage', this)">Stockage</button>
+            </div>
+            <div id="logs-content"></div>
+          </div>
+
+          <!-- --- Support --- -->
+          <div class="settings-page" id="apage-support">
+            <div class="block-head">
+              <div>
+                <div class="block-title">Support</div>
+                <div class="block-sub">Demandes des utilisateurs, les non-lues d'abord</div>
+              </div>
+              <div class="view-switch" id="support-view-switch"></div>
+              <label class="toolbar-field">Tri
+                <select id="support-sort" onchange="sortSupport(this.value)">
+                  <option value="unread">Non-lues d'abord</option>
+                  <option value="date">Date d'ouverture</option>
+                  <option value="subject">Objet</option>
+                  <option value="user">Compte</option>
+                  <option value="status">Statut</option>
+                </select>
+              </label>
+            </div>
+            <div class="split-2">
+              <div>
+                <div class="stat-row" id="support-stats"></div>
+                <div id="support-list"></div>
+              </div>
+              <div id="support-detail"></div>
+            </div>
+          </div>
+
+          <!-- --- Système --- -->
+          <!-- Optimisation (lot 60) : cinq volets d'entretien de la machine.
+               Tout le corps est construit par renderOptimisation() : mesures
+               fraîches, réglages, et la liste des sauvegardes qui attend un
+               geste explicite. -->
+          <div class="settings-page" id="apage-optimisation">
+            <div class="page-title">Optimisation</div>
+            <div class="page-sub">Libérer ce qui ne sert plus — sans jamais toucher une session ni un document</div>
+            <div id="optimisation-content"></div>
+          </div>
+
+          <div class="settings-page" id="apage-systeme">
+            <div id="systeme-content"></div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ================= Modale de configuration d'un connecteur ================= -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="badge-logo" id="modal-logo" style="width:38px;height:38px;font-size:13px;"></div>
+      <div>
+        <div style="font-weight:500;font-size:15px;" id="modal-name"></div>
+        <div class="modal-sub" id="modal-cat"></div>
+      </div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <!-- Tout le corps de la fiche est construit par connectorSheet() : ce qui
+         s'affiche dépend entièrement de l'état du connecteur. Une phrase et un
+         bouton avant connexion ; un résumé et deux boutons après. Le reste —
+         échéance de la connexion, « Se reconnecter », choix des éléments
+         suivis, désinstallation — vit sous « Options avancées », replié. -->
+    <div id="modal-fields"></div>
+    <div class="test-result" id="modal-test-result"></div>
+    <div class="modal-actions" id="modal-actions"></div>
+    <!-- Étape de sélection : n'apparaît qu'après une découverte réussie, et
+         seulement s'il y a plus d'un élément à choisir. -->
+    <div class="modal-actions" id="modal-discovery-actions" style="display:none;">
+      <button class="btn-secondary" onclick="confirmDiscovery()" id="modal-discovery-confirm">Continuer</button>
+      <button class="btn-danger" onclick="cancelDiscovery()">Retour</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= Connexion par navigateur distant =================
+     Un vrai Chromium tourne sur le serveur, sur un écran X en mémoire, et
+     s'affiche ici via noVNC. La modale est LARGE : on y lit un formulaire de
+     connexion de fournisseur, pas un champ de crabe. -->
+<div class="modal-overlay" id="rb-overlay">
+  <div class="modal modal-wide">
+    <div class="modal-head">
+      <div class="badge-logo" id="rb-logo" style="width:38px;height:38px;font-size:13px;"></div>
+      <div>
+        <div style="font-weight:500;font-size:15px;" id="rb-name"></div>
+        <div class="modal-sub" id="rb-state"></div>
+      </div>
+      <div class="rb-countdown" id="rb-countdown"></div>
+      <button class="modal-close" onclick="cancelRemoteLogin()">✕</button>
+    </div>
+
+    <!-- UN SEUL bandeau (lot 14, §7.4).
+         Il y en avait deux, qui disaient la même chose en des termes à peine
+         différents : « Connectez-vous comme vous le feriez sur le site… » puis
+         le `hint` du manifeste, « Connectez-vous comme d'habitude… ». Celui
+         qui reste porte la seule information utile : la fenêtre se ferme
+         seule, et la connexion enregistrée vaut environ un an. -->
+    <div class="rb-banner" id="rb-banner"></div>
+
+    <!-- « Saisir mes identifiants » (§7.3a).
+         Le presse-papiers est un cul-de-sac dans les deux sens : l'API n'existe
+         pas hors contexte sécurisé, et le « Coller » du navigateur distant lit
+         un presse-papiers X que rien ne remplit. Ce bouton supprime le besoin :
+         le serveur écrit lui-même les identifiants enregistrés dans le
+         formulaire du site, par Playwright. Le mot de passe ne quitte jamais le
+         serveur — il n'est dans aucune réponse, aucun journal, aucun
+         diagnostic. -->
+    <div class="rb-actions-inline">
+      <button type="button" class="btn-secondary" id="rb-fill"
+              onclick="fillRemoteCredentials()">Saisir mes identifiants</button>
+      <span class="rb-paste-note" id="rb-fill-note"></span>
+    </div>
+
+    <div class="rb-screen" id="rb-screen">
+      <div class="rb-veil" id="rb-veil">
+        <div class="rb-spinner"></div>
+        <div id="rb-veil-text">Ouverture du navigateur…</div>
+      </div>
+    </div>
+
+    <!-- Coller un texte — VISIBLE EN PERMANENCE.
+         Ctrl+V directement dans la fenêtre distante ne produit rien : le
+         navigateur du poste ne laisse pas noVNC lire le presse-papiers sur une
+         instance servie en HTTP simple, et le raccourci collerait de toute
+         façon le presse-papiers DU SERVEUR. Or personne ne saisit un mot de
+         passe fort à la main, et le public visé range ses mots de passe dans
+         un gestionnaire : ce champ est donc la voie PRINCIPALE, pas un repli
+         qu'il faudrait penser à déplier. Le texte y est collé normalement
+         (c'est une page de crabe), puis FRAPPÉ caractère par caractère dans le
+         champ actif du site. Il fonctionne aussi bien pour un identifiant ou
+         un code reçu par SMS — d'où le libellé, qui ne parle pas de mot de
+         passe. -->
+    <div class="rb-paste" id="rb-paste">
+      <div class="rb-paste-title">Coller un texte</div>
+      <div class="rb-paste-row">
+        <input type="password" id="rb-paste-input" autocomplete="off" spellcheck="false"
+               placeholder="Collez ici (Ctrl+V)" aria-label="Texte à saisir dans le site"
+               onkeydown="onRemotePasteKey(event)">
+        <button type="button" class="btn-secondary rb-paste-send" id="rb-paste-send"
+                onclick="pasteIntoRemote()">Envoyer</button>
+      </div>
+      <div class="rb-paste-note" id="rb-paste-note">
+        Pour un code reçu par message ou un identifiant temporaire. Cliquez
+        d'abord dans le champ voulu de la fenêtre ci-dessus, collez ici
+        (Ctrl+V), puis cliquez « Envoyer ».
+      </div>
+    </div>
+
+    <!-- « Enregistrer » — n'apparaît QUE si un premier essai a montré que la
+         session n'était pas encore valable (§6.3). Le contrôle est refait à
+         l'identique : ce bouton ne le contourne pas. -->
+    <div class="rb-actions-inline" id="rb-save-row" style="display:none;">
+      <button type="button" class="btn-primary" id="rb-save"
+              onclick="saveRemoteSession()">Enregistrer</button>
+      <span class="rb-paste-note">
+        Cliquez ici une fois la connexion terminée sur le site.
+      </span>
+    </div>
+
+    <!-- Renoncer — n'apparaît qu'après TROIS vérifications restées sans preuve
+         (lot 48). Recliquer « Enregistrer » sans fin était le piège du
+         22/08/2026 : l'écran doit proposer lui-même la sortie. Le bouton ferme
+         la fenêtre, libère l'affichage, et n'enregistre rien. -->
+    <div class="rb-actions-inline" id="rb-renoncer-row" style="display:none;">
+      <button type="button" class="btn-danger" id="rb-renoncer"
+              onclick="cancelRemoteLogin()">Abandonner et fermer la fenêtre</button>
+      <span class="rb-paste-note">
+        La vérification a échoué plusieurs fois. Vous pouvez abandonner sans rien
+        perdre : rien n'est enregistré, et vous pourrez réessayer plus tard.
+      </span>
+    </div>
+
+    <div class="test-result" id="rb-result"></div>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="retryRemoteLogin()" id="rb-retry"
+              style="display:none;">Réessayer</button>
+      <!-- « Fermer / Abandonner » : disponible à TOUT moment (lot 48). Il
+           éteint le navigateur côté serveur, libère l'affichage et le verrou
+           de profil — la fenêtre ne retient jamais l'utilisateur. -->
+      <button class="btn-danger" onclick="cancelRemoteLogin()" id="rb-cancel">Fermer / Abandonner</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= Aperçu rapide d'un connecteur ================= -->
+<div class="modal-overlay" id="qv-overlay">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="badge-logo" id="qv-logo" style="width:38px;height:38px;font-size:13px;"></div>
+      <div>
+        <div style="font-weight:500;font-size:15px;" id="qv-name"></div>
+        <div class="modal-sub" id="qv-account"></div>
+      </div>
+      <button class="modal-close" onclick="closeQuickview()">✕</button>
+    </div>
+
+    <div id="qv-error-block" class="qv-error" style="display:none;">
+      <div class="qv-error-head">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+        <span id="qv-error-time"></span>
+      </div>
+      <div class="qv-error-text" id="qv-error-text"></div>
+      <!-- Le geste proposé DÉPEND de l'échec (lot 7) : « Synchroniser » sur un
+           connecteur dont la connexion a expiré rejouerait une session morte et
+           ramènerait à cette même ligne d'erreur. -->
+      <div class="qv-error-actions" id="qv-error-actions"></div>
+    </div>
+
+    <div class="qv-card">
+      <div class="qv-card-head">
+        <div class="qv-card-icon">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>
+        </div>
+        <div>
+          <div class="qv-card-title">Vos documents</div>
+          <div class="qv-card-sub">Ce service récupère vos dernières factures et garde une sauvegarde chiffrée pour vous.</div>
+        </div>
+      </div>
+      <div id="qv-docs"></div>
+      <button class="qv-open-btn" onclick="closeQuickview(); showView('documents');">
+        Voir tous mes documents
+      </button>
+    </div>
+
+    <div class="qv-card">
+      <div class="qv-info-row" id="qv-store-row">
+        <div class="qv-info-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+        </div>
+        <div>
+          <div class="qv-info-title">Voir dans le Store</div>
+          <div class="qv-info-sub">Modifier la configuration de ce connecteur</div>
+        </div>
+      </div>
+      <div class="qv-info-row" id="qv-site-row">
+        <div class="qv-info-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 010 20 15 15 0 010-20z"/></svg>
+        </div>
+        <div>
+          <div class="qv-info-title">Ouvrir le site</div>
+          <div class="qv-info-sub" id="qv-site"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= Gestion des accès à une application ================= -->
+<div class="modal-overlay" id="access-overlay">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="badge-logo" id="access-logo" style="width:38px;height:38px;font-size:13px;"></div>
+      <div>
+        <div style="font-weight:500;font-size:15px;" id="access-name"></div>
+        <div class="modal-sub">Choisir les utilisateurs autorisés</div>
+      </div>
+      <button class="modal-close" onclick="closeAccessModal()">✕</button>
+    </div>
+    <div class="access-list" id="access-list"></div>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="saveAccess()">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= Dépannage : déposer une connexion enregistrée =================
+     Paramètres → Applications → Dépannage. Ce geste vivait dans la fiche de
+     l'utilisateur, sous « Options avancées », avec la ligne de commande qui
+     produit le fichier. Il reste possible — il sauve les cas où le navigateur
+     distant ne peut pas s'ouvrir — mais c'est un outil d'administrateur. -->
+<!-- ================= Date et heure du serveur =================
+     Parametres -> Systeme -> ligne « Heure du serveur » -> Configurer.
+     Le bloc vivait en pied de page ; la modale rend la page lisible. -->
+<div class="modal-overlay" id="datetime-overlay">
+  <div class="modal">
+    <div class="modal-head">
+      <div>
+        <div style="font-weight:500;font-size:15px;">Date et heure</div>
+        <div class="modal-sub">Fuseau et formats — appliqués à tous les affichages et aux tâches planifiées</div>
+      </div>
+      <button class="modal-close" onclick="closeDatetimeModal()">✕</button>
+    </div>
+    <div class="dest-fields">
+      <div class="field"><label>Fuseau horaire</label><select id="set-timezone"></select></div>
+      <div class="field"><label>Format d'heure</label><select id="set-time-format"></select></div>
+      <div class="field"><label>Format de date</label><select id="set-date-format"></select></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="saveDisplaySettings()">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="session-overlay">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="badge-logo" id="session-logo" style="width:38px;height:38px;font-size:13px;"></div>
+      <div>
+        <div style="font-weight:500;font-size:15px;" id="session-name"></div>
+        <div class="modal-sub">Déposer une connexion enregistrée pour un compte</div>
+      </div>
+      <button class="modal-close" onclick="closeSessionModal()">✕</button>
+    </div>
+    <div class="sec-note" id="session-intro"></div>
+    <div class="field">
+      <label for="session-account">Compte concerné</label>
+      <select id="session-account"></select>
+    </div>
+    <div class="field">
+      <label>Contenu de la connexion</label>
+      <div class="session-actions">
+        <label class="btn-file">
+          <input type="file" id="session-file" accept="application/json,.json"
+                 onchange="readAdminSessionFile(event)">
+          <span>Choisir un fichier…</span>
+        </label>
+      </div>
+      <textarea class="session-paste" id="session-paste" rows="4" spellcheck="false"
+                placeholder='{"cookies":[…],"origins":[…]}'></textarea>
+      <div class="session-chosen" id="session-chosen"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="saveAdminSession()" id="session-save">Déposer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= Modale générique (mot de passe, 2FA, utilisateur…) ================= -->
+<div class="modal-overlay" id="generic-overlay">
+  <div class="modal">
+    <div class="modal-head">
+      <div>
+        <div style="font-weight:500;font-size:15px;" id="generic-title"></div>
+        <div class="modal-sub" id="generic-sub"></div>
+      </div>
+      <button class="modal-close" onclick="closeGenericModal()">✕</button>
+    </div>
+    <div id="generic-body"></div>
+    <div class="test-result" id="generic-result"></div>
+    <div class="modal-actions" id="generic-actions"></div>
+  </div>
+</div>
+
+<div class="settings-scrim" id="settings-scrim" onclick="closeSettingsMenu()"></div>
+
+<!-- ================= Personnalisation de l'accueil =================
+     Panneau latéral : une ligne par bloc, case à cocher, poignée de
+     glisser-déposer et boutons monter / descendre — ces derniers sont la
+     solution tactile, le glisser-déposer HTML5 ne fonctionnant pas sur
+     téléphone. -->
+<div class="panel-overlay" id="home-panel-overlay" onclick="closeHomePanel()"></div>
+<div class="panel" id="home-panel" role="dialog" aria-label="Personnaliser l'accueil">
+  <div class="panel-head">
+    <h2>Personnaliser l'accueil</h2>
+    <button class="panel-close" onclick="closeHomePanel()" aria-label="Fermer">✕</button>
+  </div>
+  <div class="panel-body">
+    <div class="panel-hint">
+      Cochez les blocs à afficher, faites-les glisser — ou utilisez les flèches — pour
+      changer l'ordre, et choisissez la largeur de chacun : 1 = ligne entière, ½, ⅓, ¼.
+      Ces réglages sont propres à votre compte et vous suivent d'un appareil à l'autre.
+    </div>
+    <div id="home-panel-list"></div>
+  </div>
+  <div class="panel-foot">
+    <button class="btn-secondary" id="home-panel-reset" onclick="resetHomeWidgets()">Réinitialiser la disposition par défaut</button>
+    <button class="btn-primary" onclick="closeHomePanel()">Terminé</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="/fmt.js"></script>
+<script src="/keysym.js"></script>
+<!-- Bascule cartes / liste et tri des tableaux, partagés par app.js et
+     admin.js : la même règle partout, à un seul endroit. -->
+<script src="/ui-prefs.js"></script>
+<script src="/app.js"></script>
+<script src="/admin.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  boot().catch((err) => {
+    console.error(err);
+    location.href = '/';
+  });
+});
+</script>
+</body>
+</html>

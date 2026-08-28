@@ -1,0 +1,54 @@
+{
+  "id": "free",
+  "name": "Free Internet",
+  "category": "telecom",
+  "color": "#c8102e",
+  "letters": "F",
+  "site": "subscribe.free.fr",
+  "implementation": "scraping",
+  "description": "Récupère automatiquement vos factures Freebox.",
+  "technicalNote": "Scraping de l’espace abonné (identifiant + mot de passe, sans code SMS). Parcours validé contre un compte réel le 30/07/2026.",
+  "accountIdField": "username",
+  "fields": [
+    {
+      "key": "username",
+      "identification": "identifiant",
+      "label": "Identifiant Free",
+      "type": "text",
+      "required": true,
+      "placeholder": "fbx12345678",
+      "help": "Identifiant de connexion à l'espace abonné (commence généralement par « fbx »). Il sert aussi de nom de dossier de destination."
+    },
+    {
+      "key": "password",
+      "label": "Mot de passe",
+      "type": "password",
+      "required": true,
+      "help": "Le mot de passe de votre espace abonné Free. Il est chiffré ici, jamais réaffiché, et ne sert qu'à y prendre vos factures."
+    },
+    {
+      "key": "historique",
+      "label": "Historique à récupérer",
+      "type": "history",
+      "default": "depuis",
+      "help": "Free garde plusieurs années de factures d'abonnement. crabe reprend tout une première fois, puis ne suit plus que l'année en cours."
+    }
+  ],
+  "permissions": [
+    {
+      "key": "factures",
+      "scope": "read-write",
+      "description": "Télécharge les factures PDF de votre abonnement Freebox depuis l'espace abonné Free, et les dépose sur vos destinations de stockage."
+    },
+    {
+      "key": "identifiants",
+      "scope": "read",
+      "description": "Votre identifiant et votre mot de passe Free, chiffrés au repos, utilisés uniquement pour ouvrir une session sur le portail abonné."
+    },
+    {
+      "key": "informations-compte",
+      "scope": "read",
+      "description": "Votre identifiant d'abonné (fbx…), lu sur l'espace abonné : il sert de nom de dossier de destination pour vos factures Free."
+    }
+  ]
+}

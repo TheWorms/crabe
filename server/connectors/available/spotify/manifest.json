@@ -1,0 +1,55 @@
+{
+  "id": "spotify",
+  "name": "Spotify",
+  "category": "divertissement",
+  "color": "#1ed760",
+  "letters": "SP",
+  "site": "www.spotify.com",
+  "implementation": "scraping",
+  "initialStatus": "pending",
+  "description": "Récupère automatiquement vos factures d'abonnement Spotify.",
+  "caveat": "Spotify ne conserve que les reçus des 2 dernières années, et un abonnement facturé par un tiers (opérateur, App Store) n'a pas ses factures ici : ce connecteur ne voit que les paiements faits directement à Spotify.",
+  "technicalNote": "LOT 36 (17/08/2026) — ÉCRIT MAIS JAMAIS EXERCÉ CONTRE UN COMPTE RÉEL. « initialStatus »: « pending ». Reconnaissance dans docs/reconnaissance-lot36.md §2.\n\nRECONNAISSANCE DU 17/08/2026, vrai Chromium du socle, aucun identifiant : (1) accounts.spotify.com/fr/login rend un PARCOURS NATIF (champ « Adresse e-mail » + « Continuer ») avec les liens /login/google|facebook|apple À CÔTÉ — la connexion par tiers n'est pas la seule voie. (2) Un reCAPTCHA ENTERPRISE INVISIBLE est rendu sur cette page (iframe www.google.com/recaptcha/enterprise/anchor, k=6LfCVLAU…) : il note le navigateur sans poser de challenge par défaut. Il garde la CONNEXION seule — le rejeu de session ne repasse pas par lui ; l'humain le traverse dans la fenêtre visible au moment de la capture. (3) www.spotify.com/fr/account/order-history/ redirige l'anonyme vers la connexion — mais TOUT /account/* fait pareil, témoin compris : l'existence de la page des paiements vient de la DOCUMENTATION OFFICIELLE (support.spotify.com « Consulter vos reçus »), pas du statut HTTP.\n\nLE DOCUMENT, d'après cette documentation : www.spotify.com/account/payment-history/ → sélectionner un paiement → « Gérer » → « Visualiser les reçus » → bouton « Télécharger » en bas de chaque reçu. LIMITE ÉNONCÉE PAR SPOTIFY : « Des reçus sont disponibles pour les transactions des 2 dernières années. » Le connecteur la porte dans son caveat ET dans sa déclaration de couverture (couverture.complete = false, toujours) : « tout l'historique » ne s'écrira jamais ici, parce que ce n'est jamais vrai.\n\nCE QUI N'EST PAS VÉRIFIÉ, faute de compte : la présentation exacte de l'historique des paiements derrière la session (le connecteur relève les liens aux indices génériques de documents-de-page et JOURNALISE ce que la page montre quand il ne reconnaît rien), et le FORMAT du fichier derrière « Télécharger » (PDF probable, non prouvé — %PDF- vérifié sur ce qui descend, et dit clairement quand ce n'en est pas un). L'API Web officielle ne couvre que le catalogue et la lecture : aucun point d'accès de facturation (vérifié sur la référence publique le 17/08).\n\nPOURQUOI UNE SESSION CAPTURÉE : le reCAPTCHA de connexion et une éventuelle vérification par e-mail sont des gestes d'humain ; la fenêtre visible les lui laisse, une fois. keepDomains = [spotify.com] : si la connexion empruntait Google/Facebook/Apple, ces cookies tiers seraient écartés avant chiffrement (session-state.limiterAuxDomaines).\n\nSTATUT : chargé et installable, mais « pending » (invisible aux comptes ordinaires) tant qu'un reçu n'a pas été récupéré pour de bon sur le compte réel mesuré.",
+  "remoteLogin": {
+    "url": "https://accounts.spotify.com/fr/login",
+    "verifyUrl": "https://www.spotify.com/fr/account/payment-history/",
+    "keepDomains": [
+      "spotify.com"
+    ],
+    "hint": "Connectez-vous à Spotify avec votre adresse e-mail (bouton « Continuer » sous le champ), pas par « Google », « Facebook » ni « Apple » : ces voies ne fonctionnent pas dans une fenêtre pilotée par un programme. Un code de vérification peut arriver par e-mail — gardez votre boîte ouverte à côté. Laissez la page finir de s'afficher avant d'enregistrer."
+  },
+  "fields": [
+    {
+      "key": "session",
+      "label": "Connexion à Spotify",
+      "type": "session",
+      "required": false,
+      "accept": "application/json,.json",
+      "help": "Le bouton « Se connecter à Spotify » ouvre une fenêtre de navigateur dans crabe : connectez-vous avec votre adresse e-mail Spotify, et la connexion est enregistrée d'elle-même.\nAttention : la connexion par « Google », « Facebook » ou « Apple » ne fonctionne pas dans cette fenêtre. Si c'est ainsi que vous vous connectez d'habitude, utilisez « Continuer » avec votre adresse e-mail (définissez au besoin un mot de passe Spotify depuis votre compte).\nCette connexion vaut vos identifiants : elle est chiffrée ici et n'est jamais réaffichée. Elle finira par expirer, et crabe vous demandera alors de la rouvrir."
+    },
+    {
+      "key": "historique",
+      "label": "Historique à récupérer",
+      "type": "history",
+      "default": "depuis",
+      "help": "Combien d'années remonter dans vos reçus d'abonnement. À savoir : Spotify ne conserve que les reçus des 2 dernières années — au-delà, il n'y a rien à récupérer, quel que soit ce réglage."
+    }
+  ],
+  "permissions": [
+    {
+      "key": "factures",
+      "scope": "read-write",
+      "description": "Ouvre la page « Historique des paiements » de votre compte Spotify pour y lister et télécharger vos reçus d'abonnement, puis les dépose sur vos destinations de stockage, dans un dossier par année."
+    },
+    {
+      "key": "identifiants",
+      "scope": "read",
+      "description": "La connexion de navigateur que vous avez ouverte vous-même : les cookies de session de spotify.com, chiffrés au repos, rejoués uniquement pour ouvrir votre page de paiements. Aucun mot de passe n'est stocké ici, et si votre connexion empruntait Google, Facebook ou Apple, aucun cookie de ces comptes n'est conservé."
+    },
+    {
+      "key": "operations-bancaires",
+      "scope": "read",
+      "description": "Les dates et les montants de vos paiements Spotify, tels que l'historique des paiements les affiche. Ils servent à nommer et à dater vos reçus, et à savoir lesquels ont déjà été récupérés."
+    }
+  ]
+}

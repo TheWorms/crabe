@@ -1,0 +1,41 @@
+# crabe — démarrage en une commande : docker compose up -d
+#
+# Aucune configuration préalable n'est nécessaire : la base se crée toute
+# seule, la phrase secrète est générée au premier démarrage (lisez les
+# journaux : docker compose logs crabe), et le premier écran est la création
+# de votre compte.
+
+services:
+  crabe:
+    # L'image publiée. Ou construisez localement : décommentez `build: .`
+    # et remplacez éventuellement l'image par un nom à vous.
+    image: ghcr.io/theworms/crabe:latest
+    # build: .
+
+    ports:
+      # Le port de l'application (pas un port 80 : crabe vit très bien
+      # derrière votre reverse proxy, ou tout seul sur ce port).
+      - "3000:3000"
+
+    volumes:
+      # TOUT ce qui doit survivre vit là : base, secrets, documents, profils
+      # de navigateur. Sauvegardez ce dossier, vous sauvegardez crabe.
+      - ./data:/data
+
+    environment:
+      # Voir .env.example pour la liste complète et le détail de chaque
+      # variable. Rien n'est obligatoire pour démarrer.
+      #
+      # Fixez la phrase secrète vous-même plutôt que de la laisser se
+      # générer, si vous préférez la tenir hors du volume :
+      # CRABE_MASTER_PASSPHRASE: "une-phrase-longue-et-privee"
+      #
+      # Vérification de mise à jour (coupée par défaut) — le dépôt GitHub
+      # interrogé une fois par jour au plus :
+      CRABE_UPDATE_REPO: "TheWorms/crabe"
+      TZ: "Europe/Paris"
+
+    # Chromium a besoin de plus de mémoire partagée que les 64 Mo par défaut.
+    shm_size: "1gb"
+
+    restart: unless-stopped

@@ -1,0 +1,8 @@
+{
+  "id": "sepig",
+  "name": "SEPIG",
+  "category": "energie",
+  "site": "www.sepig.fr",
+  "description": "Récupère automatiquement vos factures d'eau SEPIG.",
+  "status": "planned"
+}

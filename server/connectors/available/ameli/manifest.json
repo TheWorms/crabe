@@ -1,0 +1,56 @@
+{
+  "id": "ameli",
+  "name": "Ameli",
+  "category": "public",
+  "color": "#3b7dd8",
+  "letters": "A",
+  "site": "www.ameli.fr",
+  "implementation": "scraping",
+  "description": "Récupère automatiquement vos relevés de remboursement et vos attestations Ameli.",
+  "fields": [
+    {
+      "key": "username",
+      "identification": "identifiant",
+      "label": "Numéro de sécurité sociale",
+      "type": "text",
+      "required": true,
+      "help": "Votre numéro de sécurité sociale, celui avec lequel vous vous connectez sur le site de l'Assurance Maladie."
+    },
+    {
+      "key": "password",
+      "label": "Code personnel",
+      "type": "password",
+      "required": true,
+      "help": "Le code personnel de votre compte ameli. Il est chiffré ici, jamais réaffiché, et ne sert qu'à ouvrir votre espace pour y prendre vos relevés."
+    },
+    {
+      "key": "historique",
+      "label": "Historique à récupérer",
+      "type": "history",
+      "default": "depuis",
+      "help": "L'Assurance Maladie garde plusieurs années de relevés de remboursement. crabe reprend tout une première fois, puis ne suit plus que l'année en cours."
+    }
+  ],
+  "permissions": [
+    {
+      "key": "factures",
+      "scope": "read-write",
+      "description": "Télécharge vos relevés de remboursement de l'Assurance Maladie, puis les dépose sur vos destinations de stockage."
+    },
+    {
+      "key": "identifiants",
+      "scope": "read",
+      "description": "Votre numéro de sécurité sociale et votre code Ameli, chiffrés au repos, utilisés uniquement pour la connexion à ameli.fr."
+    },
+    {
+      "key": "documents-contractuels",
+      "scope": "read-write",
+      "description": "Récupère vos attestations de droits à l'Assurance Maladie et les dépose au même endroit que vos relevés."
+    },
+    {
+      "key": "operations-bancaires",
+      "scope": "read",
+      "description": "Les montants et dates de remboursement figurant sur vos relevés. Aucune coordonnée bancaire n'est lue."
+    }
+  ]
+}

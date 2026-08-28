@@ -1,0 +1,8 @@
+{
+  "id": "oney",
+  "name": "Oney",
+  "category": "banque",
+  "site": "www.oney.fr",
+  "description": "Récupère automatiquement vos échéanciers et relevés de paiement Oney.",
+  "status": "planned"
+}

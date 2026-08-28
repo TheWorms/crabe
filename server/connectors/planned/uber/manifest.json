@@ -1,0 +1,8 @@
+{
+  "id": "uber",
+  "name": "Uber",
+  "category": "voyage",
+  "site": "www.uber.com",
+  "description": "Récupère automatiquement les reçus de vos courses et commandes Uber.",
+  "status": "planned"
+}

@@ -1,0 +1,8 @@
+{
+  "id": "olivier-assurance",
+  "name": "L'Olivier",
+  "category": "sante",
+  "site": "www.lolivier.fr",
+  "description": "Récupère automatiquement vos avis d'échéance et attestations d'assurance auto.",
+  "status": "planned"
+}

@@ -1,0 +1,8 @@
+{
+  "id": "alma",
+  "name": "Alma",
+  "category": "banque",
+  "site": "getalma.eu",
+  "description": "Récupère automatiquement vos échéanciers et reçus de paiement Alma.",
+  "status": "planned"
+}

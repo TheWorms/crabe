@@ -1,0 +1,35 @@
+{
+  "name": "crabe",
+  "version": "0.1.0",
+  "description": "Gestionnaire de factures auto-hébergé, multi-compte",
+  "type": "commonjs",
+  "main": "server/index.js",
+  "private": true,
+  "license": "AGPL-3.0-only",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "NODE_ENV=development node --watch server/index.js",
+    "test": "node --test \"test/*.test.js\"",
+    "test:watch": "node --test --watch \"test/*.test.js\""
+  },
+  "dependencies": {
+    "archiver": "^7.0.1",
+    "better-sqlite3": "^12.4.1",
+    "express": "^4.21.2",
+    "express-session": "^1.18.1",
+    "libsodium-wrappers-sumo": "^0.7.15",
+    "node-cron": "^4.6.0",
+    "nodemailer": "^9.0.5",
+    "otplib": "^12.0.1",
+    "qrcode": "^1.5.4"
+  },
+  "allowScripts": {
+    "better-sqlite3@12.11.1": true
+  },
+  "optionalDependencies": {
+    "playwright": "^1.62.1"
+  }
+}

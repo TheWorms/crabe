@@ -1,0 +1,47 @@
+{
+  "id": "bricomarche",
+  "name": "Bricomarché",
+  "category": "shopping",
+  "site": "www.bricomarche.com",
+  "implementation": "scraping",
+  "initialStatus": "pending",
+  "description": "Récupère automatiquement les factures de vos achats Bricomarché.",
+  "technicalNote": "LOT 47 (22/08/2026) — ÉBAUCHE : la fiche existe pour que la session puisse être ouverte à la main (fenêtre « Se connecter ») et gardée dans un profil persistant ; LE PARCOURS DES DOCUMENTS N'EST PAS ÉCRIT. Lancé, le connecteur atteint la page des commandes, exige une preuve forte de compte connecté, dépose la preuve de liste (lot 31), journalise ce qu'il voit et s'arrête en le disant (aucunDocument, lot 41).\n\nMESURÉ le 22/08/2026, en visiteur anonyme, en production (sonde anonyme, docs/reconnaissance-lot47.md) — LE MUR EST LE FAIT PRINCIPAL : au fetch nu, 403 « cf-mitigated: challenge » (Cloudflare) sur TOUT le site, témoin inventé compris. Au vrai Chromium du socle : l'ACCUEIL passe (36 441 caractères rendus), mais /connexion, /mon-compte, /mon-compte/commandes ET le témoin restent sur l'interstitiel « Un instant… / Vérification de sécurité en cours » — le défi Cloudflare ne s'est pas résolu pendant la sonde. L'espace client est DERRIÈRE le mur : aucune route prouvée, aucun formulaire vu, aucune redirection d'anonyme mesurée. /mon-compte/commandes est une adresse CANDIDATE, pas une mesure.\n\nPOURQUOI L'ÉBAUCHE EXISTE QUAND MÊME : la fenêtre visible de crabe sur profil persistant sait franchir ce genre de mur à la main (recette du lot 30, PrestaShop Addons) — le jeton de passage Cloudflare vit ensuite dans le profil. La connexion manuelle dans la fenêtre visible est exactement le geste qui l'établira. CONSÉQUENCES : « verifyUrlTient » n'est PAS déclaré (rien de mesuré) — le contrôle de session repose sur la preuve forte générique (lien de déconnexion) ; si le défi Cloudflare se représente au moment du contrôle, l'enregistrement sera refusé ou non concluant — à RE-MESURER à la première session, premier candidat à adapter.\n\nNON MESURÉ, à cause du mur : la forme de l'authentification, l'adresse réelle de la liste des commandes, la forme des lignes, le format du document. Le compte de « repères de commande » du journal est un motif générique jamais vérifié.\n\nLOT 48 (23/08/2026) — LE MUR CLOUDFLARE S'EST LEVÉ pour la sonde anonyme, et la mesure contredit le lot 47 : /connexion, /mon-compte et /mon-compte/commandes rendent tous un 404 franc (« Page non trouvée ») — ces adresses N'EXISTENT PAS ; la fenêtre du 22/08 s'était ouverte sur un 404, ce qui explique la soirée. MESURÉ : le lien « Se connecter » du site pointe sur /my-account, qui REDIRIGE les anonymes vers /login (« S'Identifier | Bricomarché ») — d'où url /login, « verifyUrl » /my-account et « verifyUrlTient »: true. ATTENTION : le témoin /my-account/nawak-inexistant-42 est redirigé LUI AUSSI — la garde passe avant le routage, l'existence de la route sur session n'est pas prouvée (leçon du lot 21). NON VÉRIFIÉ sur session. L'adresse de la LISTE des commandes reste inconnue : la première session la dira.\n\nLOT 53 (24/08/2026) — LE PARCOURS NE SERA PAS ÉCRIT EN L'ÉTAT, et c'est une décision MESURÉE. Protocole de stabilité (trois lectures espacées, journal des 23-24/08 à l'appui) : les deux SEULS passages où /my-account a été servi à la lecture automatique (23/08 08:44:28 et 11:31:59) sont chacun survenus ~10 secondes après une capture de session par la fenêtre « Se connecter » (08:44:19, 11:31:49) ; TOUS les passages éloignés d'une capture fraîche sont renvoyés vers /login malgré la session enregistrée (23/08 09:13 et 11:28 ; 24/08 07:40 et 07:49 — sondes de ce lot, deux lectures à chaque fois). La liste n'est donc servie que dans la foulée immédiate d'une connexion manuelle — session très courte ou garde anti-automatisation — et une récupération qui ne tient que deux passages sur six produirait des trous silencieux : pire qu'une absence de récupération. Le message servi au renvoi (erreurRenvoiVersAuthentification, lot 50) reste JUSTE dans ce cas : la connexion est bien enregistrée, c'est le site qui refuse le passage automatique. NON MESURABLE tant qu'aucune lecture n'atteint la liste : la véracité du « 1 repère » (motif générique) et le contenu de « Mon historique d'achats » — le menu du compte porte ce libellé, distinct de « Mon compte » (journalisé les 23/08 08:44 et 11:31), son adresse n'a jamais pu être relevée. À la prochaine session ouverte à la main, relever l'adresse de cet espace AVANT toute autre chose.",
+  "fields": [
+    {
+      "key": "session",
+      "label": "Connexion à Bricomarché",
+      "type": "session",
+      "required": false,
+      "accept": "application/json,.json",
+      "help": "Le bouton « Se connecter à Bricomarché » ouvre une fenêtre de navigateur dans crabe : si une vérification de sécurité s'affiche (« Un instant… »), laissez-la se terminer ou cochez la case qu'elle propose, fermez le bandeau de cookies, puis connectez-vous avec votre e-mail et votre mot de passe Bricomarché. La connexion est conservée dans un profil de navigateur sur le serveur et n'est jamais réaffichée."
+    },
+    {
+      "key": "historique",
+      "label": "Historique à récupérer",
+      "type": "history",
+      "default": "depuis",
+      "help": "La liste de vos commandes sera relue en entier à chaque récupération quand le parcours sera écrit ; les documents déjà déposés ne seront pas repris."
+    }
+  ],
+  "remoteLogin": {
+    "url": "https://www.bricomarche.com/login",
+    "marker": "",
+    "verifyUrl": "https://www.bricomarche.com/my-account",
+    "persistent": true,
+    "hint": "Fermez le bandeau de cookies (« Continuer sans accepter »), puis connectez-vous avec votre e-mail et votre mot de passe Bricomarché. Quand votre espace client s'affiche, cliquez sur Enregistrer.",
+    "verifyUrlTient": true
+  },
+  "permissions": [
+    {
+      "key": "factures",
+      "scope": "read-write",
+      "description": "Parcourra vos commandes Bricomarché et déposera leurs factures sur vos destinations de stockage quand ce parcours sera écrit ; aujourd'hui cette fiche ouvre la connexion et ne récupère encore rien."
+    },
+    {
+      "key": "identifiants",
+      "scope": "read",
+      "description": "Votre connexion Bricomarché, conservée dans un profil de navigateur protégé sur le serveur, utilisée pour la seule lecture de votre espace client — jamais réaffichée, jamais journalisée."
+    }
+  ]
+}

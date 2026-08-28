@@ -1,0 +1,51 @@
+{
+  "id": "vinted",
+  "name": "Vinted",
+  "category": "shopping",
+  "color": "#09b1ba",
+  "letters": "V",
+  "site": "www.vinted.fr",
+  "implementation": "scraping",
+  "description": "Récupère automatiquement vos justificatifs de vente Vinted.",
+  "technicalNote": "Candidature de connecteur : livrée en « pending », elle doit être testée par un administrateur avant d’apparaître dans le Store.",
+  "initialStatus": "pending",
+  "fields": [
+    {
+      "key": "email",
+      "identification": "email",
+      "type": "email",
+      "required": true
+    },
+    {
+      "key": "password",
+      "label": "Mot de passe",
+      "type": "password",
+      "required": true,
+      "help": "Le mot de passe de votre compte Vinted. Il est chiffré ici, jamais réaffiché, et ne sert qu'à ouvrir votre compte pour y prendre vos justificatifs."
+    },
+    {
+      "key": "historique",
+      "label": "Historique à récupérer",
+      "type": "history",
+      "default": "depuis",
+      "help": "Vinted garde l'historique de vos ventes et de vos achats. crabe reprend tout une première fois, puis ne suit plus que l'année en cours."
+    }
+  ],
+  "permissions": [
+    {
+      "key": "factures",
+      "scope": "read-write",
+      "description": "Télécharge les justificatifs de vos ventes et achats Vinted, puis les dépose sur vos destinations de stockage."
+    },
+    {
+      "key": "identifiants",
+      "scope": "read",
+      "description": "Votre adresse e-mail et votre mot de passe Vinted, chiffrés au repos, utilisés uniquement pour la connexion à vinted.fr."
+    },
+    {
+      "key": "operations-bancaires",
+      "scope": "read",
+      "description": "Le montant et la date de vos transactions Vinted, tels qu'ils figurent sur les justificatifs récupérés."
+    }
+  ]
+}

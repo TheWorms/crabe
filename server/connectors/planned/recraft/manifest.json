@@ -1,0 +1,9 @@
+{
+  "id": "recraft",
+  "name": "Recraft",
+  "category": "ia",
+  "site": "www.recraft.ai",
+  "description": "Récupère automatiquement vos factures d'abonnement Recraft.",
+  "status": "planned",
+  "technicalNote": "RECONNAISSANCE lot 18 (12/08/2026) — VERDICT : ARRÊT, Turnstile à la connexion.\n\nwww.recraft.ai/profile/billing redirige (302) vers\nid.recraft.ai/realms/recraft/protocol/openid-connect/auth — un Keycloak. La\npage de connexion charge challenges.cloudflare.com : c'est un Turnstile.\n\nC'est exactement le cas que la règle du lot 18 (§7) demande de signaler sans y\ntoucher : la parade du profil de navigateur persistant existe dans le socle,\nmais elle a coûté une nuit entière sur addons-prestashop les 11-12/08/2026 et\nson coût se décide avec l'administrateur, au cas par cas.\n\nÀ REPRENDRE seulement sur décision explicite de l'administrateur."
+}

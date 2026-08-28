@@ -1,0 +1,8 @@
+{
+  "id": "kraken",
+  "name": "Kraken",
+  "category": "crypto",
+  "site": "www.kraken.com",
+  "description": "Récupère automatiquement vos relevés et justificatifs d'opérations Kraken.",
+  "status": "planned"
+}

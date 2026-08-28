@@ -1,0 +1,57 @@
+{
+  "id": "ile-aux-epices",
+  "name": "L'Île aux Épices",
+  "category": "shopping",
+  "site": "ileauxepices.com",
+  "implementation": "prestashop",
+  "description": "Récupère automatiquement les factures de vos achats d'épices.",
+  "technicalNote": "Parcours validé contre un compte réel les 10-11/08/2026, PDF téléchargés et ouverts. Connexion : https://ileauxepices.com/connexion?back=my-account · Commandes : https://ileauxepices.com/historique-commandes. Boutique PrestaShop : aucun code propre à cette boutique. Le connecteur est l'implémentation partagée server/connectors/available/prestashop/, qui sert sept boutiques et l'entrée générique. Connexion par adresse électronique et mot de passe, sans navigateur distant ni code SMS ; sessions observées de 400 jours, sans case à cocher — PrestaShop maintient une session longue par défaut. Le bandeau de cookies est fermé avant la saisie s'il est présent. Les liens de facture sont cherchés d'abord en schéma standard (index.php?controller=pdf-invoice&id_order=<numéro>), puis en schéma module (modules/<module>/pdf-invoice.php?id_order=<numéro>) ; à défaut tout lien dont l'URL contient pdf, invoice ou facture est relevé ET journalisé, pour qu'un schéma inconnu soit diagnosticable. Le tri porte sur l'URL, JAMAIS sur le texte du lien : la page porte des widgets d'avis clients et des articles dont le libellé peut dire « Facture ». Numéro, date et montant sont lus en remontant jusqu'à six ancêtres autour du lien, en s'arrêtant dès qu'un ancêtre engloberait plusieurs commandes — sans quoi la facture de juillet serait datée de celle de juin. Le contenu fait foi, pas l'en-tête : on vérifie que le fichier commence par %PDF-. Le remoteId est le numéro de commande (id_order), stable, contrairement aux identifiants volatils d'Amazon. Une connexion refusée arrête le connecteur : aucune nouvelle tentative automatique.",
+  "urls": {
+    "login": "https://ileauxepices.com/connexion?back=my-account",
+    "orders": "https://ileauxepices.com/historique-commandes"
+  },
+  "fields": [
+    {
+      "key": "email",
+      "identification": "email",
+      "type": "email",
+      "required": true
+    },
+    {
+      "key": "motDePasse",
+      "label": "Mot de passe",
+      "type": "password",
+      "required": true,
+      "help": "Votre mot de passe est chiffré ici, et jamais réaffiché. Il n'est utilisé que pour ouvrir votre espace client et y prendre vos factures."
+    },
+    {
+      "key": "historique",
+      "label": "Historique à récupérer",
+      "type": "history",
+      "default": "depuis",
+      "help": "La boutique garde toutes vos commandes. crabe reprend tout une première fois, puis ne suit plus que l'année en cours."
+    }
+  ],
+  "permissions": [
+    {
+      "key": "factures",
+      "scope": "read-write",
+      "description": "Télécharge les factures PDF de vos commandes L'Île aux Épices et les dépose sur vos destinations de stockage, dans un dossier par année. Ces factures contiennent le détail de vos achats, leur montant et votre adresse de livraison."
+    },
+    {
+      "key": "identifiants",
+      "scope": "read",
+      "description": "L'adresse électronique et le mot de passe de votre compte L'Île aux Épices, chiffrés au repos et utilisés uniquement pour ouvrir votre espace client sur la boutique. Ils ne sont jamais réaffichés ni journalisés."
+    },
+    {
+      "key": "operations-bancaires",
+      "scope": "read",
+      "description": "Les montants de vos commandes L'Île aux Épices telle que la boutique l'affiche : numéro, date et montant. Elle sert à nommer et à dater vos factures, et à savoir lesquelles ont déjà été récupérées."
+    },
+    {
+      "key": "informations-compte",
+      "scope": "read",
+      "description": "Votre adresse électronique L'Île aux Épices, qui nomme le dossier de vos documents. Aucune autre information de profil n'est lue : ni nom, ni adresse postale, ni moyen de paiement."
+    }
+  ]
+}

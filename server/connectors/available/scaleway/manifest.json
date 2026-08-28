@@ -1,0 +1,58 @@
+{
+  "id": "scaleway",
+  "name": "Scaleway",
+  "category": "hebergement",
+  "color": "#4f0599",
+  "letters": "SC",
+  "site": "console.scaleway.com",
+  "implementation": "scraping",
+  "description": "Récupère automatiquement vos factures Scaleway.",
+  "technicalNote": "Implémentation encore simulée. Une API Billing officielle existe : c’est le meilleur candidat à une implémentation réelle après OVH.",
+  "fields": [
+    {
+      "key": "accessKey",
+      "label": "Access Key",
+      "type": "password",
+      "required": true,
+      "help": "Dans la console Scaleway, ouvrez le menu de votre compte puis la section des clés d'API, et créez-en une. La console affiche alors deux valeurs : celle-ci est la première."
+    },
+    {
+      "key": "secretKey",
+      "label": "Secret Key",
+      "type": "password",
+      "required": true,
+      "help": "La seconde valeur donnée à la création de la clé. Scaleway ne l'affiche qu'une fois : notez-la avant de fermer la page."
+    },
+    {
+      "key": "organizationId",
+      "label": "Organization ID",
+      "type": "text",
+      "required": false,
+      "help": "L'identifiant de votre organisation Scaleway, visible dans les paramètres de l'organisation, dans la console. Il ressemble à une longue suite de lettres et de chiffres séparés par des tirets."
+    },
+    {
+      "key": "historique",
+      "label": "Historique à récupérer",
+      "type": "history",
+      "default": "depuis",
+      "help": "Scaleway garde toutes vos factures depuis l'ouverture de votre compte. crabe reprend tout une première fois, puis ne suit plus que l'année en cours."
+    }
+  ],
+  "permissions": [
+    {
+      "key": "factures",
+      "scope": "read-write",
+      "description": "Interroge l'API Billing de Scaleway pour récupérer vos factures, puis les dépose sur vos destinations de stockage."
+    },
+    {
+      "key": "identifiants",
+      "scope": "read",
+      "description": "Votre clé d'accès et votre clé secrète Scaleway, chiffrées au repos, utilisées uniquement pour signer les appels à l'API Billing."
+    },
+    {
+      "key": "informations-compte",
+      "scope": "read",
+      "description": "L'identifiant de votre organisation Scaleway, que vous saisissez à la configuration : il cible les factures à récupérer."
+    }
+  ]
+}

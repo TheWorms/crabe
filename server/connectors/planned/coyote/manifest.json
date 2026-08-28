@@ -1,0 +1,8 @@
+{
+  "id": "coyote",
+  "name": "Coyote",
+  "category": "voyage",
+  "site": "www.moncoyote.com",
+  "description": "Récupère automatiquement vos factures d'abonnement Coyote.",
+  "status": "planned"
+}

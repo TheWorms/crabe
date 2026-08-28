@@ -1,0 +1,64 @@
+{
+  "id": "infomaniak",
+  "name": "Infomaniak",
+  "category": "hebergement",
+  "color": "#0098ff",
+  "letters": "IK",
+  "site": "www.infomaniak.com",
+  "implementation": "scraping",
+  "initialStatus": "pending",
+  "description": "Récupère automatiquement vos factures Infomaniak — hébergement, courriel, cloud, noms de domaine.",
+  "caveat": "Vous ouvrez la connexion vous-même une fois, dans une fenêtre de navigateur, double authentification comprise.",
+  "technicalNote": "LOT 25 (13/08/2026) — TROIS ORGANISATIONS, ET DEUX D'ENTRE ELLES ÉTAIENT IGNORÉES. Le connecteur lisait UN numéro de compte, celui vers lequel la racine du manager redirige, et s'arrêtait là. Mesuré sur le compte réel : GET manager.infomaniak.com/proxy/1/accounts rend 3 organisations, toutes avec facturation (billing, type=owner), toutes joignables sur la route de facturation du lot 24 — 67 factures (2023-06 → 2026-06), 12 (2023-08 → 2026-05) et 3 (2026-06 → 2026-08). Quinze factures existaient donc et n'étaient jamais récupérées, sans qu'aucun message ne le laisse soupçonner.\n\n⚠ C'EST /proxy/1/accounts, PAS /proxy/2/. Les deux répondent 200 ; la version 2 rend un objet sans liste exploitable. /proxy/1/profile/accounts et /proxy/2/profile/accounts rendent 404.\n\nLA DÉCOUVERTE PASSE PAR LE SOCLE DU LOT 5 : étape discover(), champ multiselect « organisations », écran de sélection qui ne s'affiche que s'il y a un choix (lot 7), et le RANG VIENT DE L'INDEX (lot 9) — aucun badge n'est posé par ce connecteur. L'organisation courante est remontée en PREMIER : ses factures sont déjà rangées sous son numéro, et lui laisser le rang « principale » évite qu'un changement d'ordre chez Infomaniak ne renomme le dossier de référence.\n\nTOUTES SONT COCHÉES D'OFFICE, contrairement aux lignes Free Mobile dont seule la première l'est : chaque organisation émet SES factures, et n'en cocher qu'une reproduirait exactement le défaut corrigé ici. Chaque facture porte l'identifiant de son organisation (accountId par facture), donc son propre dossier : sans quoi trois organisations écriraient au même endroit et rien à l'arrivée ne dirait laquelle a émis quoi.\n\nREPLI SÛR : un échec de la route des organisations n'interrompt RIEN. On retombe sur l'organisation lue dans l'URL — le comportement d'avant ce lot — et on le journalise. Une organisation marquée no_access ou is_blocked n'est pas proposée : elle ne rendrait jamais de facture, et la proposer ferait une case à cocher qui ne peut qu'échouer.\n\n--- LOT 24 (13/08/2026), TOUJOURS VALABLE ---\n\nLOT 24 (13/08/2026) — LES FACTURES SONT TROUVÉES, ET LE RELEVÉ DE PAGE EST ABANDONNÉ. Les trois adresses essayées jusqu'ici (/v3/ng/accounts/invoices, /accounts/billing, /accounts/orders) rendent TOUTES « Page introuvable », session ouverte. Le connecteur ne pouvait rien trouver et annonçait « aucune nouvelle facture » à chaque exécution.\n\nOÙ ELLES SONT : pas dans le namespace Angular /v3/<compte>/ng/…. C'est l'accueil du manager qui l'a dit, avec son lien « 3 produits à payer » vers /v3/<compte>/accounts/accounting/renewal — sans /ng/. De là, l'onglet « Factures » mène à manager.infomaniak.com/v3/invoicing/<compte>/bills, qui affiche les 77 lignes du compte réel. Cette page est toutefois INEXPLOITABLE au relevé de liens : elle est peinte en composants maison (<ik-table-row>, <ik-table-cell>) et ne contient AUCUN <a href> vers un document — un bouton anonyme par ligne, et c'est tout.\n\nLA ROUTE RETENUE, relevée en écoutant les appels de la page elle-même : GET manager.infomaniak.com/proxy/2/invoicing/account/<compte>/invoices → HTTP 200, application/json, 67 factures d'un coup (per_page=500 confirme « page 1/1, total 67 » ; sans paramètre la route rend déjà tout, avec ?page=2 elle pagine à 15). Chaque élément porte id, type, status, amount_incl_tax, currency, created_at (horodatage Unix en SECONDES) et pdf = https://api.infomaniak.com/2/invoicing/invoice/pdf/<jeton>, une adresse PRÉ-SIGNÉE : téléchargée sans aucun cookie elle rend 200, application/pdf, %PDF-1.7, 161 ko. Même mécanisme que le pdfUrl d'OVHcloud. Le numéro de compte se lit sur l'adresse où la racine du manager redirige (/v3/<compte>/ng/home) ; il nomme aussi le dossier de destination.\n\nVERDICT SUR L'API OFFICIELLE : EXISTANTE MAIS HORS DE PORTÉE. (1) La documentation publique n'a pas de facturation : developer.infomaniak.com/docs/api, ouvert dans un vrai navigateur (c'est une application JavaScript, illisible en curl), liste quatorze domaines produits — AI Tools, Core, Domain & Zone, Etickets, Mail Services, Newsletter, Public Cloud, Streaming radio, Streaming video, Swiss Backup, Url shortener, VOD, kChat, kDrive, kMeet — dont aucun n'est la facturation, et sa recherche interne rend 0 résultat pour « invoice », « facture » et « billing ». (2) La route existe pourtant sur le host public, et une route témoin le prouve : api.infomaniak.com/2/invoicing/account/<compte>/invoices rend 401 « Authorization required » là où /2/invoicing/account/<compte>/nawak-inexistant-temoin rend 404 « Method not found ». Elle accepterait donc un jeton. (3) Et c'est pour ça qu'on ne la prend pas : une route qu'aucune documentation ne décrit ne permet pas de dire à l'utilisateur quel droit cocher en créant son jeton, et une aide de champ qui ne peut pas nommer le droit exact ne sert à rien (leçon du champ de clé OVH, lot 16). S'y ajoute qu'Infomaniak fait dépendre l'accès aux factures du rôle du compte, ce qu'un jeton ne dit pas. On garde donc la session, et on s'en sert pour appeler la MÊME route JSON, par le proxy du manager : la robustesse de l'API sans jeton à décrire.\n\nPOURQUOI UNE SESSION CAPTURÉE MALGRÉ UN FORMULAIRE SIMPLE (lot 21, toujours valable) : rien ne garde la porte — login.infomaniak.com/fr/login est un formulaire Angular ordinaire (input[name=login], input[name=password], data-testid=btn-connect), 0 reCAPTCHA, 0 hCaptcha, 0 Turnstile, aucun Cloudflare, aucun DataDome. Mais la console vit derrière un OAuth2 avec PKCE (/authorize?…code_challenge=…&code_challenge_method=S256) qu'un navigateur traverse seul et qu'un script devrait refaire à la main à chaque changement du flux ; et la double authentification d'Infomaniak (application mobile, SMS) est répandue sans qu'on puisse savoir de l'extérieur si un compte l'a activée. La session couvre les deux cas.\n\nPAS DE keepDomains, contrairement à Mistral et Anthropic : le parcours ne traverse aucun fournisseur d'identité tiers, tout se passe chez Infomaniak. Restreindre sans tiers à écarter risquerait de jeter un cookie utile sans rien protéger.\n\nSTATUT : ÉCRIT MAIS JAMAIS EXERCÉ CONTRE UN COMPTE RÉEL de bout en bout — la liste des factures et le téléchargement d'un PDF ont été mesurés à la main sur le compte réel, mais aucune récupération complète n'est encore passée par le planificateur. Chargé et installable, en « pending » (invisible aux comptes ordinaires) tant qu'une facture n'a pas été récupérée pour de bon.\n\nLOT 68 (28/08/2026) — LA PREUVE DE SESSION PAR LE RENVOI MESURÉ, ET UNE ADRESSE DE CONTRÔLE QUI N'EST PLUS LA RACINE. Rejeu headless de la session enregistrée : manager.infomaniak.com/ redirige un CONNECTÉ vers l'accueil de son organisation (/v3/…/ng/home), même site, page pleine — mais aucun lien de déconnexion lisible : le contrôle refusait donc une session valide (« aucun marqueur »). Sonde anonyme le même jour, profil jetable : la racine, /v3 et un témoin inexistant sont TOUS renvoyés vers login.infomaniak.com/fr/login?… (titre « Se connecter à votre console », champ mot de passe) — la garde précède le routage, comme chez Mistral : ce renvoi ne dit rien de l'existence d'une page, il dit l'absence de session, et c'est ce qu'on lui demande. verifyUrl passe de la racine à /v3 : une racine est servie à tout le monde et la preuve par la tenue ou par le renvoi n'y voudrait rien dire (garde du schéma, lot 68) ; /v3 est mesuré des deux côtés — l'anonyme en est chassé vers la connexion, le connecté y est ramené chez lui. remoteLogin.renvoiAnonyme = \"connexion\".",
+  "remoteLogin": {
+    "url": "https://manager.infomaniak.com/",
+    "verifyUrl": "https://manager.infomaniak.com/v3",
+    "hint": "La fenêtre s'ouvre sur votre espace Infomaniak : connectez-vous comme sur le site, double authentification comprise (application mobile ou SMS). Laissez la page d'accueil finir de s'afficher avant d'enregistrer.",
+    "renvoiAnonyme": "connexion"
+  },
+  "fields": [
+    {
+      "key": "session",
+      "label": "Connexion à Infomaniak",
+      "type": "session",
+      "required": false,
+      "accept": "application/json,.json",
+      "help": "Le bouton « Se connecter à Infomaniak » ouvre une fenêtre de navigateur dans crabe : connectez-vous comme sur le site, double authentification comprise (application mobile ou SMS), et la connexion est enregistrée d'elle-même.\nCette connexion vaut vos identifiants : elle est chiffrée ici et n'est jamais réaffichée. Elle finira par expirer, et crabe vous demandera alors de la rouvrir."
+    },
+    {
+      "key": "organisations",
+      "label": "Organisations à récupérer",
+      "type": "multiselect",
+      "source": "discover",
+      "unit": "organisation",
+      "unitFeminine": true,
+      "required": false,
+      "notice": "Chaque organisation a sa propre facturation, et ses factures sont rangées dans un dossier à son nom. Décocher une organisation ne supprime rien de ce qui a déjà été récupéré : crabe cesse simplement d'aller y chercher les nouveautés.",
+      "help": "La liste est établie après connexion, à partir des organisations auxquelles votre compte Infomaniak donne accès. Une organisation ouverte plus tard sera ajoutée toute seule à cette sélection, et signalée dans les journaux. Si votre compte n'en a qu'une, cet écran ne s'affiche pas."
+    },
+    {
+      "key": "historique",
+      "label": "Historique à récupérer",
+      "type": "history",
+      "default": "depuis",
+      "help": "Combien d'années remonter dans vos factures Infomaniak. crabe reprend tout une première fois, puis ne va plus chercher que les nouveautés."
+    }
+  ],
+  "permissions": [
+    {
+      "key": "factures",
+      "scope": "read-write",
+      "description": "Lit la liste de vos factures dans votre espace Infomaniak et télécharge leurs PDF, puis les dépose sur vos destinations de stockage."
+    },
+    {
+      "key": "identifiants",
+      "scope": "read",
+      "description": "La connexion de navigateur que vous avez ouverte vous-même : les cookies de session d'Infomaniak, chiffrés au repos, rejoués uniquement pour lire votre facturation. Aucun mot de passe n'est stocké ici."
+    },
+    {
+      "key": "informations-compte",
+      "scope": "read",
+      "description": "Le numéro de votre compte Infomaniak, lu sur l'adresse de votre espace, qui nomme le dossier de destination de vos factures."
+    }
+  ]
+}

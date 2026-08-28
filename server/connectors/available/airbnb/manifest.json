@@ -1,0 +1,56 @@
+{
+  "id": "airbnb",
+  "name": "Airbnb",
+  "category": "voyage",
+  "color": "#ff5a5f",
+  "letters": "AB",
+  "site": "www.airbnb.fr",
+  "implementation": "scraping",
+  "initialStatus": "pending",
+  "description": "Récupère automatiquement les reçus de vos séjours Airbnb.",
+  "caveat": "Airbnb refuse la connexion « par Google » à un programme. Si votre compte passe par Google, définissez d'abord un mot de passe Airbnb pour vous connecter par e-mail. Vous ouvrez la connexion vous-même, une fois.",
+  "technicalNote": "LOT 35 (15/08/2026) — ÉCRIT MAIS JAMAIS EXERCÉ CONTRE UN COMPTE RÉEL. « initialStatus »: « pending ». Reconnaissance dans docs/reconnaissance-lot35.md §1.\n\nRECONNAISSANCE DU 15/08/2026, vrai Chromium du socle, aucun identifiant, aucune tentative de connexion (une seule adresse bidon pour mesurer le refus de Google). (1) www.airbnb.fr/login répond 200, servi par nginx, AUCUN dispositif anti-robot : pas de DataDome, pas de Cloudflare, pas de captcha rendu, zéro script de garde tiers. Le formulaire porte un champ e-mail natif (input[type=email] présent au chargement) EN PLUS des boutons Google/Apple/téléphone. (2) La page cible, account-settings/payments/your-payments, s'ouvre elle aussi sans garde (texte 1424, aucun captcha). (3) LE DOCUMENT EST UN PDF : Airbnb génère un reçu téléchargeable (« Download PDF version », nommé « Airbnb Travel Receipt <ID>.pdf »). Sur le compte réel mesuré, relevé le 14/08, chaque paiement de la page porte un lien receipt-on-demand avec bill_token, tender_token, product_id.\n\nL'OBSTACLE MESURÉ, ET IL N'EST PAS CHEZ AIRBNB : le compte réel mesuré est lié à Google, et Google BLOQUE NET un navigateur piloté sur sa page de connexion — mesuré avec une adresse bidon : le clic « Suivant » redirige vers /v3/signin/rejected, « Ce navigateur ou cette application ne sont peut-être pas sécurisés ». C'est un blocage dur, connu, qui ne se contourne pas. Le drapeau --disable-blink-features=AutomationControlled ne le lève pas (le refus arrive APRÈS la saisie de l'adresse, sur le jugement du navigateur). D'où le caveat : la connexion doit être NATIVE (mot de passe Airbnb), pas « par Google ». Décision de l'utilisateur, pas de crabe.\n\nPOURQUOI UNE SESSION CAPTURÉE plutôt qu'un mot de passe stocké : la connexion peut traverser un fournisseur d'identité tiers, et de toute façon un code par e-mail ou une double authentification peuvent s'intercaler — rien qu'un connecteur puisse saisir seul. La session capturée dans la fenêtre visible couvre tous les cas. remoteLogin.keepDomains = [airbnb.fr, airbnb.com] : si un jour la connexion empruntait Google, la photo de fin de parcours emporterait sinon la session Google de l'utilisateur, dont crabe n'a aucun usage ; ces cookies sont écartés avant même d'être chiffrés (session-state.limiterAuxDomaines).\n\nLE RELEVÉ : route déclarée receipt-on-demand (documents-de-page.js avec l'option route), parce que la forme EXACTE du lien est connue du relevé réel. Le connecteur télécharge le lien, vérifie %PDF- sur ce qui descend, et DIT clairement si ce n'est pas un PDF — la mécanique de téléchargement derrière la session (le receipt-on-demand rend-il le PDF directement ou une page à imprimer ?) n'a PAS pu être vérifiée sans compte, et c'est le seul point qui reste. remoteId = l'identifiant lu dans l'adresse du reçu (referenceDepuisLien), stable ; à défaut l'empreinte du lien.\n\nCE QUI N'EST PAS VÉRIFIÉ : le contenu exact de la page des paiements DERRIÈRE la session (la présentation de la liste par année, le texte de la ligne qui porte la date et le montant) et la réponse réelle du lien receipt-on-demand. Le relevé passe donc par documents-de-page.js et DIT quand il n'a rien reconnu, au lieu d'annoncer « 0 reçu » comme un fait.\n\nSTATUT : chargé et installable, mais « pending » (invisible aux comptes ordinaires) tant qu'un reçu n'a pas été récupéré pour de bon.",
+  "remoteLogin": {
+    "url": "https://www.airbnb.fr/login",
+    "verifyUrl": "https://www.airbnb.fr/account-settings/payments/your-payments",
+    "keepDomains": [
+      "airbnb.fr",
+      "airbnb.com"
+    ],
+    "hint": "Connectez-vous à Airbnb dans cette fenêtre. ⚠ Si votre compte passe par « Google », ce chemin ne fonctionne pas pour un programme : utilisez plutôt « Continuer avec un e-mail » (définissez au besoin un mot de passe Airbnb depuis Compte → Connexion et sécurité). Un code de vérification peut arriver par e-mail — gardez votre boîte ouverte à côté. Laissez la page finir de s'afficher avant d'enregistrer."
+  },
+  "fields": [
+    {
+      "key": "session",
+      "label": "Connexion à Airbnb",
+      "type": "session",
+      "required": false,
+      "accept": "application/json,.json",
+      "help": "Le bouton « Se connecter à Airbnb » ouvre une fenêtre de navigateur dans crabe : connectez-vous à Airbnb par e-mail, et la connexion est enregistrée d'elle-même.\nAttention : Airbnb ne laisse pas un programme se connecter par « Google ». Si c'est ainsi que vous vous connectez d'habitude, définissez d'abord un mot de passe Airbnb (Compte → Connexion et sécurité), puis connectez-vous par e-mail dans la fenêtre.\nCette connexion vaut vos identifiants : elle est chiffrée ici et n'est jamais réaffichée. Elle finira par expirer, et crabe vous demandera alors de la rouvrir."
+    },
+    {
+      "key": "historique",
+      "label": "Historique à récupérer",
+      "type": "history",
+      "default": "depuis",
+      "help": "Combien d'années remonter dans vos reçus de séjours. crabe reprend tout une première fois, puis ne va plus chercher que les nouveautés."
+    }
+  ],
+  "permissions": [
+    {
+      "key": "factures",
+      "scope": "read-write",
+      "description": "Ouvre la page des paiements de votre compte Airbnb pour y lister et télécharger les reçus de vos séjours, puis les dépose sur vos destinations de stockage, dans un dossier par année."
+    },
+    {
+      "key": "identifiants",
+      "scope": "read",
+      "description": "La connexion de navigateur que vous avez ouverte vous-même : les cookies de session d'airbnb.fr, chiffrés au repos, rejoués uniquement pour ouvrir votre page de paiements. Aucun mot de passe n'est stocké ici, et si votre connexion empruntait Google, aucun cookie de votre compte Google n'est conservé."
+    },
+    {
+      "key": "operations-bancaires",
+      "scope": "read",
+      "description": "Les dates et les montants de vos paiements Airbnb, tels que la page des paiements les affiche. Ils servent à nommer et à dater vos reçus, et à savoir lesquels ont déjà été récupérés."
+    }
+  ]
+}
