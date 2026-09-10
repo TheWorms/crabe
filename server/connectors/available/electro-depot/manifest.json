@@ -1,0 +1,47 @@
+{
+  "id": "electro-depot",
+  "name": "Electro Dépôt",
+  "category": "shopping",
+  "site": "www.electrodepot.fr",
+  "implementation": "scraping",
+  "initialStatus": "pending",
+  "description": "Récupère automatiquement les factures de vos achats Electro Dépôt.",
+  "technicalNote": "LOT 47 (22/08/2026) — ÉBAUCHE : la fiche existe pour que la session puisse être ouverte à la main (fenêtre « Se connecter ») et gardée dans un profil persistant ; LE PARCOURS DES DOCUMENTS N'EST PAS ÉCRIT. Lancé, le connecteur atteint la page des commandes, dépose la preuve de liste (lot 31), journalise ce qu'il voit et s'arrête en le disant (aucunDocument, lot 41).\n\nMESURÉ le 22/08/2026, en visiteur anonyme, en production (sonde anonyme, docs/reconnaissance-lot47.md) — sonde DISCRIMINANTE, boutique d'ossature Magento : www.electrodepot.fr répond 200 au fetch nu (« server: fasterize », CloudFront devant), aucun marqueur anti-robot. /customer/account ET /sales/order/history rendent 302 vers /customer/account/login/ (elles EXISTENT et redirigent les anonymes) ; le témoin inventé /customer/account/nawak-inexistant-42 rend un 404 franc — rester sur /sales/order/history est donc un signe de session : d'où « verifyUrl » et « verifyUrlTient »: true. La page de connexion (« Compte Client - Electro Dépôt ») montre un champ e-mail (input#email) ; AUCUN champ de mot de passe n'était visible au chargement — second écran ou rendu différé, la forme exacte reste à voir à la première connexion manuelle. DEUX widgets de captcha sont MONTÉS sur cette page de connexion : connexion à la main seulement, jamais de soumission programmée.\n\nNON MESURÉ, faute de session : la forme de la liste des commandes, le libellé des liens de facture, le format du document, la pagination, ce que le site demande APRÈS une connexion réussie. Le compte de « repères de commande » du journal est un motif générique jamais vérifié.\n\nLOT 48 (23/08/2026) — la fenêtre du 22/08 a été refermée 16 secondes après son ouverture : la « verifyUrl » /sales/order/history (redirection anonyme mesurée au lot 47, témoin 404 franc — la meilleure mesure anonyme possible) n'a JAMAIS été essayée sur session. Rien à corriger sur pièces : à vérifier à la prochaine session.\n\nLOT 52 (24/08/2026) — ADRESSE CORRIGÉE et compte vide dit clairement, mesuré sur une session réelle : /sales/order/history répond mais ne liste rien — l'espace client réel est une application peinte côté client sur /customer/account/#/order (« Mes commandes » / « Toutes mes commandes »). La page est servie au compte et affiche son état vide (« Vous n'avez pas de commande en cours ») : AUCUNE commande en ligne — les achats faits en magasin ne remontent pas sur le site. Le comptage 0 est donc EXACT, et le connecteur le dit comme un fait (jamais « aucune nouvelle facture », jamais une panne inventée). Le connecteur attend que l'application ait peint son espace (compter dans une coquille vide dirait 0 à tort) et reconnaît /customer/account/ suivi de la fin, d'une query ou d'un fragment — jamais un simple préfixe, /customer/account/login/ commence pareil. LA RÉCUPÉRATION N'EST PAS ÉCRITE, et c'est un choix : aucun passage réel ne pourrait la prouver sur un compte sans commande en ligne — du code jamais exercé qui se présenterait comme fonctionnel serait un piège. Elle s'écrira le jour où une commande en ligne réelle existera.",
+  "fields": [
+    {
+      "key": "session",
+      "label": "Connexion à Electro Dépôt",
+      "type": "session",
+      "required": false,
+      "accept": "application/json,.json",
+      "help": "Le bouton « Se connecter à Electro Dépôt » ouvre une fenêtre de navigateur dans crabe : fermez le bandeau de cookies s'il s'affiche, puis connectez-vous avec votre e-mail et votre mot de passe Electro Dépôt (un captcha peut vous être demandé — résolvez-le normalement). La connexion est conservée dans un profil de navigateur sur le serveur et n'est jamais réaffichée."
+    },
+    {
+      "key": "historique",
+      "label": "Historique à récupérer",
+      "type": "history",
+      "default": "depuis",
+      "help": "La liste de vos commandes sera relue en entier à chaque récupération quand le parcours sera écrit ; les documents déjà déposés ne seront pas repris."
+    }
+  ],
+  "remoteLogin": {
+    "url": "https://www.electrodepot.fr/customer/account/#/order",
+    "marker": "",
+    "verifyUrl": "https://www.electrodepot.fr/customer/account/#/order",
+    "verifyUrlTient": true,
+    "persistent": true,
+    "hint": "Fermez d'abord le bandeau de cookies s'il s'affiche, puis connectez-vous avec votre e-mail et votre mot de passe Electro Dépôt (résolvez le captcha si la page en montre un). Quand votre espace client s'affiche, enregistrez la connexion."
+  },
+  "permissions": [
+    {
+      "key": "factures",
+      "scope": "read-write",
+      "description": "Parcourra vos commandes Electro Dépôt et déposera leurs factures sur vos destinations de stockage quand ce parcours sera écrit ; aujourd'hui cette fiche ouvre la connexion et ne récupère encore rien."
+    },
+    {
+      "key": "identifiants",
+      "scope": "read",
+      "description": "Votre connexion Electro Dépôt, conservée dans un profil de navigateur protégé sur le serveur, utilisée pour la seule lecture de votre espace client — jamais réaffichée, jamais journalisée."
+    }
+  ]
+}

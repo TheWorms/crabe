@@ -1,0 +1,48 @@
+{
+  "id": "proxmox",
+  "name": "Proxmox",
+  "category": "hebergement",
+  "color": "#e57000",
+  "letters": "PX",
+  "site": "shop.proxmox.com",
+  "implementation": "scraping",
+  "initialStatus": "pending",
+  "description": "Récupère automatiquement les factures de vos abonnements de support Proxmox.",
+  "caveat": "Il s'agit de la boutique de licences Proxmox (shop.proxmox.com), pas de vos serveurs : un serveur Proxmox n'émet aucune facture.",
+  "technicalNote": "LOT 21 (13/08/2026) — ÉCRIT MAIS JAMAIS EXERCÉ CONTRE UN COMPTE RÉEL. Chargé et installable, mais en « pending » (invisible aux comptes ordinaires) tant qu'aucune facture n'a été récupérée pour de bon.\n\nLOT 22 (13/08/2026) — PREMIER ESSAI RÉEL, ET LA ROUTE DE PDF ÉTAIT FAUSSE. Le lot 21 écrivait dl.php?type=invoice&id=<n> et l'appelait « la route standard de WHMCS ». Elle ne l'est pas. Mesurée derrière une VRAIE session, avec les identifiants enregistrés : type=invoice rend 200, text/html, 22 721 octets — la page d'accueil de l'espace client, pour TOUTES les factures, pas seulement pour celle qui avait été signalée. La vraie adresse se lit sur la page d'une facture, où le bouton « Télécharger » pointe dl.php?type=i&id=<n> : 200, application/pdf, ~93 ko, content-disposition attachment; filename=\"Facture-<n>.pdf\", et les octets commencent par %PDF-. Deux autres candidates mesurées et écartées : viewinvoice.php?id=<n>&pdf=1 rend du HTML (7,8 ko), dl.php?type=inv rend la même page d'accueil que type=invoice.\n\nCE QUE LE LOT 21 AVAIT VU JUSTE : il refusait d'affirmer que dl.php servait un PDF, et le contrôle de signature a fait exactement son travail — il a empêché de déposer dix pages d'accueil sous des noms en « .pdf ». Ce que le compte rendu disait mal, en revanche : il nommait UNE facture (« la 23366 ») là où la route était fausse pour toutes. La 23366 n'avait rien de particulier — elle était la première de la liste, et la boucle s'arrêtait sur elle. Corrigé aussi : une facture qui ne descend pas n'interrompt plus les autres, et zéro document récupéré alors qu'il y en avait à prendre reste un échec explicite.\n\nLE TABLEAU RÉEL (10 lignes, compte réel mesuré) : une colonne de statut en toutes lettres — 9 PAYÉE, 1 ANNULÉE (« C-23365 »). L'annulée a un PDF comme les autres, la boutique le sert de la même façon, et c'est une pièce comptable à part entière : rien à écarter. Les liens du tableau ne portent QUE viewinvoice.php?id= (« Afficher la facture ») ; l'adresse du PDF est donc composée, pas relevée.\n\nROUTES MESURÉES AVANT TOUTE CONNEXION (lot 21, toujours vraies) : /viewinvoice.php?id=1 et /clientarea.php?action=invoices rendent 302 vers la connexion — donc elles existent et sont gardées — là où /nawak-inexistant.php rend un vrai 404 d'Apache. ⚠ Mais /clientarea.php?action=nawak redirige AUSSI : la garde précède le routage de l'action, et un 302 ne prouve donc rien sur l'action elle-même. C'est exactement le piège dans lequel la route de PDF est tombée : elle répondait, elle existait, et elle ne servait pas ce qu'on croyait.\n\nRECONNAISSANCE DU 13/08/2026, depuis le conteneur, aucune tentative de connexion. WHMCS CONFIRMÉ, et pas par le chemin clientarea.php : le serveur pose lui-même un cookie WHMCSvVl9CFfEzwuY dès la première réponse. Server: Apache, aucun Cloudflare, aucun DataDome, X-Frame-Options: SAMEORIGIN.\n\nFORMULAIRE relevé dans un vrai Chromium : POST /index.php?rp=/login, champ caché « token » (jeton anti-rejeu régénéré à chaque affichage), input[name=username] de type email, input[name=password], input#login[type=submit]. Le formulaire est REMPLI dans le navigateur et non fabriqué : le jeton part alors tout seul, et il n'y a rien à relire à chaque mise à jour de WHMCS. Même raison qu'Invoice Ninja.\n\nAUCUN CAPTCHA MONTÉ, et c'est la mesure qui décide de la méthode. Le modèle WHMCS de la boutique déclare bien une clé reCAPTCHA dans son JavaScript, mais en render=explicit : le widget n'est instancié que si un conteneur le demande. Sur la page de connexion : 0 .g-recaptcha, 0 [data-sitekey], 0 iframe reCAPTCHA, 0 hcaptcha, 0 turnstile. « Le site sait afficher un captcha » n'est pas « le site en affiche un ici ». D'où le choix d'identifiants stockés plutôt qu'une session à renouveler.\n\nWHMCS sait poser un captcha après plusieurs échecs de connexion : le connecteur le détecte et le nomme, sans quoi des identifiants parfaitement bons seraient rapportés comme refusés.",
+  "fields": [
+    {
+      "key": "email",
+      "identification": "email",
+      "type": "email",
+      "required": true,
+      "help": "L'adresse avec laquelle vous vous connectez à shop.proxmox.com, la boutique où s'achètent les abonnements de support.\n⚠ Ce n'est ni le compte d'un de vos serveurs Proxmox, ni celui du forum : ce sont trois comptes distincts, qui portent souvent la même adresse."
+    },
+    {
+      "key": "password",
+      "label": "Mot de passe",
+      "type": "password",
+      "required": true,
+      "help": "Le mot de passe de votre compte sur la boutique shop.proxmox.com. Si vous l'avez oublié, utilisez « Forgot Password? » sur cette page — la boutique est en anglais.\nIl est chiffré ici et n'est jamais réaffiché."
+    },
+    {
+      "key": "historique",
+      "label": "Historique à récupérer",
+      "type": "history",
+      "default": "depuis",
+      "help": "Combien d'années remonter dans vos factures Proxmox. crabe reprend tout une première fois, puis ne va plus chercher que les nouveautés."
+    }
+  ],
+  "permissions": [
+    {
+      "key": "factures",
+      "scope": "read-write",
+      "description": "Ouvre votre espace client de la boutique Proxmox pour y lister et télécharger vos factures, puis les dépose sur vos destinations de stockage."
+    },
+    {
+      "key": "identifiants",
+      "scope": "read",
+      "description": "L'adresse électronique et le mot de passe de votre compte sur la boutique Proxmox, chiffrés au repos et utilisés uniquement pour ouvrir la session sur shop.proxmox.com."
+    }
+  ]
+}

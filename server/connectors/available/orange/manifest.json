@@ -1,0 +1,51 @@
+{
+  "id": "orange",
+  "name": "Orange",
+  "category": "telecom",
+  "color": "#ff7900",
+  "letters": "O",
+  "site": "espace-client.orange.fr",
+  "implementation": "scraping",
+  "description": "Récupère automatiquement vos factures Orange, Livebox et Sosh.",
+  "fields": [
+    {
+      "key": "username",
+      "identification": "identifiant",
+      "label": "Adresse e-mail ou numéro",
+      "type": "text",
+      "required": true,
+      "help": "L'identifiant de votre espace client Orange : votre adresse électronique ou votre numéro de mobile, selon ce que vous utilisez pour vous connecter."
+    },
+    {
+      "key": "password",
+      "label": "Mot de passe",
+      "type": "password",
+      "required": true,
+      "help": "Le mot de passe de votre espace client Orange. Il est chiffré ici, jamais réaffiché, et ne sert qu'à y prendre vos factures."
+    },
+    {
+      "key": "historique",
+      "label": "Historique à récupérer",
+      "type": "history",
+      "default": "depuis",
+      "help": "Orange garde plusieurs années de factures. crabe reprend tout une première fois, puis ne suit plus que l'année en cours."
+    }
+  ],
+  "permissions": [
+    {
+      "key": "factures",
+      "scope": "read-write",
+      "description": "Télécharge vos factures Orange (mobile, Livebox, Sosh) depuis l'espace client, puis les dépose sur vos destinations de stockage."
+    },
+    {
+      "key": "identifiants",
+      "scope": "read",
+      "description": "Votre identifiant et votre mot de passe Orange, chiffrés au repos, utilisés uniquement pour la connexion à l'espace client."
+    },
+    {
+      "key": "informations-compte",
+      "scope": "read",
+      "description": "Le numéro de ligne ou de contrat rattaché à votre compte Orange : il nomme le dossier de destination de chaque abonnement."
+    }
+  ]
+}

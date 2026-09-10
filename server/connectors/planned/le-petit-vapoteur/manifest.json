@@ -1,0 +1,10 @@
+{
+  "id": "le-petit-vapoteur",
+  "name": "Le Petit Vapoteur",
+  "category": "shopping",
+  "site": "www.lepetitvapoteur.com",
+  "description": "Récupère automatiquement les factures de vos achats Le Petit Vapoteur.",
+  "technicalNote": "Boutique PrestaShop, mais ÉCARTÉE du connecteur partagé : protection Cloudflare qui ferme la connexion avant la saisie (vérifié le 11/08/2026). Volontairement sans « implementation »: « prestashop » — la déclarer la rendrait installable et elle échouerait à tous les coups. Reste annoncée avec sa réserve plutôt que promise puis cassée.",
+  "status": "planned",
+  "caveat": "Cette boutique est protégée par un filtre anti-robot qui ferme la connexion avant même la saisie du mot de passe : crabe ne peut pas y accéder pour l'instant."
+}

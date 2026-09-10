@@ -1,0 +1,52 @@
+{
+  "id": "bitstamp",
+  "name": "Bitstamp",
+  "category": "crypto",
+  "color": "#009e3d",
+  "letters": "BS",
+  "site": "www.bitstamp.net",
+  "implementation": "api",
+  "description": "Reconstitue vos relevés mensuels d'opérations Bitstamp à partir de votre historique de compte.",
+  "caveat": "Bitstamp n'émet aucune facture : crabe met votre historique d'opérations en forme et le signale en tête de chaque page. Ce n'est pas un document émis par Bitstamp.",
+  "technicalNote": "LOT 27 (13/08/2026) — since_timestamp CORRIGÉ, ET RETIRÉ. Le test de connexion passait, la vraie récupération échouait sur « Failed to convert since_timestamp parameter. » : le connecteur envoyait la borne basse en MILLISECONDES (depuis.getTime()), Bitstamp l'attend en SECONDES. Défaut d'origine, écrit au lot 19 ; invisible jusqu'au lot 23 parce que le premier passage de « depuis la dernière récupération » ne pose aucune borne.\n\nSURTOUT : convertir en secondes ne suffisait pas. MESURÉ contre le compte réel le 13/08/2026, sonde en lecture seule — since_timestamp en secondes sur une borne plus ancienne que 30 jours rend « since_timestamp parameter must be higher than <maintenant moins 30 jours> ». Le paramètre ne couvre donc QUE le dernier mois, alors que les fenêtres de crabe tombent toujours sur un 1er janvier (connectors/history.js). Il est retiré : la fenêtre est appliquée par crabe sur les dates rendues par l'API. Les six variantes essayées : sans paramètre → 200 ; millisecondes → « Failed to convert » ; secondes (nombre et chaîne) → « must be higher than » ; secondes il y a 10 jours → 200 ; secondes il y a 5 ans → « must be higher than ».\n\nLOT 23 (13/08/2026) — VALIDÉ SUR LE COMPTE RÉEL, ET PUBLIÉ. Exécution du 13/08 à 07:29 (run_logs) : clé d'API acceptée, 891 lignes de solde lues, dernière opération le 23/04/2026, puis **4 factures récupérées**. C'est la condition qui lève l'attente : « initialStatus » disparaît du manifeste, et la migration 27 remet la ligne de catalogue sur « available » — sans quoi elle serait restée sur « pending » pour toujours, syncCatalog() n'écrasant jamais une ligne existante.\n\nLOT 21 (13/08/2026) — PREMIER ESSAI RÉEL, ET UN VRAI DÉFAUT CORRIGÉ. Six tentatives dans run_logs le 12/08 au soir, trois griefs successifs, et c'est leur ORDRE qui informe : « Wrong API key format » (21:06), puis « API key not found » ×4 (21:09 à 21:42), puis « Content-Type header should not be present » (21:44). Le troisième ne parle plus de la clé : le serveur la reconnaît et refuse la REQUÊTE. Autrement dit, la clé réelle a fini par être acceptée, et c'est crabe qui était en faute.\n\nLA CAUSE : fetch attribue d'office « text/plain;charset=UTF-8 » à tout corps de type CHAÎNE, sans exception pour la chaîne vide. Le connecteur passait body: '' sur les appels sans paramètre (/balance/, le premier de la vérification de clé) — un type de contenu partait donc, que la signature n'avait pas pris en compte. Corrigé : plus aucun body quand il n'y a rien à envoyer (optionsDeRequete). Le test du lot 20 ne pouvait pas le voir, il examinait nos en-têtes et non ceux reçus ; le nouveau mesure ce qui arrive à un serveur d'écho local.\n\nDeux autres corrections tirées du même journal : la clé et le secret sont débarrassés de leurs espaces de bord (« Wrong API key format » est le grief typique d'un retour à la ligne collé par erreur), et le message d'échec distingue désormais un grief de CLÉ d'un grief de REQUÊTE — avant, les trois cas sortaient sous « vérifiez votre clé », ce qui envoyait l'utilisateur vérifier trois fois une clé qui n'avait plus rien à se reprocher.\n\nCE QUE BITSTAMP DONNE : un journal d'opérations, jamais une facture. Aucune route de document, aucun PDF officiel — c'est une API de place de marché, pas de facturation. D'où le relevé reconstitué (connectors/releve-reconstitue.js), avec son bandeau d'avertissement en tête de CHAQUE page.\n\nDÉCOUPE : un relevé par MOIS CIVIL RÉVOLU. Le mois en cours est écarté — un relevé de juillet produit le 12 juillet serait incomplet, et comme son identifiant serait déjà connu il ne serait jamais regénéré : les opérations du 13 au 31 disparaîtraient de tout document (voir releve-reconstitue.parMoisRevolus).\n\nAUTHENTIFICATION, vérifiée le 12/08/2026 : HMAC-SHA256, pas un simple jeton. Un appel sans signature rend 403 {\"status\":\"error\",\"reason\":\"Missing key, signature and nonce parameters\",\"code\":\"API0000\"} — constaté sur /balance/, /user_transactions/ et /crypto-transactions/. Une route publique (/ticker/btceur/) répond 200 : l'API est joignable, rien ne la garde.\n\nCinq en-têtes exigés : X-Auth (« BITSTAMP <clé> »), X-Auth-Signature, X-Auth-Nonce (36 caractères minuscules, unique dans une fenêtre de 150 s), X-Auth-Timestamp (millisecondes UTC), X-Auth-Version (« v2 »). ⚠ La chaîne signée est une CONCATÉNATION SANS SÉPARATEUR, dans cet ordre exact : \"BITSTAMP \" + clé + verbe + hôte + chemin + requête + type de contenu + nonce + horodatage + version + corps. Le type de contenu ne s'ajoute PAS quand le corps est vide. Une pièce à la mauvaise place et le serveur rend une erreur indiscernable d'une clé fausse.\n\nLa réponse porte X-Server-Auth-Signature : le connecteur la VÉRIFIE (HMAC de nonce + horodatage + type de contenu de la réponse + corps). Sans ce contrôle, un intermédiaire pourrait servir un historique de son choix, et le relevé produit le recopierait sans broncher.\n\nHISTORIQUE : POST /api/v2/user_transactions/, paramètres offset, limit, sort, since_timestamp, since_id. Pagination par offset. ⚠ since_timestamp est plafonné à 30 jours par le serveur (mesuré au lot 27) : crabe ne s'en sert pas.\n\nCE QUI N'EST PAS VÉRIFIÉ : la profondeur réellement servie, le comportement de offset au-delà de quelques milliers de lignes, et les types d'opérations rendus par un vrai compte.",
+  "fields": [
+    {
+      "key": "apiKey",
+      "label": "Clé d'API",
+      "type": "password",
+      "required": true,
+      "help": "⚠ À FAIRE AVANT TOUT — ACTIVER LA CLÉ : dès que vous créez une clé, Bitstamp vous envoie un courriel contenant un lien d'activation. Tant que ce lien n'est pas cliqué, la clé existe à l'écran mais n'existe pas pour le serveur : toute tentative répond « clé introuvable », exactement comme si vous vous étiez trompé en la recopiant. C'est l'oubli le plus fréquent, et le plus déroutant.\nOù la créer : sur bitstamp.net, ouvrez votre compte puis « Settings » › « API access » › « New API key ».\nCochez UNIQUEMENT les permissions de lecture : « Account balance » et « User transactions ». Surtout pas les permissions de retrait — crabe n'en a aucun usage, et une clé qui peut retirer est une clé qu'on ne veut pas stocker.\n⚠ En la recopiant : collez la valeur entière, d'un seul tenant. Un espace ou un retour à la ligne emporté par le copier-coller suffit à faire répondre « mauvais format », et il ne se voit pas à l'écran — crabe retire ceux qui se trouvent au début et à la fin, mais il ne peut rien pour une valeur coupée en deux.\n⚠ Si vous posez une restriction par adresse IP, elle doit viser l'adresse publique par laquelle sort votre installation de crabe, pas celle de l'ordinateur depuis lequel vous créez la clé."
+    },
+    {
+      "key": "apiSecret",
+      "label": "Secret d'API",
+      "type": "password",
+      "required": true,
+      "help": "Le secret affiché une seule fois, au moment de la création de la clé. Si vous l'avez perdu, il faut créer une nouvelle clé — il n'est jamais réaffiché, ni chez Bitstamp, ni ici.\nIl doit venir de la MÊME clé que ci-dessus : un secret et une clé qui ne vont pas ensemble donnent un refus que rien ne distingue d'un mot de passe faux."
+    },
+    {
+      "key": "historique",
+      "label": "Historique à récupérer",
+      "type": "history",
+      "default": "depuis",
+      "help": "Combien d'années d'opérations reprendre. crabe produit un relevé par mois civil terminé : le mois en cours attend d'être fini, pour ne pas donner un document incomplet qui ne serait jamais corrigé."
+    }
+  ],
+  "permissions": [
+    {
+      "key": "operations-bancaires",
+      "scope": "read",
+      "description": "Lit l'historique de vos opérations Bitstamp — dates, types, montants, frais — pour le mettre en forme dans un relevé mensuel."
+    },
+    {
+      "key": "factures",
+      "scope": "read-write",
+      "description": "Dépose sur vos destinations de stockage les relevés mensuels que crabe reconstitue. Ces documents ne sont pas émis par Bitstamp, et chacune de leurs pages le dit."
+    },
+    {
+      "key": "identifiants",
+      "scope": "read",
+      "description": "Votre clé d'API Bitstamp et son secret, chiffrés au repos et utilisés uniquement pour signer les appels de lecture de votre historique."
+    }
+  ]
+}

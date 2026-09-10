@@ -1,0 +1,8 @@
+{
+  "id": "coinbase",
+  "name": "Coinbase",
+  "category": "crypto",
+  "site": "www.coinbase.com",
+  "description": "Récupère automatiquement vos relevés et justificatifs d'opérations Coinbase.",
+  "status": "planned"
+}
