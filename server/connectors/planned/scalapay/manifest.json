@@ -1,0 +1,8 @@
+{
+  "id": "scalapay",
+  "name": "Scalapay",
+  "category": "banque",
+  "site": "www.scalapay.com",
+  "description": "Récupère automatiquement vos échéanciers et reçus de paiement Scalapay.",
+  "status": "planned"
+}

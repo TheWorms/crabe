@@ -1,0 +1,47 @@
+{
+  "id": "decathlon",
+  "name": "Decathlon",
+  "category": "shopping",
+  "site": "www.decathlon.fr",
+  "implementation": "scraping",
+  "initialStatus": "pending",
+  "description": "Lit l'historique de vos achats Decathlon et dit ce que le site propose pour vos factures.",
+  "technicalNote": "LOT 47 (22/08/2026) — reconnaissance en visiteur anonyme (sonde docs/reconnaissance-lot47.md) : au fetch nu, TOUT www.decathlon.fr répond 403 « cf-mitigated: challenge » (Cloudflare) ; le vrai Chromium du socle PASSE — accueil rendu en entier, aucun captcha monté sur le site. Bandeau Didomi fermé par « Continuer sans accepter → » (module partagé, plusieurs passages : il peut se remonter). Hors session, toute route /account/* — témoin inventé compris — redirige vers le SSO login.decathlon.net : la garde passe avant le routage, mais la redirection est mesurée, d'où « verifyUrlTient »: true (rester sur /account/… est la preuve de session). Le SSO montre e-mail/mobile + mot de passe + boutons Google/Facebook/Apple ; UN widget de captcha y est monté — connexion NATIVE à la main dans la fenêtre visible, jamais de soumission en programme, et pas par Google (refus mesuré au lot 35).\n\nLOT 48 (23/08/2026) — /account/purchases répond 404 une fois la garde SSO franchie ; /account/dashboard (callbackUrl du SSO) était l'adresse la plus probable, jamais vérifiée sur session — elle s'est révélée être le tableau de bord, qui ne liste RIEN : le connecteur y comptait 0 à tort.\n\nLOT 52 (24/08/2026) — LISTE TROUVÉE et mesurée sur une session réelle : l'historique vit sur /account/myPurchase (« Historique de vos achats »). La page est PEINTE en JavaScript (le connecteur attend un marqueur avant de compter — compter dans le vide disait 0) ; un compteur de résultats vit dans un role=\"status\" ; chaque achat est un article.my-purchase portant aria-labelledby=\"wef-account-order-<référence>\" (le h3 correspondant l'affiche sous « Numéro de commande », le statut est dans un aria-label « Statut de la commande : … »). DEUX natures au lien de détail /account/orderTracking : orderId=<référence>&type=oneom (commande en ligne) et transactionId=<uuid>&type=store (achat en magasin). AUCUN lien de facture sur la liste.\n\nCE QUE CHAQUE NATURE PROPOSE (mesuré sur les détails, 24/08/2026) : oneom — un bouton « Demander ma facture », dont le clic DÉPOSE la demande immédiatement (boîte « Nous recevons votre facture », bouton Fermer seul ; re-mesuré 25 minutes après : le bouton est inchangé, le document n'apparaît pas sur la page — la facture est préparée puis remise ailleurs). Un automate qui cliquerait à chaque passage déposerait des demandes en rafale sans jamais rien lire : crabe ne le déclenche PAS. store — un bouton « Télécharger ma facture » qui ouvre un formulaire « Informations client » (nom, prénom, adresse…) à VALIDER pour générer la facture depuis le ticket : crabe ne remplit jamais ces informations à la place de l'utilisateur. CONCLUSION : aucun document directement récupérable — le connecteur compte l'historique par nature, prouve la liste, et dit à l'écran ce que le site propose (un fait mesuré, pas une panne). Le jour où Decathlon servira un document sur la page, le parcours s'écrira sur cette mesure-là.",
+  "fields": [
+    {
+      "key": "session",
+      "label": "Connexion à Decathlon",
+      "type": "session",
+      "required": false,
+      "accept": "application/json,.json",
+      "help": "Le bouton « Se connecter à Decathlon » ouvre une fenêtre de navigateur dans crabe : fermez le bandeau de cookies (« Continuer sans accepter »), puis connectez-vous avec votre e-mail (ou n° de mobile) et votre mot de passe Decathlon — évitez « Continuer avec Google », souvent refusé dans cette fenêtre. La connexion est conservée dans un profil de navigateur sur le serveur et n'est jamais réaffichée."
+    },
+    {
+      "key": "historique",
+      "label": "Historique à récupérer",
+      "type": "history",
+      "default": "depuis",
+      "help": "L'historique de vos achats est relu en entier à chaque passage. Decathlon ne sert pas de facture téléchargeable directement sur ses pages : la fiche et le journal expliquent comment l'obtenir sur le site."
+    }
+  ],
+  "remoteLogin": {
+    "url": "https://www.decathlon.fr/account/myPurchase",
+    "marker": "",
+    "verifyUrl": "https://www.decathlon.fr/account/myPurchase",
+    "verifyUrlTient": true,
+    "persistent": true,
+    "hint": "Fermez d'abord le bandeau de cookies (« Continuer sans accepter »), puis connectez-vous avec votre e-mail et votre mot de passe Decathlon — pas par Google. Quand l'historique de vos achats s'affiche, enregistrez la connexion."
+  },
+  "permissions": [
+    {
+      "key": "factures",
+      "scope": "read-write",
+      "description": "Lit l'historique de vos achats Decathlon et le compte. Decathlon ne servant pas de facture directement sur ses pages (mesuré le 24/08/2026), rien n'est déposé aujourd'hui ; si le site change, la récupération sera écrite et cette fiche mise à jour."
+    },
+    {
+      "key": "identifiants",
+      "scope": "read",
+      "description": "Votre connexion Decathlon, conservée dans un profil de navigateur protégé sur le serveur, utilisée pour la seule lecture de votre espace client — jamais réaffichée, jamais journalisée."
+    }
+  ]
+}

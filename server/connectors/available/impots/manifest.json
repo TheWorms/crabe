@@ -1,0 +1,64 @@
+{
+  "id": "impots",
+  "name": "Impots.gouv.fr",
+  "category": "public",
+  "color": "#000091",
+  "letters": "IG",
+  "site": "cfspart.impots.gouv.fr",
+  "implementation": "scraping",
+  "description": "Récupère automatiquement vos avis d'impôt et déclarations.",
+  "technicalNote": "Connecteur sur mesure, parcours validé contre un compte réel le 10/08/2026 : dix années proposées (2017 à 2026), un PDF de 164 Ko téléchargé et vérifié. Le portail le plus simple rencontré à ce jour — pas de menu flottant, pas de pagination. Session capturée par navigateur distant : le portail demande numéro fiscal, mot de passe puis un code de sécurité ; 13 cookies observés, valables 182 jours, sans case à cocher (le portail prolonge de lui-même). FranceConnect est volontairement évité : le parcours direct est plus stable. Navigation par année sur documents.do?n=<année> (n=0 = année courante), les années sont relevées dynamiquement dans les href des liens « Année AAAA ». Chaque document est un li.row.align-items-center contenant un bouton dont l'attribut TITLE porte le libellé complet — le texte du bouton ne dit que « Visualiser PDF », et sans le title les quatre documents d'une année sont indiscernables ; le préfixe « Visualiser PDF » est retiré. PIÈGE : des documents sont repliés sous « Afficher les documents liés » et sont ratés EN SILENCE sans dépliage — toutes les sections repliables sont dépliées avant le relevé, et le journal donne le compte avant/après. L'identifiant idEnsua n'est pas dans la page : il est produit au clic, qui ouvre une FENÊTRE SURGISSANTE ; crabe l'intercepte, relève son URL, la referme, puis télécharge par le contexte authentifié. Le nom du fichier vient du serveur (content-disposition) et contient DÉJÀ « .pdf » : ne pas le doubler. La déduplication porte sur le libellé + l'année, JAMAIS sur idEnsua, probablement instable comme les UUID d'Amazon. Compter plusieurs minutes pour un rattrapage complet : chaque document exige un clic.",
+  "remoteLogin": {
+    "url": "https://cfspart.impots.gouv.fr/",
+    "verifyUrl": "https://cfspart.impots.gouv.fr/enp/documents.do",
+    "marker": "Documents",
+    "hint": "Saisissez votre numéro fiscal, votre mot de passe, puis le code de sécurité demandé. Ne passez pas par FranceConnect : le parcours direct est plus stable."
+  },
+  "fields": [
+    {
+      "key": "session",
+      "label": "Connexion à impots.gouv.fr",
+      "type": "session",
+      "required": false,
+      "accept": "application/json,.json",
+      "help": "Le bouton « Se connecter à Impots.gouv.fr » ouvre une fenêtre de navigateur dans crabe : connectez-vous comme sur le site, la connexion est enregistrée d'elle-même. Elle vaut vos identifiants — elle est chiffrée ici, et jamais réaffichée. Elle reste valable environ six mois."
+    },
+    {
+      "key": "numeroFiscal",
+      "identification": "identifiant",
+      "label": "Numéro fiscal",
+      "type": "text",
+      "required": false,
+      "help": "13 chiffres, en haut de votre dernier avis. Facultatif : il sert seulement à nommer le dossier de vos documents, et crabe le lit sur le portail s'il le trouve."
+    },
+    {
+      "key": "historique",
+      "label": "Historique à récupérer",
+      "type": "history",
+      "default": "depuis",
+      "help": "Le portail garde une dizaine d'années de documents. Tout reprendre demande plusieurs minutes, chaque document devant être ouvert un par un : crabe le fait une fois, puis ne suit plus que l'année en cours."
+    }
+  ],
+  "permissions": [
+    {
+      "key": "factures",
+      "scope": "read-write",
+      "description": "Télécharge les documents PDF de votre espace particulier — avis d'impôt, déclarations, accusés de réception, avis de situation déclarative — et les dépose sur vos destinations de stockage, dans un dossier par année. Ces documents contiennent des INFORMATIONS FISCALES : revenus, impôt dû, composition du foyer."
+    },
+    {
+      "key": "identifiants",
+      "scope": "read",
+      "description": "La connexion à impots.gouv.fr que vous avez ouverte dans crabe : les cookies de votre session, chiffrés au repos, rejoués uniquement pour atteindre vos documents. Le portail exigeant un code de sécurité, aucun mot de passe n'est conservé."
+    },
+    {
+      "key": "documents-contractuels",
+      "scope": "read-write",
+      "description": "Vos déclarations de revenus et les accusés de réception qui les accompagnent, tels que le portail les met à disposition. Leur contenu n'est ni lu ni analysé : le fichier est déposé tel quel."
+    },
+    {
+      "key": "informations-compte",
+      "scope": "read",
+      "description": "Votre numéro fiscal — 13 chiffres identifiant le foyer — s'il est lisible sur la page, ainsi que la liste des années pour lesquelles des documents existent, pour savoir quoi parcourir. Il nomme le dossier de destination de vos documents."
+    }
+  ]
+}

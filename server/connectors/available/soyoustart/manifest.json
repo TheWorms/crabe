@@ -1,0 +1,75 @@
+{
+  "id": "soyoustart",
+  "name": "SoYouStart",
+  "category": "hebergement",
+  "color": "#0050d7",
+  "letters": "SYS",
+  "site": "www.soyoustart.com",
+  "implementation": "ovh-api",
+  "description": "Récupère automatiquement vos factures de serveur SoYouStart.",
+  "technicalNote": "API officielle /me/bill, même moteur qu'OVHcloud (implémentation partagée ovh-api) : eu.api.soyoustart.com ou ca.api.soyoustart.com selon le compte. Exige un jeu de clés généré sur api.soyoustart.com/createToken/ portant les droits GET /me et GET /me/bill*. Les clés OVHcloud ne fonctionnent PAS ici : chaque marque a son propre serveur de jetons. Validé sur le compte réel de l'utilisateur au lot 17.",
+  "fields": [
+    {
+      "key": "endpoint",
+      "label": "Région de l'API",
+      "type": "select",
+      "required": true,
+      "options": [
+        {
+          "value": "soyoustart-eu",
+          "label": "Europe (soyoustart-eu)"
+        },
+        {
+          "value": "soyoustart-ca",
+          "label": "Canada (soyoustart-ca)"
+        }
+      ],
+      "help": "Europe pour un compte ouvert en France ou ailleurs en Europe. Ne changez ce réglage que si vous avez ouvert votre compte au Canada."
+    },
+    {
+      "key": "applicationKey",
+      "label": "Application Key",
+      "type": "password",
+      "required": true,
+      "help": "Les trois valeurs à saisir ici se créent en une seule fois, sur https://api.soyoustart.com/createToken/ — connectez-vous avec votre compte SoYouStart.\nDans le cadre « Rights » (les droits), ajoutez DEUX lignes, et rien de plus :\n   GET   /me\n   GET   /me/bill*\nL'astérisque de la seconde ligne compte : sans elle, crabe voit la liste de vos factures mais ne peut en ouvrir aucune.\nDans « Validity » (la durée de validité), choisissez « Unlimited ». Toute autre durée arrête la récupération sans prévenir le jour où elle expire.\nLa page affiche alors trois valeurs : recopiez-les dans les trois champs ci-dessous.\n⚠ SoYouStart et OVHcloud appartiennent au même groupe mais ont des comptes séparés : une clé créée chez OVHcloud est refusée ici. Créez bien la vôtre sur l'adresse ci-dessus."
+    },
+    {
+      "key": "applicationSecret",
+      "label": "Application Secret",
+      "type": "password",
+      "required": true,
+      "help": "La deuxième des trois valeurs. Elle n'est affichée qu'une fois, à la création : notez-la avant de fermer la page, elle est introuvable ensuite."
+    },
+    {
+      "key": "consumerKey",
+      "label": "Consumer Key",
+      "type": "password",
+      "required": true,
+      "help": "La troisième des trois valeurs. C'est elle qui porte les deux droits cochés à la création."
+    },
+    {
+      "key": "historique",
+      "label": "Historique à récupérer",
+      "type": "history",
+      "default": "depuis",
+      "help": "SoYouStart garde toutes vos factures depuis l'ouverture de votre compte. crabe reprend tout une première fois, puis ne suit plus que l'année en cours."
+    }
+  ],
+  "permissions": [
+    {
+      "key": "factures",
+      "scope": "read-write",
+      "description": "Appelle l'API officielle /me/bill de SoYouStart pour lister et télécharger vos factures, puis les dépose sur vos destinations de stockage."
+    },
+    {
+      "key": "identifiants",
+      "scope": "read",
+      "description": "Vos clés d'API SoYouStart (application key, application secret, consumer key), chiffrées au repos. Le droit GET /me/bill* suffit : ne donnez pas plus."
+    },
+    {
+      "key": "informations-compte",
+      "scope": "read",
+      "description": "Votre identifiant client SoYouStart (nic-handle), renvoyé par l'API, qui nomme le dossier de destination de vos factures."
+    }
+  ]
+}

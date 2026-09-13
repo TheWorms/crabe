@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" role="img" aria-label="Autre stockage">
+  <!-- La destination « Autre stockage » n'est le service de personne : son type
+       est choisi par l'administrateur parmi tous ceux qu'rclone sait gérer. Elle
+       n'a donc pas de site, aucun logo à récupérer, et surtout aucun logo de
+       fournisseur à emprunter — ce nuage neutre ne prétend représenter aucune
+       marque, et c'est exactement ce qu'on lui demande.
+       Blanc en dur, comme stockage-local.svg : chargé dans une balise <img>, un SVG
+       externe n'hérite ni du thème ni de la couleur du texte de la page. -->
+  <path d="M7.2 19.4c-2.6 0-4.7-2.1-4.7-4.7 0-2.3 1.7-4.3 4-4.6.8-2.6 3.2-4.5 6-4.5 3.1 0 5.7 2.2 6.2 5.2 2 .4 3.5 2.2 3.5 4.3 0 2.4-2 4.4-4.4 4.4H7.2Z" fill="#ffffff"/>
+</svg>

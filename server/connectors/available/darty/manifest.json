@@ -1,0 +1,59 @@
+{
+  "id": "darty",
+  "name": "Darty",
+  "category": "shopping",
+  "site": "www.darty.com",
+  "implementation": "scraping",
+  "initialStatus": "pending",
+  "description": "Récupère automatiquement les factures de vos achats Darty.",
+  "technicalNote": "LOT 47 (22/08/2026) — ÉBAUCHE : la fiche existe pour que la session puisse être ouverte à la main (fenêtre « Se connecter ») et gardée dans un profil persistant ; LE PARCOURS DES DOCUMENTS N'EST PAS ÉCRIT. Lancé, le connecteur reconnaît d'abord le mur, puis exige une preuve forte de compte connecté, dépose la preuve de liste (lot 31), journalise ce qu'il voit et s'arrête en le disant (aucunDocument, lot 41).\n\nMESURÉ le 22/08/2026, en visiteur anonyme, en production (sonde anonyme, docs/reconnaissance-lot47.md) — LE MUR EST LE FAIT PRINCIPAL : au fetch nu, 403 sur TOUT www.darty.com avec « x-datadome: protected » et le script captcha-delivery.com dans le corps — DataDome, la même garde que sncf-connect.com. Au vrai Chromium du socle : TOUTES les routes (accueil, /nav/connexion, /nav/extra/compte et ses variantes, témoin inventé compris) rendent HTTP 403 avec une page « FNAC DARTY - Maintenance » (« Malheureusement notre site n'est actuellement pas disponible. », 61 caractères). DEUX passages à une demi-heure d'écart, même réponse : un 403 constant n'est pas une maintenance, c'est le refus DataDome HABILLÉ en page d'excuse — le connecteur la reconnaît (MOTIF_FAUSSE_MAINTENANCE) pour ne pas envoyer chercher une panne du site.\n\nPOURQUOI L'ÉBAUCHE EXISTE QUAND MÊME : la fenêtre visible de crabe sur profil persistant est la recette qui franchit DataDome ailleurs (lot 30 PrestaShop Addons, lot 31 SNCF Connect) — le jeton de passage vit ensuite dans le profil. La connexion manuelle dans la fenêtre visible est exactement le geste qui l'établira. CONSÉQUENCES : /nav/extra/compte est une adresse CANDIDATE (rien n'a pu être prouvé derrière le mur), « verifyUrlTient » n'est PAS déclaré — le contrôle de session repose sur la preuve forte générique (lien de déconnexion) ; si le mur se présente au moment du contrôle, l'enregistrement sera refusé ou non concluant — à RE-MESURER à la première session, premier candidat à adapter.\n\nNON MESURÉ, à cause du mur : la forme de l'authentification (Darty et Fnac partagent un compte — un choix d'enseigne peut s'intercaler), l'adresse réelle de la liste des commandes, la forme des lignes, le format du document. Le compte de « repères de commande » du journal est un motif générique jamais vérifié.\n\nLOT 48 (23/08/2026) — LE MUR S'EST LEVÉ pour la sonde anonyme (Chromium du socle) : le site répond, et affiche LUI-MÊME son espace client dans le pied de page. MESURÉ : /espace_client/mes-commandes REDIRIGE les anonymes vers /authentification/login (SSO auth.darty.com), et le témoin inventé /espace_client/nawak-inexistant-42 rend un 404 franc — sonde DISCRIMINANTE, d'où « verifyUrl » /espace_client/mes-commandes et « verifyUrlTient »: true. L'ancienne candidate /nav/extra/compte était une impasse : servie SANS marqueur de compte sur une session réelle le 22/08. NON VÉRIFIÉ sur session : que la page tienne une fois connecté (DataDome peut se représenter au contrôle headless — un 403 rend désormais un verdict « indéterminé », jamais une confirmation). L'URL d'ouverture devient /espace_client/connexion (200 mesuré, formulaire e-mail en un écran).\n\nLOT 49 (23/08/2026) — PREUVE SUR FENÊTRE. Mesuré sur un compte réel : /espace_client/mes-commandes EST la bonne adresse — la page des commandes s'affichait dans la fenêtre pendant que le contrôle par seconde requête recevait un 403 DataDome. Vérifier en redemandant la page est fragile par construction sur un site à mur : la preuve se lit désormais sur le DOM déjà affiché (« preuveSurFenetre » + « marqueursFenetre » : data-testid \"order\", data-testid \"orderHeader\", titre « Mes commandes »), sans aucune requête supplémentaire. « verifyUrlTient » reste consigné comme mesure (les anonymes sont redirigés) mais le contrôle headless n'est plus la voie de ce service. REPÈRES POUR LE PARCOURS (relevés sur un compte réel, PAS encore codés — la récupération reste à écrire) : chaque commande porte un data-testid \"order\" avec son en-tête data-testid \"orderHeader\" ; le numéro vit dans un data-testid « _number_… », forme « N° » suivi de chiffres ; le détail est /espace_client/mes-commandes/<numéro>/0 ; la facture se télécharge par data-testid \"downloadBillLink\", libellé « Justificatif de vente ». Ce lot COMPTE les commandes (sélecteur mesuré [data-testid=\"order\"]), il ne télécharge rien.\n\nLOT 50 (23/08/2026) — LE MESSAGE NE MENT PLUS. Mesuré au matin du 23/08 : session capturée à 09:40:23 (58 cookies, validité vérifiée sur la fenêtre), puis connecteur renvoyé vers l'authentification à 09:41:16 et 09:42:08 — la session est bonne, mais dès que les cookies servent HORS de la fenêtre, le mur DataDome renvoie au login. L'écran disait alors « votre connexion a expiré ou n'a jamais été ouverte : cliquez Se connecter » à quelqu'un qui venait de le faire — une boucle sans sortie. Depuis ce lot, profil-marchand distingue les deux causes : profil ABSENT (erreurSessionExpiree, le geste est bien de se connecter) et session PRÉSENTE mais renvoyée (erreurRenvoiVersAuthentification : le message dit que la connexion est enregistrée, que le site refuse le passage automatique, et quoi faire selon l'âge de la connexion). La distinction est générique à tous les connecteurs à profil marchand. La RÉCUPÉRATION Darty reste à écrire — et le renvoi mesuré vient d'un Chromium RELANCÉ par le connecteur (profil-marchand.surLeProfil, pourtant visible et sur le même profil) : DataDome accepte la fenêtre où l'utilisateur vient d'agir et refoule la relance. La piste consignée au SUMMARY du lot 50 : lire les commandes dans le navigateur de la fenêtre elle-même, sans relance — implémentation dans un lot futur.\n\nLOT 51 (23/08/2026) — LE PARCOURS EST ÉCRIT, PARCE QUE LA MESURE L'A AUTORISÉ : trois lectures de liste espacées sur 61 minutes (11:56, 12:11, 12:57 UTC, même session) ont toutes atteint /espace_client/mes-commandes et compté les mêmes 6 commandes, sans renvoi — le brief exigeait de n'écrire le parcours QUE si la voie directe tenait sur les trois passages (une récupération intermittente ferait des trous silencieux). Repères relevés à l'écran (forme uniquement) : le numéro vit dans un data-testid « _number_… » (en-tête data-testid=\"orderHeader\"), forme « N° » + chiffres ; le détail vit sur /espace_client/mes-commandes/<numéro>/0 ; la facture y est data-testid=\"downloadBillLink\", libellé « Justificatif de vente » (motif en filet). clic-document guette les trois voies du clic et journalise celle qui sert. L'ancre d'idempotence est darty-<numéro de commande> — jamais une empreinte du PDF (lot 46) ; une commande déjà déposée n'est même pas rouverte. Le MUR PEUT REVENIR en cours de parcours (DataDome juge chaque passage) : chaque page de détail est jugée avant d'être lue — page « Maintenance » ou renvoi vers l'authentification au milieu du parcours arrêtent la récupération EN LE DISANT, les documents déjà lus sont conservés et le reste attend un autre passage. Le statut reste pending tant que la fiche n'a pas été prononcée après validation sur compte réel.",
+  "fields": [
+    {
+      "key": "session",
+      "label": "Connexion à Darty",
+      "type": "session",
+      "required": false,
+      "accept": "application/json,.json",
+      "help": "Le bouton « Se connecter à Darty » ouvre une fenêtre de navigateur dans crabe : si une vérification de sécurité ou une page « site indisponible » s'affiche, patientez quelques secondes puis rechargez ; fermez le bandeau de cookies, et connectez-vous avec votre e-mail et votre mot de passe Darty. La connexion est conservée dans un profil de navigateur sur le serveur et n'est jamais réaffichée."
+    },
+    {
+      "key": "historique",
+      "label": "Historique à récupérer",
+      "type": "history",
+      "default": "depuis",
+      "help": "La liste de vos commandes est relue en entier à chaque récupération ; les documents déjà déposés ne sont pas repris."
+    }
+  ],
+  "remoteLogin": {
+    "url": "https://www.darty.com/espace_client/connexion",
+    "marker": "",
+    "verifyUrl": "https://www.darty.com/espace_client/mes-commandes",
+    "persistent": true,
+    "hint": "Si une vérification de sécurité ou une page « site indisponible » s'affiche, patientez puis rechargez. Fermez le bandeau de cookies, puis connectez-vous avec votre e-mail et votre mot de passe Darty. Quand la page de vos commandes s'affiche, enregistrez la connexion.",
+    "verifyUrlTient": true,
+    "preuveSurFenetre": true,
+    "marqueursFenetre": [
+      {
+        "selecteur": "[data-testid=\"order\"]"
+      },
+      {
+        "selecteur": "[data-testid=\"orderHeader\"]"
+      },
+      {
+        "texte": "Mes commandes"
+      }
+    ]
+  },
+  "permissions": [
+    {
+      "key": "factures",
+      "scope": "read-write",
+      "description": "Parcourt vos commandes Darty et dépose leurs justificatifs de vente sur vos destinations de stockage. Si le site refuse un passage en cours de route, la récupération s'arrête en le disant et reprend au passage suivant."
+    },
+    {
+      "key": "identifiants",
+      "scope": "read",
+      "description": "Votre connexion Darty, conservée dans un profil de navigateur protégé sur le serveur, utilisée pour la seule lecture de votre espace client — jamais réaffichée, jamais journalisée."
+    }
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "id": "ldlc",
+  "name": "LDLC",
+  "category": "shopping",
+  "site": "www.ldlc.com",
+  "implementation": "scraping",
+  "initialStatus": "pending",
+  "description": "Récupère automatiquement les factures de vos achats LDLC.",
+  "technicalNote": "LOT 47 (22/08/2026) — reconnaissance en visiteur anonyme (sonde docs/reconnaissance-lot47.md), la mesure la plus nette des sept : l'espace client vit sur secure2.ldlc.com (« server: ldlc »), AUCUN marqueur anti-robot au fetch comme au navigateur, aucun captcha monté. /fr-fr/Account et /fr-fr/Orders rendent 302 vers /fr-fr/Login/Login?returnUrl=… (elles EXISTENT et redirigent les anonymes) ; le témoin inventé rend un 404 franc — rester sur /fr-fr/Orders est un signe de session : d'où « verifyUrl » et « verifyUrlTient »: true. Le formulaire de connexion : input#Email, input#Password, case #LongAuthenticationDuration « Rester connecté » — la même ossature ASP.NET que Materiel.net (même groupe LDLC) : jeton anti-rejeu dans la page, jamais de POST reconstruit.\n\nLOT 48 (23/08/2026) — l'enregistrement par « verifyUrlTient » a fonctionné (7 cookies gardés, /fr-fr/Orders a tenu). Le motif de repère avait alors été calibré sur « la référence » visible de la seule commande affichée — UNE ERREUR, réparée au lot 52 : cette valeur était le numéro de suivi du transporteur, et elle était en dur dans le dépôt (interdit par la règle du projet).\n\nLOT 52 (24/08/2026) — PARCOURS ÉCRIT, mesuré sur une session réelle. La ligne d'une commande (bloc .order, tableau dsp-row/dsp-cell) porte TROIS numéros distincts : l'identifiant d'ADRESSE (une lettre puis neuf chiffres, porté par le détail /fr-fr/Orders/PartialCompletedOrderContent?orderId=… — chargé en AJAX dans #order_<identifiant> — ET par la facture /fr-fr/Orders/DownloadOrderInvoice?orderId=…), le « Nº commande » AFFICHÉ dans sa cellule (treize chiffres puis une lettre, présent à l'écran mais absent de toute adresse), et le numéro de suivi du transporteur (deux lettres, neuf chiffres, deux lettres — l'erreur du lot 48). L'ancre d'idempotence (remote_id) est l'identifiant d'adresse : c'est le seul que le site utilise pour SERVIR le détail et la facture, il se relit tel quel dans les liens à chaque passage — le numéro affiché n'apparaît dans aucune adresse et ne peut pas être vérifié autrement qu'à l'écran, le numéro de suivi n'existe que pour une commande expédiée et dépend du transporteur (l'ancrer dessus, c'était ne jamais compter une commande non expédiée, sans que rien ne le dise). Tous les motifs sont calibrés sur la FORME, jamais sur une valeur.\n\nPériodes : la liste ne montre par défaut que « Depuis les 6 derniers mois ». Le sélecteur est un widget select2 (#CompletedOrders_FirstPeriod_Value, data-period-url=/fr-fr/Orders/CompletedOrdersPeriodSelection — route POST, le GET rend 405, data-history-headers-url=/fr-fr/Orders/PartialCompletedOrdersHeader qui rafraîchit #completedOrdersHeader) : ses options ne sont montées dans la page qu'une fois le menu OUVERT (mousedown sur la poignée select2). Le parcours ouvre le menu, lit les périodes et les parcourt toutes ; s'il n'y parvient pas, le journal dit que l'historique peut être incomplet. Piège mesuré : la liste rafraîchie en AJAX ne porte PLUS le lien de facture sur la ligne (le rendu serveur initial le porte) — il revient en ouvrant « Détails » (le bloc #order_<identifiant> chargé porte le lien bill-link « Télécharger la facture »).\n\nVoie du document (mesurée le 24/08/2026) : la facture est un VRAI lien <a href> — le clic déclenche un téléchargement direct (%PDF, ~172 Ko). La lecture passe par clic-document, qui dira ce qui a servi si le site change.\n\nDONNÉES PERSONNELLES : la page de détail affiche l'adresse postale du client et son moyen de paiement — le parcours ne les lit, ne les journalise et ne les stocke JAMAIS ; il ne vise que les liens de détail et de facture.",
+  "fields": [
+    {
+      "key": "session",
+      "label": "Connexion à LDLC",
+      "type": "session",
+      "required": false,
+      "accept": "application/json,.json",
+      "help": "Le bouton « Se connecter à LDLC » ouvre une fenêtre de navigateur dans crabe : fermez le bandeau de cookies s'il s'affiche, puis connectez-vous avec votre e-mail et votre mot de passe LDLC, en cochant « Rester connecté ». La connexion est conservée dans un profil de navigateur sur le serveur et n'est jamais réaffichée."
+    },
+    {
+      "key": "historique",
+      "label": "Historique à récupérer",
+      "type": "history",
+      "default": "depuis",
+      "help": "Toutes les périodes d'historique proposées par LDLC sont relues à chaque récupération ; les factures déjà déposées ne sont pas reprises."
+    }
+  ],
+  "remoteLogin": {
+    "url": "https://secure2.ldlc.com/fr-fr/Orders",
+    "marker": "",
+    "verifyUrl": "https://secure2.ldlc.com/fr-fr/Orders",
+    "verifyUrlTient": true,
+    "persistent": true,
+    "hint": "Connectez-vous avec votre e-mail et votre mot de passe LDLC, et cochez « Rester connecté ». Quand la page de vos commandes s'affiche, enregistrez la connexion."
+  },
+  "permissions": [
+    {
+      "key": "factures",
+      "scope": "read-write",
+      "description": "Parcourt vos commandes LDLC sur toutes les périodes proposées et dépose leurs factures sur vos destinations de stockage."
+    },
+    {
+      "key": "identifiants",
+      "scope": "read",
+      "description": "Votre connexion LDLC, conservée dans un profil de navigateur protégé sur le serveur, utilisée pour la seule lecture de votre espace client — jamais réaffichée, jamais journalisée."
+    }
+  ]
+}

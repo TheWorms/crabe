@@ -1,0 +1,54 @@
+{
+  "id": "uber",
+  "name": "Uber",
+  "category": "voyage",
+  "site": "www.uber.com",
+  "implementation": "scraping",
+  "initialStatus": "pending",
+  "description": "Récupère automatiquement les reçus de vos trajets Uber (Uber Eats et Location à l'étude).",
+  "technicalNote": "LOT 73 (remesuré au 73-bis, 09/09/2026) — le parcours des TRAJETS est écrit, mesuré et remesuré sur la session réelle ; Uber Eats et Location journalisent leur état.\n\nTRAJETS (remesuré sur le compte connecté, 09/09/2026) : riders.uber.com/trips rend chaque trajet en CARTE — un seul trajet apparaît en lien direct a[href*=\"/trips/\"], ce qui avait fait compter « 1 trajet » à tort au lot 73. L'identifiant de chaque carte se lit sur son lien d'aide ?jobId=<uuid> : ce jobId EST l'uuid du détail (vérifié — le lien direct porte un jobId de la liste), et c'est sur lui que s'ancre le remote_id (jamais l'empreinte du PDF, leçon OUIGO du lot 46). La liste est PAGINÉE : un bouton « Plus » charge la page suivante en REMPLAÇANT le DOM (l'URL gagne un cursor=) — mesuré 5, +10, +10, +2 = 27 trajets distincts, « Plus » disparu à la dernière page. On déroule donc TOUT en cumulant les jobId. Vue par défaut = « Personnel » + « Toutes les courses » : l'historique complet du profil personnel est lu (un profil pro, s'il existait, aurait son propre sélecteur — non couvert). Le détail porte la DATE (documents-de-page.dateDepuisTexte) et un bouton « Télécharger » qui sert un vrai PDF (%PDF-1.4) — mesuré. Deux passages n'écrivent qu'une ligne par trajet, le second ne clique même pas.\n\nUBER EATS (mesuré le 09/09/2026) : www.ubereats.com/fr/orders renvoie le navigateur, session de trajets comprise, vers auth.uber.com — cette session NE COUVRE PAS Uber Eats. Les commandes Eats demandent leur propre connexion ; rien n'est récupéré pour ce service ici, et le journal le dit. À RELEVER si l'utilisateur ouvre une connexion Uber Eats : l'adresse et la forme de la liste des commandes, la forme d'un reçu.\n\nLOCATION : aucune liste de locations sur ce compte. La page Trajets porte un lien générique m.uber.com/go/rent, mais pas de liste de documents — rien à parcourir, aucune adresse inventée. À RELEVER au premier compte ayant une location : l'adresse de la liste et la forme d'un reçu de location.\n\nAUTHENTIFICATION : auth.uber.com (hôte, pas chemin), reCAPTCHA ET Arkose montés — la connexion ne se soumet jamais en programme, fenêtre visible sur profil persistant (lots 30-31). verifyUrlTient : les anonymes sont éconduits de riders.uber.com/trips vers auth.uber.com — mesuré.\n\n⚠ Données personnelles : les pages de trajets portent des adresses de prise en charge, des noms de chauffeurs — rien de tel n'entre dans un test, une fixture, une technicalNote ou un journal de niveau normal. Seules les FORMES (uuid masqué, %PDF, date masquée) ont été consignées à la mesure.",
+  "fields": [
+    {
+      "key": "session",
+      "label": "Connexion à Uber",
+      "type": "session",
+      "required": false,
+      "accept": "application/json,.json",
+      "help": "Le bouton « Se connecter à Uber » ouvre une fenêtre de navigateur dans crabe : saisissez votre numéro de téléphone ou votre e-mail, puis le code de vérification qu'Uber vous envoie (SMS ou e-mail). La connexion est conservée dans un profil de navigateur sur le serveur et n'est jamais réaffichée."
+    },
+    {
+      "key": "services",
+      "label": "Services à couvrir",
+      "type": "multiselect",
+      "source": "discover",
+      "help": "Choisissez ce que crabe doit couvrir : vos trajets en voiture, vos locations, vos commandes Uber Eats. Les trois sont proposés cochés — la première récupération dira lesquels sont actifs sur votre compte."
+    },
+    {
+      "key": "historique",
+      "label": "Historique à récupérer",
+      "type": "history",
+      "default": "depuis",
+      "help": "Votre liste de trajets est relue en entier à chaque récupération ; les reçus déjà déposés ne sont pas repris."
+    }
+  ],
+  "remoteLogin": {
+    "url": "https://riders.uber.com/trips",
+    "marker": "",
+    "verifyUrl": "https://riders.uber.com/trips",
+    "verifyUrlTient": true,
+    "persistent": true,
+    "hint": "Saisissez votre numéro de téléphone ou votre e-mail, puis le code de vérification qu'Uber vous envoie. Quand la page de vos trajets s'affiche dans la fenêtre, cliquez sur Enregistrer."
+  },
+  "permissions": [
+    {
+      "key": "factures",
+      "scope": "read-write",
+      "description": "Parcourt vos trajets Uber et dépose leurs reçus sur vos destinations de stockage. Uber Eats et Location sont proposés mais à l'étude : aujourd'hui seuls les reçus de trajets sont récupérés."
+    },
+    {
+      "key": "identifiants",
+      "scope": "read",
+      "description": "Votre connexion Uber, conservée dans un profil de navigateur protégé sur le serveur, utilisée pour la seule lecture de votre espace client — jamais réaffichée, jamais journalisée."
+    }
+  ]
+}

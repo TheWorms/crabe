@@ -1,0 +1,51 @@
+{
+  "id": "mistral",
+  "name": "Mistral",
+  "category": "ia",
+  "color": "#fa520f",
+  "letters": "MI",
+  "site": "admin.mistral.ai",
+  "implementation": "scraping",
+  "initialStatus": "pending",
+  "description": "Récupère automatiquement vos factures d'abonnement et d'usage Mistral.",
+  "caveat": "Vous ouvrez la connexion vous-même une fois, dans une fenêtre de navigateur — y compris si vous passez par un bouton Google.",
+  "technicalNote": "LOT 24 (13/08/2026) — CORRECTION DE L'ADRESSE DE FACTURATION. Les lots 20 et 21 visaient console.mistral.ai/admin/billing et console.mistral.ai/billing/invoices. Les deux sont FAUSSES, et la reconnaissance hors session ne pouvait pas le voir : chez Mistral, toute adresse redirige vers la connexion quand on n'est pas connecté, /nawak-inexistant compris — la garde précède le routage. Le connecteur annonçait donc « aucune nouvelle facture » à chaque exécution, sur une page qui n'existait pas.\n\nMesuré SESSION OUVERTE le 13/08/2026, ce qui tranche : console.mistral.ai/admin/billing rend un 404 « This page could not be found » ; admin.mistral.ai/nawak-inexistant-temoin rend un 404 (le témoin) ; admin.mistral.ai/organization/billing rend un 200, titre « Facturation - Admin - Mistral AI ». La facturation a changé de sous-domaine. La session capturée y sert telle quelle : le cookie de Mistral est posé sur .mistral.ai et couvre les deux.\n\nCE QUE LA PAGE CONTIENT : un bloc « Factures » listant numéro et date (par ex. MSTRL-API-781711-001, 2026-02-12), chacun avec un bouton « Télécharger » pointant sur api.eu.getlago.com/rails/active_storage/blobs/redirect/<jeton>/<numéro>.pdf. Mistral sous-traite sa facturation à Lago : les adresses de document sont pré-signées et vivent sur un autre domaine que la page — le téléchargement ne filtre donc pas sur le domaine.\n\nLOT 21 (13/08/2026) — CHANGEMENT DE MÉTHODE : connexion scriptée ABANDONNÉE au profit d'une session capturée. Le lot 20 avait écrit ce connecteur sur le flux Ory « identifier_first » relevé au lot 19 (écran 1 : email, écran 2 : mot de passe). Le contrat de formulaire était exact ; l'hypothèse qui le portait ne l'était pas — elle supposait un mot de passe MISTRAL. Le compte réel de l'utilisateur se connecte par « Se connecter avec Google ». Il n'y a donc rien à stocker, et scripter un identifiant Google est exclu (protections anti-automatisation de Google ; un lot entier y a déjà été perdu sur addons-prestashop).\n\nRECONNAISSANCE DU 13/08/2026, vrai Chromium, aucune saisie : console.mistral.ai mène à v2.auth.mistral.ai/login?flow=<uuid>, titre « Connexion - Mistral AI », UN SEUL champ visible (email, autocomplete=username), aucun captcha monté (0 recaptcha, 0 hcaptcha, 0 turnstile), aucun interstitiel — Cloudflare sert le site sans garder la porte. AUCUN bouton tiers n'est visible à ce stade : la voie Google n'apparaît qu'APRÈS la saisie de l'adresse. Aucune reconnaissance de la page d'accueil ne pouvait donc la prévoir — c'est la leçon de ce connecteur.\n\nremoteLogin.keepDomains = [mistral.ai] : la connexion traverse accounts.google.com, et la photo de fin de parcours emporterait sinon la session Google de l'utilisateur — dont crabe n'a aucun usage. Le tri a lieu avant l'essai de session, donc ce qui est vérifié est exactement ce qui est enregistré.\n\nSTATUT : ÉCRIT MAIS JAMAIS EXERCÉ CONTRE UN COMPTE RÉEL de bout en bout — chargé et installable, mais en « pending » (invisible aux comptes ordinaires) tant qu'aucune facture n'a été récupérée pour de bon. La page de facturation est maintenant vue et la route des documents est connue ; ce qui reste à établir, c'est qu'un téléchargement Lago aboutisse depuis le rejeu headless du planificateur.\n\nLOT 68 (28/08/2026) — LA PREUVE DE SESSION PAR LE RENVOI MESURÉ. Rejeu headless de la session enregistrée : admin.mistral.ai/organization/billing TIENT (200, page non vide) mais ne porte aucun lien de déconnexion lisible — le contrôle refusait donc une session valide (« aucun marqueur »). Or le renvoi des anonymes est mesuré depuis le 13/08 (ci-dessus) : toute adresse redirige vers v2.auth.mistral.ai/login?flow=… quand on n'est pas connecté — une adresse que le motif d'authentification reconnaît. remoteLogin.renvoiAnonyme = \"connexion\" déclare cette mesure. ⚠ La garde précède le routage chez Mistral (le témoin inexistant est renvoyé pareil) : ce renvoi ne prouve RIEN de l'existence d'une page — leçon du lot 21 maintenue — mais il prouve l'absence de session, et c'est tout ce que la preuve par renvoi lui demande.",
+  "remoteLogin": {
+    "url": "https://admin.mistral.ai/organization/billing",
+    "verifyUrl": "https://admin.mistral.ai/organization/billing",
+    "keepDomains": [
+      "mistral.ai"
+    ],
+    "hint": "La fenêtre s'ouvre sur votre espace de facturation Mistral : connectez-vous comme vous en avez l'habitude — saisissez votre adresse, puis suivez le chemin que Mistral vous propose, mot de passe ou bouton « Google ». La double authentification est comprise. Laissez la page des factures finir de s'afficher avant d'enregistrer.",
+    "renvoiAnonyme": "connexion"
+  },
+  "fields": [
+    {
+      "key": "session",
+      "label": "Connexion à Mistral",
+      "type": "session",
+      "required": false,
+      "accept": "application/json,.json",
+      "help": "Le bouton « Se connecter à Mistral » ouvre une fenêtre de navigateur dans crabe : connectez-vous comme sur le site — y compris par « Google » si c'est votre habitude — et la connexion est enregistrée d'elle-même.\nSi vous passez par Google : seule la connexion à Mistral est conservée. Les cookies de votre compte Google sont écartés avant tout enregistrement, parce que crabe n'a rien à y faire.\nCette connexion vaut vos identifiants : elle est chiffrée ici et n'est jamais réaffichée. Elle finira par expirer, et crabe vous demandera alors de la rouvrir."
+    },
+    {
+      "key": "historique",
+      "label": "Historique à récupérer",
+      "type": "history",
+      "default": "depuis",
+      "help": "Combien d'années remonter dans vos factures Mistral. crabe reprend tout une première fois, puis ne va plus chercher que les nouveautés."
+    }
+  ],
+  "permissions": [
+    {
+      "key": "factures",
+      "scope": "read-write",
+      "description": "Ouvre votre espace de facturation Mistral pour y lister et télécharger vos factures, puis les dépose sur vos destinations de stockage."
+    },
+    {
+      "key": "identifiants",
+      "scope": "read",
+      "description": "La connexion de navigateur que vous avez ouverte vous-même : les cookies de session de mistral.ai, chiffrés au repos, rejoués uniquement pour ouvrir votre espace de facturation. Aucun mot de passe n'est stocké ici, et si vous passez par Google, aucun cookie de votre compte Google n'est conservé."
+    }
+  ]
+}

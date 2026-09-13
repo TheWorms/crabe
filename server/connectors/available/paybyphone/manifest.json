@@ -1,0 +1,65 @@
+{
+  "id": "paybyphone",
+  "name": "PayByPhone",
+  "category": "voyage",
+  "site": "secure.paybyphone.fr",
+  "implementation": "scraping",
+  "initialStatus": "pending",
+  "description": "Récupère automatiquement vos relevés de stationnement payé depuis votre mobile.",
+  "technicalNote": "LOT 30 (14/08/2026) — ÉCRIT MAIS JAMAIS EXÉCUTÉ CONTRE UN VRAI COMPTE. « initialStatus »: « pending ». ⚠ CE CONNECTEUR EST LE MOINS VÉRIFIÉ DU DÉPÔT : la connexion est mesurée au caractère près, TOUT CE QUI SUIT est déduit de l'aide officielle et n'a jamais été vu. Voir docs/reconnaissance-lot30.md §2.\n\n⚠ PAS LE SITE QU'ON CROIT. PayByPhone a DEUX surfaces web, et la principale est un cul-de-sac. m.paybyphone.com est une application Flutter (CanvasKit) protégée par HUMAN Security / PerimeterX (script PXbDaeXV9t.human.min.v1.js, cookies pxcts/_pxvid/__pxvid, collecteurs b.px-cdn.net et collector-pxbdaexv9t.px-cloud.net) ET par un reCAPTCHA Enterprise INVISIBLE (size=invisible). Elle NE S'AFFICHE JAMAIS dans un navigateur automatisé : mesuré QUATRE fois en production — invisible, invisible avec l'anti-robot rendu joignable, VISIBLE sous Xvfb avec --disable-blink-features=AutomationControlled, et avec relevé de toutes les réponses. À chaque fois : zone graphique 0, texte 0 caractère, champs 0, bloqué sur #/onboardingPage après 45 à 66 secondes. Et ce n'est PAS un défaut de la sonde : AUCUNE réponse HTTP >= 400, canvaskit.js 200, canvaskit.wasm 200, main.dart.js 200, window._flutter et window.flutterCanvasKit présents, WebGL disponible, AUCUNE erreur JavaScript — le moteur est chargé et prêt, et flt-glass-pane reste VIDE (0 octet). Raison exacte non établie. N'ÉCRIVEZ PAS DE CONNECTEUR CONTRE m.paybyphone.com.\n\nLE VRAI POINT D'ENTRÉE est le PORTAIL DE REÇUS, trouvé dans un cadre de www.paybyphone.fr/automobilistes/recus-de-stationnement : <iframe src=\"https://secure.paybyphone.fr/consumersite/login.aspx\">. C'est une application ASP.NET WebForms classique servie par nginx, bâtie sur jQuery 1.7.2, et elle ne porte AUCUN dispositif anti-robot : zéro occurrence de turnstile, recaptcha, hcaptcha, datadome, perimeterx ou captcha dans la page. Cookies posés : AWSALB, AWSALBCORS, ASP.NET_SessionId — rien d'autre. HTTP 200 après une redirection qui pose la session.\n\nFORMULAIRE, relevé au caractère près le 13/08/2026 : <form name=\"aspnetForm\" method=\"post\" action=\"./login.aspx\" id=\"ctl00\"> contenant select#CallingCodeDropDownList (name ctl00$MainContent$CallingCodeDropDownList, 232 options, la France valant « 5 » — l'option « -3 » n'est que le raccourci en tête de liste), input#MobileNumberTextBox (text), input#PinTextBox (password, maxlength 20) et input#LoginButton (type=submit, value « se connecter »). Champs cachés : __VIEWSTATE, __VIEWSTATEGENERATOR (AC874368), __EVENTTARGET, __EVENTARGUMENT, __VIEWSTATEENCRYPTED. Identification par NUMÉRO DE MOBILE, pas par adresse électronique. Une seule étape, pas de clavier virtuel, aucune authentification forte visible.\n\n⚠ ICI ON CLIQUE LE BOUTON, contrairement à Materiel.net où l'on presse Entrée — et ce n'est pas une incohérence, c'est la même règle appliquée à deux pages différentes. En ASP.NET WebForms, le couple nom/valeur du bouton (ctl00$MainContent$LoginButton=se connecter) doit partir avec le POST pour que le serveur sache quel contrôle a déclenché la soumission ; Entrée ne le garantit pas. Et c'est SANS RISQUE ici : la page ne contient AUCUNE balise <button> (vérifié) et un seul input[type=submit]. Chez Materiel.net à l'inverse, un <button type=button> (l'œil du mot de passe) est écrit AVANT le bouton d'envoi, d'où la touche Entrée. La règle commune : on désigne le contrôle qui porte la donnée décisive, jamais « le premier bouton ».\n\nNATURE DU DOCUMENT — ÉTABLIE par le centre d'aide officiel (support.paybyphone.com/hc/fr/articles/14010257480593), et c'est elle qui décide de la forme du connecteur. Citations exactes : « Puis-je recevoir une facture mensuelle ? Non. Les factures mensuelles ne sont pas disponibles. » et « Exporter votre historique de stationnement — Portail des reçus (ordinateur) : 1. Connectez-vous au portail des reçus. 2. Sélectionnez Transactions de stationnement. 3. Choisissez une période (jusqu'à 31 jours). 4. Téléchargez en PDF ou CSV. » Et sur les reçus unitaires : « Les reçus sont générés lors d'une session de stationnement réussie. […] Les utilisateurs ayant activé les reçus par e-mail les recevront automatiquement. »\n\nBRANCHE PRISE : LE RELEVÉ DE PÉRIODE, UN PDF PAR MOIS CIVIL. Justification, selon la règle du lot : un document PAR STATIONNEMENT en PDF n'existe pas sur le portail — le reçu unitaire est un COURRIEL, et crabe n'est pas un connecteur de boîte aux lettres. Le seul document que le portail produit est l'export de période, en PDF, plafonné à 31 jours — donc découpé par mois civil. Le mois EN COURS est écarté : un relevé d'août produit le 14 août serait incomplet, et comme son identifiant serait déjà connu il ne serait jamais regénéré ; les stationnements du 15 au 31 disparaîtraient de tout document. Même raisonnement que le relevé reconstitué de Bitstamp (connectors/releve-reconstitue.js, parMoisRevolus).\n\nHISTORIQUE : environ 12 mois conservés par le portail, d'après l'aide. Au-delà, il faut écrire au support.\n\n⚠ CE QUI N'EST PAS VÉRIFIÉ, ET C'EST BEAUCOUP : toute la structure du portail APRÈS la connexion. Aucun compte n'a été utilisé, et une sonde de routes a été tentée puis JETÉE parce qu'elle ne discriminait pas — ASP.NET redirige vers le formulaire TOUTE adresse sous /consumersite/, y compris ceci-nexiste-surement-pas-42.aspx. Aucune route « trouvée » par cette sonde n'a donc été reprise. Le connecteur DÉCOUVRE donc sa route au lieu de la supposer : il cherche dans la page le lien qui mène aux transactions, puis les contrôles de période et de téléchargement, et quand il ne trouve pas il ÉCRIT AU JOURNAL CE QU'IL A VU (liens et champs), pour que la première exécution réelle soit diagnosticable du premier coup plutôt qu'après trois passages à l'aveugle.\n\nCE QUI N'EST JAMAIS FAIT : aucune deuxième tentative de connexion. Le portail est un vieux site ASP.NET, et rien ne dit ce qu'il fait d'un compte qui échoue plusieurs fois de suite.",
+  "fields": [
+    {
+      "key": "numeroMobile",
+      "identification": "identifiant",
+      "label": "Numéro de mobile",
+      "type": "text",
+      "required": true,
+      "help": "Le numéro de mobile de votre compte PayByPhone, celui avec lequel vous payez votre stationnement. Écrivez-le sans l'indicatif du pays et sans espaces, par exemple 612345678 pour un 06 12 34 56 78."
+    },
+    {
+      "key": "motDePasse",
+      "label": "Mot de passe",
+      "type": "password",
+      "required": true,
+      "help": "Le mot de passe ou le code de votre compte PayByPhone. Si vous ne l'avez jamais utilisé sur ordinateur, refaites-en un depuis « Réinitialiser le mot de passe » sur la page de connexion du portail. Il est chiffré et ne sert qu'à ouvrir vos relevés."
+    },
+    {
+      "key": "indicatif",
+      "label": "Pays du numéro",
+      "type": "select",
+      "required": false,
+      "default": "France",
+      "options": ["France", "Belgique", "Suisse", "Monaco", "Royaume-Uni"],
+      "help": "Le pays qui a délivré votre numéro de mobile. Laissez « France » si votre numéro commence par 06 ou 07."
+    },
+    {
+      "key": "historique",
+      "label": "Historique à récupérer",
+      "type": "history",
+      "default": "depuis",
+      "help": "PayByPhone garde environ douze mois de stationnements. crabe reprend tout une première fois, puis ne suit plus que les mois nouveaux."
+    }
+  ],
+  "permissions": [
+    {
+      "key": "factures",
+      "scope": "read-write",
+      "description": "Télécharge vos relevés mensuels de stationnement et les dépose sur vos destinations de stockage, dans un dossier par année. Un relevé porte la liste de vos stationnements du mois, avec la ville, la durée et le montant payé."
+    },
+    {
+      "key": "identifiants",
+      "scope": "read",
+      "description": "Votre numéro de mobile et votre mot de passe PayByPhone, chiffrés au repos. Ils n'ouvrent que le portail des reçus, pour y prendre vos relevés, ne sont transmis qu'au portail lui-même, et n'apparaissent dans aucun journal. La connexion ouverte est gardée sur le serveur d'une fois sur l'autre."
+    },
+    {
+      "key": "operations-bancaires",
+      "scope": "read",
+      "description": "Les dates, les lieux et les montants de vos stationnements payés, tels que le portail des reçus les affiche. Ils servent à dater et à nommer vos relevés, et à savoir quels mois ont déjà été rangés."
+    },
+    {
+      "key": "informations-compte",
+      "scope": "read",
+      "description": "Votre numéro de mobile, qui nomme le dossier de vos documents. Ni votre nom, ni votre plaque d'immatriculation, ni votre moyen de paiement ne sont lus."
+    }
+  ]
+}

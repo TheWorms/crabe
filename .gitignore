@@ -1,0 +1,30 @@
+# Dépendances
+node_modules
+
+# Données d'exécution : base SQLite, secrets chiffrés, documents téléchargés.
+# Tout vit sous data/ (CRABE_DATA_DIR) — rien de tout ça n'appartient à un dépôt.
+data/
+*.db
+*.db-*
+
+# Secrets
+.env
+*.pem
+*.key
+
+# Sessions de navigateur capturées (tools/capture-session.js).
+# Un de ces fichiers VAUT les identifiants du portail tant qu'il est valide :
+# il n'a rien à faire dans un dépôt, même privé.
+sessions/
+
+# Profils de navigateur persistants
+profils-navigateur/
+
+# Journaux
+*.log
+
+# Couverture de tests
+coverage/
+
+# Divers
+.DS_Store

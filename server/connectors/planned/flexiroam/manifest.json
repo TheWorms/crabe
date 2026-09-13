@@ -1,0 +1,9 @@
+{
+  "id": "flexiroam",
+  "name": "Flexiroam",
+  "category": "telecom",
+  "site": "www.flexiroam.com",
+  "description": "Récupère automatiquement vos factures de forfaits data à l'étranger.",
+  "unfeasible": "Flexiroam ne montre ses factures que dans son application mobile et les envoie par e-mail : il n'existe pas de page web où crabe pourrait les récupérer.",
+  "status": "planned"
+}

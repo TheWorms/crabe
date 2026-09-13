@@ -1,0 +1,66 @@
+{
+  "id": "addons-prestashop",
+  "name": "PrestaShop Addons",
+  "category": "shopping",
+  "color": "#DF0067",
+  "letters": "PA",
+  "site": "addons.prestashop.com",
+  "implementation": "scraping",
+  "description": "Récupère les factures de vos achats de modules et thèmes sur la marketplace PrestaShop Addons.",
+  "technicalNote": "Marketplace protégée par Cloudflare à deux niveaux : challenge pleine page à l'entrée, Turnstile dans le formulaire de connexion (authv2.prestashop.com). Les deux jugent le NAVIGATEUR, pas les cookies : une session capturée (storageState) rejouée dans un contexte neuf boucle sur « Performing security verification » (vérifié le 11/08/2026). D'où remoteLogin.persistent : la connexion s'ouvre sur un profil Chromium persistant, que le connecteur rouvre tel quel — avec le drapeau --disable-blink-features=AutomationControlled, indispensable. Vérifié sur le LXC : profil persistant + headless:false sous Xvfb passe, headless:true est bloqué. PAS de verifyUrl : le contrôle de session rejoue les cookies dans un contexte headless neuf, exactement ce que Cloudflare bloque — il conclurait toujours à tort. La langue du PDF suit la langue de la SESSION serveur : naviguer exclusivement en /fr/ (un passage par /en/ rebascule la session en anglais). Historique : /fr/historique-des-commandes (après connexion on atterrit sur l'accueil, y naviguer explicitement). Tableau Vue.js, 25 lignes par page, pagination puik sans changement d'URL (bouton aria-label « Go to page 2 »). Une API interne existe (/request3/clientaccount/orders/) mais rend 401 hors de l'app Vue : abandonnée, on passe par le DOM. Chaque ligne porte .order-action-invoice[orderid] ; le clic déclenche un TÉLÉCHARGEMENT depuis une URL S3 signée temporaire, à l'identifiant sans rapport avec orderid — écouter download + page (about:blank) en parallèle, comme impots/connector.js. Ne jamais nommer les fichiers d'après le nom S3 (opaque) : nommer d'après orderid. Déduplication sur orderid.",
+  "remoteLogin": {
+    "url": "https://addons.prestashop.com/fr/login?back=https://addons.prestashop.com/fr/historique-des-commandes",
+    "marker": "",
+    "persistent": true,
+    "hint": "Connectez-vous avec votre compte PrestaShop. Si la page s'affiche en anglais, cliquez « Français » en bas de page avant de vous connecter : la langue de vos factures en dépend. Une vérification de sécurité (case « Je ne suis pas un robot ») peut apparaître : cochez-la."
+  },
+  "fields": [
+    {
+      "key": "session",
+      "label": "Connexion à PrestaShop Addons",
+      "type": "session",
+      "required": false,
+      "accept": "application/json,.json",
+      "help": "Le bouton « Se connecter à PrestaShop Addons » ouvre une fenêtre de navigateur dans crabe : connectez-vous comme sur le site. La connexion est conservée dans un profil de navigateur sur le serveur — c'est nécessaire pour ce site, protégé par Cloudflare — et n'est jamais réaffichée."
+    },
+    {
+      "key": "email",
+      "identification": "identifiant",
+      "label": "Adresse e-mail",
+      "type": "text",
+      "required": false,
+      "help": "L'adresse de votre compte PrestaShop. Facultative : elle est pré-remplie dans la fenêtre de connexion, et le bouton « Saisir mes identifiants » s'en sert."
+    },
+    {
+      "key": "motDePasse",
+      "label": "Mot de passe",
+      "type": "password",
+      "required": false,
+      "help": "Facultatif : s'il est renseigné, le bouton « Saisir mes identifiants » de la fenêtre de connexion remplit le formulaire du site pour vous — pratique quand Cloudflare fait expirer la session. Il est chiffré et ne sort jamais du serveur. La case de vérification (Turnstile) reste à cocher vous-même."
+    },
+    {
+      "key": "historique",
+      "label": "Historique à récupérer",
+      "type": "history",
+      "default": "depuis",
+      "help": "L'historique complet compte plusieurs dizaines de commandes réparties sur plusieurs pages. Chaque facture exige un clic : le premier rattrapage prend quelques minutes, puis crabe ne suit plus que les nouvelles commandes."
+    }
+  ],
+  "permissions": [
+    {
+      "key": "factures",
+      "scope": "read-write",
+      "description": "Télécharge les factures PDF de vos commandes sur la marketplace — achats de modules, de thèmes et renouvellements — et les dépose sur vos destinations de stockage."
+    },
+    {
+      "key": "identifiants",
+      "scope": "read",
+      "description": "La connexion à PrestaShop Addons ouverte dans crabe : un profil de navigateur conservé EN CLAIR sur le disque du serveur (en 0700, un dossier par utilisateur), car ce site protégé par Cloudflare refuse les sessions par cookies seuls. Il est rejoué uniquement pour atteindre vos factures, et effacé si vous retirez le connecteur."
+    },
+    {
+      "key": "informations-compte",
+      "scope": "read",
+      "description": "La liste de vos commandes — numéro, date, montant — telle que la page d'historique l'affiche, pour savoir quelles factures télécharger."
+    }
+  ]
+}

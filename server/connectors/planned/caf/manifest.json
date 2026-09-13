@@ -1,0 +1,12 @@
+{
+  "id": "caf",
+  "name": "CAF",
+  "category": "public",
+  "color": "#0b3d91",
+  "letters": "CAF",
+  "site": "www.caf.fr",
+  "status": "planned",
+  "description": "Récupère automatiquement vos attestations de paiement et de quotient familial de la CAF.",
+  "caveat": "Le site de la Caf a changé en 2026 : sa page de connexion ne présente plus les champs que crabe savait remplir. La récupération est à reconstruire ; ce service reviendra dans une prochaine version.",
+  "technicalNote": "LOT 78 (09/09/2026) — CONNECTEUR DÉSACTIVÉ SUR DÉCISION DE L'UTILISATEUR, remis en « prochainement » (dossier planned/, manifeste écrit à la main comme Envato au lot 23 — ne PAS l'ajouter à scripts/gen-planned.js, la régénération écraserait cette note). La migration 55 désarme la planification des installations existantes (enabled = 0) pour que le cron mensuel ne parte plus échouer sur le refus « service annoncé » ; RIEN d'autre n'est touché : l'installation, ses identifiants chiffrés et les documents déjà en base restent.\n\nPOURQUOI (mesuré au lot 77, 09/09/2026, sonde anonyme en production) : wwwd.caf.fr/wps/portal/caffr/authentification répond 200 et REDIRIGE vers une application monopage connect.caf.fr/connexionappli/dist/#/login (contexteAppel=caffr, urlredirect=%2Fwps%2Fmyportal%2Fcaffr). AUCUN <input> dans le DOM après 9 s, shadow DOM compris : le formulaire est peint APRÈS une interaction (choix du contexte — « Tuteur », « Pensions alimentaires » — puis « Se connecter ») qu'une sonde anonyme ne peut pas mener. Le champ input[name=\"matricule\"] de l'ancien connecteur A DISPARU (confirmé absent). Le brief du lot 77 signalait aussi un mur PerimeterX ; la sonde du 77 n'a pas vu de garde active, mais rien n'est récupérable sans connexion manuelle dans tous les cas. Les sélecteurs de l'ancien parcours (username/password/submit) sont morts avec l'ancien portail — l'historique git du lot 77 les porte si besoin (server/connectors/available/caf/ jusqu'à 971fa62).\n\nPOUR RÉÉCRIRE LE CONNECTEUR, à la première connexion ouverte par l'utilisateur : relever les noms réels des champs (numéro d'allocataire, code confidentiel), l'enchaînement du choix de contexte, ce que la connexion exige de plus (code, application ?), et l'adresse de l'espace des attestations — AVANT toute réécriture. Si la connexion demande un geste que seul le titulaire peut faire, le modèle sera la session par la fenêtre (profil persistant), comme Ameli au lot 78."
+}

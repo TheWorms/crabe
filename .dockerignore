@@ -1,0 +1,10 @@
+.git
+node_modules
+data
+test
+coverage
+*.log
+.env
+docs
+PROGRESS.md
+SUMMARY.md
