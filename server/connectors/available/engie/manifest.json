@@ -1,0 +1,49 @@
+{
+  "id": "engie",
+  "name": "Engie",
+  "category": "energie",
+  "color": "#00a0af",
+  "letters": "EN",
+  "site": "particuliers.engie.fr",
+  "implementation": "scraping",
+  "description": "Récupère automatiquement vos factures de gaz et d’électricité Engie.",
+  "fields": [
+    {
+      "key": "username",
+      "identification": "email",
+      "type": "email",
+      "required": true
+    },
+    {
+      "key": "password",
+      "label": "Mot de passe",
+      "type": "password",
+      "required": true,
+      "help": "Le mot de passe de votre espace client ENGIE. Il est chiffré ici, jamais réaffiché, et ne sert qu'à y prendre vos factures."
+    },
+    {
+      "key": "historique",
+      "label": "Historique à récupérer",
+      "type": "history",
+      "default": "depuis",
+      "help": "ENGIE garde plusieurs années de factures. crabe reprend tout une première fois, puis ne suit plus que l'année en cours."
+    }
+  ],
+  "permissions": [
+    {
+      "key": "factures",
+      "scope": "read-write",
+      "description": "Télécharge vos factures de gaz et d'électricité Engie, puis les dépose sur vos destinations de stockage."
+    },
+    {
+      "key": "identifiants",
+      "scope": "read",
+      "description": "Votre adresse e-mail et votre mot de passe Engie, chiffrés au repos, utilisés uniquement pour la connexion à votre espace client."
+    },
+    {
+      "key": "informations-compte",
+      "scope": "read",
+      "description": "Votre référence client Engie, lue sur l'espace client, qui sert à séparer les factures de chaque contrat."
+    }
+  ]
+}

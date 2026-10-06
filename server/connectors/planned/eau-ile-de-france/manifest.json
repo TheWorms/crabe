@@ -1,0 +1,9 @@
+{
+  "id": "eau-ile-de-france",
+  "name": "Eau d'Île-de-France",
+  "category": "energie",
+  "site": "connexion.leaudiledefrance.fr",
+  "description": "Récupérerait vos factures d'eau de l'Eau d'Île-de-France : son espace client n'a pas encore été étudié.",
+  "technicalNote": "LOT 97 (06/10/2026) — ANNONCE : aucune ligne de connecteur n'est écrite, aucun compte n'a été vu. Seules la page publique et l'icône ont été lues, en visiteur anonyme, sans formulaire ni saisie. MESURÉ : la racine de connexion.leaudiledefrance.fr renvoie (301) vers /s/, qui redirige en JavaScript vers /s/login/ — un espace client Salesforce (en-tête « server: sfdcedge »), page de connexion publique. L'icône est déclarée par <link rel=\"shortcut icon\"> à /resource/<horodatage>/FAVICON_FRA : ICO, six tailles dont 256×256, 102 569 octets. ⚠ Le serveur n'envoie PAS son certificat intermédiaire (« Gandi RSA Domain Validation Secure Server CA 3 ») : curl, Node et Python refusent la connexion sans lui (« unable to get local issuer certificate »), un navigateur la complète seul. La récupération du logo par crabe (Paramètres → Applications → Logos, qui passe par le fetch de Node) échouera donc sur ce site tant que ce sera le cas ; le logo de l'annonce a été rangé à la main au déploiement du lot 97.",
+  "status": "planned"
+}

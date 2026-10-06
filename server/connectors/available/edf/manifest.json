@@ -1,0 +1,49 @@
+{
+  "id": "edf",
+  "name": "EDF",
+  "category": "energie",
+  "color": "#0e6bb8",
+  "letters": "EDF",
+  "site": "particulier.edf.fr",
+  "implementation": "scraping",
+  "description": "Récupère automatiquement vos factures d’électricité EDF.",
+  "fields": [
+    {
+      "key": "username",
+      "identification": "email",
+      "type": "email",
+      "required": true
+    },
+    {
+      "key": "password",
+      "label": "Mot de passe",
+      "type": "password",
+      "required": true,
+      "help": "Le mot de passe de votre espace client EDF. Il est chiffré ici, jamais réaffiché, et ne sert qu'à y prendre vos factures."
+    },
+    {
+      "key": "historique",
+      "label": "Historique à récupérer",
+      "type": "history",
+      "default": "depuis",
+      "help": "EDF garde plusieurs années de factures. crabe reprend tout une première fois, puis ne suit plus que l'année en cours."
+    }
+  ],
+  "permissions": [
+    {
+      "key": "factures",
+      "scope": "read-write",
+      "description": "Télécharge vos factures d'électricité depuis l'espace client EDF, puis les dépose sur vos destinations de stockage."
+    },
+    {
+      "key": "identifiants",
+      "scope": "read",
+      "description": "Votre adresse e-mail et votre mot de passe EDF, chiffrés au repos, utilisés uniquement pour la connexion à particulier.edf.fr."
+    },
+    {
+      "key": "informations-compte",
+      "scope": "read",
+      "description": "Votre numéro de compte client EDF, lu sur l'espace client, qui distingue vos contrats quand vous en avez plusieurs."
+    }
+  ]
+}

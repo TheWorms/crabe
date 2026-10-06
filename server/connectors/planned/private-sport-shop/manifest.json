@@ -1,0 +1,8 @@
+{
+  "id": "private-sport-shop",
+  "name": "Private Sport Shop",
+  "category": "shopping",
+  "site": "www.privatesportshop.fr",
+  "description": "Récupère automatiquement les factures de vos achats Private Sport Shop.",
+  "status": "planned"
+}

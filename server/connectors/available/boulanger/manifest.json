@@ -1,0 +1,56 @@
+{
+  "id": "boulanger",
+  "name": "Boulanger",
+  "category": "shopping",
+  "site": "www.boulanger.com",
+  "implementation": "scraping",
+  "initialStatus": "pending",
+  "description": "Récupère automatiquement les factures de vos achats Boulanger.",
+  "technicalNote": "LOT 47 (22/08/2026) — ÉBAUCHE : la fiche existe pour que la session puisse être ouverte à la main (fenêtre « Se connecter ») et gardée dans un profil persistant ; LE PARCOURS DES DOCUMENTS N'EST PAS ÉCRIT. Lancé, le connecteur atteint la page des commandes, exige une preuve forte de compte connecté, dépose la preuve de liste (lot 31), journalise ce qu'il voit et s'arrête en le disant (aucunDocument, lot 41).\n\nMESURÉ le 22/08/2026, en visiteur anonyme, en production (sonde anonyme, docs/reconnaissance-lot47.md) — MESURE NON CONCLUANTE, et c'est le fait principal : au fetch nu, accueil 400 « AkamaiGHost » et TOUTES les routes de l'espace client en 404 « Apache », témoin inventé compris — Akamai est devant, la sonde nue ne discrimine rien. Au vrai Chromium du socle : l'accueil rend une page d'erreur Akamai (« Invalid URL »), mais /connexion, /client, /client/commandes et LE TÉMOIN /client/nawak-inexistant-42 rendent tous la MÊME coquille d'application (2 038 caractères identiques) : site peint côté client, aucun formulaire relevé (aucun input dans le document — champs probablement dans un shadow DOM), aucune redirection d'anonyme observée, aucun contenu.\n\nCONSÉQUENCES ASSUMÉES : « verifyUrlTient » n'est PAS déclaré (rester sur /client ne prouve rien, la coquille est servie à tout le monde) — le contrôle de session repose sur la preuve forte générique (lien de déconnexion), côté capture comme côté connecteur. Si la page connectée de Boulanger ne porte pas de lien de déconnexion reconnaissable, l'enregistrement de la session sera refusé : c'est un point à RE-MESURER à la première session ouverte à la main, et le premier candidat à adapter.\n\nNON MESURÉ, faute de session et à cause de la coquille : la forme de l'authentification (un écran ou deux, code à usage unique), l'adresse réelle de la liste des commandes, la forme des lignes, le format du document. Le compte de « repères de commande » du journal est un motif générique jamais vérifié.\n\nLOT 48 (23/08/2026) — MESURÉ sur une session réelle du 22/08 au soir : la page de contrôle /client répond 404 à TOUT contrôle headless, cookies de session compris — Akamai juge le navigateur, pas les cookies ; quatre vérifications ont échoué pendant que l'utilisateur était connecté à l'écran, et la session n'a jamais pu être enregistrée. CONSÉQUENCE : « preuveSurFenetre » — la preuve forte (lien de déconnexion) se lit désormais dans la fenêtre VISIBLE, sur le profil persistant que le connecteur rouvrira. SUPPOSÉ, à mesurer à la première session : que l'espace client Boulanger porte bien un lien de déconnexion reconnaissable ; si non, l'enregistrement restera refusé et c'est ce sélecteur qu'il faudra mesurer.\n\nLOT 49 (23/08/2026) — L'ADRESSE ÉTAIT FAUSSE, ET LA PREUVE A SES MARQUEURS. Mesuré sur un compte réel : /account/my-orders/in-progress liste les commandes EN COURS — vide pour un compte sans commande ouverte ; les commandes passées vivent sur /account/my-orders/finished, affichée sous les yeux de l'utilisateur. « verifyUrl » corrigée en conséquence. La preuve sur fenêtre gagne des marqueurs relevés sur cette page : blocs class=\"order\", et <h3> portant « N° F » suivi de chiffres (motif calibré sur la FORME, jamais sur une valeur réelle). DEUX PIÈGES MESURÉS, pour le lot du parcours : (1) le bouton de facture est un élément personnalisé <bl-button arialabel=\"Télécharger la facture de la commande numéro F…\"> — ce n'est NI un lien NI un <button>, un sélecteur a[href] ou button ne le verra jamais ; (2) certaines commandes portent « Votre facture sera disponible à la délivrance de votre commande » — la facture N'EXISTE PAS ENCORE, ce n'est pas une panne, et le journal du parcours devra le dire comme un fait. La récupération n'est toujours pas écrite : ce lot corrige l'adresse et la preuve, rien d'autre.\n\nLOT 50 (23/08/2026) — LE PARCOURS DES DOCUMENTS EST ÉCRIT. Le connecteur lit chaque bloc class=\"order\" de /account/my-orders/finished : numéro de commande dans le <h3> (« N° F » + chiffres — c'est l'ancre d'idempotence, remote_id = boulanger-<numéro>, jamais une empreinte du PDF : leçon du lot 46, un document regénéré change d'octets), date de commande lue dans le texte du bloc (issued_on), bouton de facture reconnu à son libellé d'accessibilité (arialabel « Télécharger la facture… ») sur l'élément personnalisé <bl-button>. Ce que le clic déclenche n'étant pas écrit dans la page, le module partagé clic-document guette les TROIS voies (téléchargement, nouvel onglet servant un PDF, réponse PDF de la page) et journalise celle qui a servi — c'est une MESURE faite au premier passage réel, pas une supposition. Une commande « Votre facture sera disponible à la délivrance de votre commande » n'est PAS une panne : le journal le dit dans ces mots et la récupération continue sur les autres. Une commande déjà déposée (numéro connu) n'est même pas cliquée. Écrit sur les relevés du 23/08/2026. DEUX MESURES FAITES AUX PREMIERS PASSAGES RÉELS du 23/08/2026 (sondes à chiffres masqués) : (1) le numéro de commande admet DEUX LETTRES MÉDIANES — trois formes coexistent, F##########, F###ML#####, F###CX##### — le motif chiffres-seuls déclarait deux commandes sur cinq « sans numéro lisible » ; (2) sur certaines commandes, le bouton de facture ne télécharge RIEN : il ouvre une BOÎTE DE CHOIX (<section class=\"popin--container\">) listant les factures de la commande, une entrée <bl-button> « Facture N° » + chiffres par document — l'arialabel des entrées répète le numéro de COMMANDE, c'est le texte visible qui les distingue. Chaque entrée cliquée sert son document (téléchargement direct mesuré) ; l'identifiant devient boulanger-<commande>-<référence de facture>. PROUVÉ sur un compte réel : 6 factures déposées (3 directes, 1 à lettres médianes, 2 par la boîte), puis passage suivant « Aucune nouvelle facture », zéro ligne ajoutée. Le statut reste pending tant que la fiche n'a pas été prononcée après validation sur compte réel.",
+  "fields": [
+    {
+      "key": "session",
+      "label": "Connexion à Boulanger",
+      "type": "session",
+      "required": false,
+      "accept": "application/json,.json",
+      "help": "Le bouton « Se connecter à Boulanger » ouvre une fenêtre de navigateur dans crabe : fermez le bandeau de cookies s'il s'affiche, puis connectez-vous avec votre e-mail et votre mot de passe Boulanger. La connexion est conservée dans un profil de navigateur sur le serveur et n'est jamais réaffichée."
+    },
+    {
+      "key": "historique",
+      "label": "Historique à récupérer",
+      "type": "history",
+      "default": "depuis",
+      "help": "La liste de vos commandes est relue en entier à chaque récupération ; les documents déjà déposés ne sont pas repris."
+    }
+  ],
+  "remoteLogin": {
+    "url": "https://www.boulanger.com/connexion",
+    "marker": "",
+    "verifyUrl": "https://www.boulanger.com/account/my-orders/finished",
+    "persistent": true,
+    "hint": "Fermez d'abord le bandeau de cookies s'il s'affiche, puis connectez-vous avec votre e-mail et votre mot de passe Boulanger. Quand votre espace client s'affiche dans la fenêtre, cliquez sur Enregistrer.",
+    "preuveSurFenetre": true,
+    "marqueursFenetre": [
+      {
+        "selecteur": ".order"
+      },
+      {
+        "selecteur": "h3",
+        "texte": "n[°o]\\s*F\\d+"
+      }
+    ]
+  },
+  "permissions": [
+    {
+      "key": "factures",
+      "scope": "read-write",
+      "description": "Parcourt vos commandes Boulanger et dépose leurs factures sur vos destinations de stockage. Une commande dont la facture n'est pas encore émise est signalée dans le journal et reprise au passage suivant."
+    },
+    {
+      "key": "identifiants",
+      "scope": "read",
+      "description": "Votre connexion Boulanger, conservée dans un profil de navigateur protégé sur le serveur, utilisée pour la seule lecture de votre espace client — jamais réaffichée, jamais journalisée."
+    }
+  ]
+}
