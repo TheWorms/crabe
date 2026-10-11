@@ -1,0 +1,10 @@
+{
+  "id": "credit-mutuel",
+  "name": "Crédit Mutuel",
+  "category": "banque",
+  "site": "www.creditmutuel.fr",
+  "description": "Récupère automatiquement vos relevés de compte Crédit Mutuel.",
+  "caveat": "La connexion à votre banque demande une validation depuis son application mobile. Ce service est à l'étude, sa disponibilité n'est pas garantie.",
+  "unfeasible": "La connexion à votre banque exige une validation depuis son application mobile, un geste que seul son titulaire peut faire : crabe ne peut pas se connecter à votre place.",
+  "status": "planned"
+}

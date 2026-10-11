@@ -1,0 +1,8 @@
+{
+  "id": "saur",
+  "name": "SAUR",
+  "category": "energie",
+  "site": "www.saurclient.fr",
+  "description": "Récupère automatiquement vos factures d'eau SAUR.",
+  "status": "planned"
+}

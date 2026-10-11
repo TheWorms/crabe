@@ -1,0 +1,56 @@
+{
+  "id": "free-mobile",
+  "name": "Free Mobile",
+  "category": "telecom",
+  "color": "#c8102e",
+  "letters": "FM",
+  "site": "mobile.free.fr",
+  "implementation": "scraping",
+  "description": "Récupère automatiquement vos factures Free Mobile, toutes vos lignes comprises.",
+  "technicalNote": "Free Mobile exige un code SMS à CHAQUE connexion : aucun couple identifiant/mot de passe ne suffit. Le connecteur rejoue un état de session capturé par l’utilisateur, normalement via le navigateur distant (« Se connecter à Free Mobile »), à défaut via tools/capture-session.js. Le menu « Mes lignes » est un déroulant replié dont le DOM contient une seconde copie de taille nulle ; la bascule d’une ligne à l’autre ne change pas l’URL, seul le titre « Ma ligne - 0X … » fait foi. Parcours validé contre un compte réel le 09/08/2026.",
+  "remoteLogin": {
+    "url": "https://mobile.free.fr/account/v2/login",
+    "verifyUrl": "https://mobile.free.fr/account/v2",
+    "verifyUrlTient": true,
+    "marker": "Mes factures",
+    "hint": "Cochez « Se souvenir de cet appareil » quand Free vous le propose : c'est cette case, et elle seule, qui fait durer la session six mois au lieu de quelques heures."
+  },
+  "fields": [
+    {
+      "key": "session",
+      "label": "Connexion à Free Mobile",
+      "type": "session",
+      "required": false,
+      "accept": "application/json,.json",
+      "help": "Le bouton « Se connecter à Free Mobile » ouvre une fenêtre de navigateur dans crabe : connectez-vous comme sur le site, la connexion est enregistrée d'elle-même. Elle vaut vos identifiants — elle est chiffrée ici, et jamais réaffichée."
+    },
+    {
+      "key": "lignes",
+      "label": "Lignes à récupérer",
+      "type": "multiselect",
+      "source": "discover",
+      "unit": "ligne",
+      "unitFeminine": true,
+      "required": false,
+      "notice": "Les lignes résiliées ne recevront plus de nouvelle facture, et Free ne conserve que les 12 dernières. Les récupérer maintenant est le seul moyen de les sauvegarder.",
+      "help": "La liste est établie après connexion, en dépliant le menu « Mes lignes » de l'espace abonné. Une ligne ouverte plus tard sera ajoutée toute seule à cette sélection, et signalée dans les journaux."
+    }
+  ],
+  "permissions": [
+    {
+      "key": "factures",
+      "scope": "read-write",
+      "description": "Télécharge les factures PDF de chaque ligne mobile sélectionnée depuis l'espace abonné Free Mobile, et les dépose sur vos destinations de stockage dans un dossier par numéro de ligne."
+    },
+    {
+      "key": "identifiants",
+      "scope": "read",
+      "description": "La session de navigateur que vous avez capturée à la main : cookies de connexion à mobile.free.fr, chiffrés au repos, rejoués uniquement pour ouvrir votre espace abonné. Free Mobile exigeant un code SMS, aucun mot de passe n'est stocké ici."
+    },
+    {
+      "key": "informations-compte",
+      "scope": "read",
+      "description": "Les numéros des lignes rattachées à votre compte Free Mobile et le nom de leur titulaire, lus dans le menu « Mes lignes » pour vous laisser choisir ce que crabe récupère."
+    }
+  ]
+}

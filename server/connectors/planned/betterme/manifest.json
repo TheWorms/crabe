@@ -1,0 +1,8 @@
+{
+  "id": "betterme",
+  "name": "BetterMe",
+  "category": "sante",
+  "site": "betterme.world",
+  "description": "Récupère automatiquement vos factures d'abonnement BetterMe.",
+  "status": "planned"
+}

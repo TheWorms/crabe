@@ -1,0 +1,48 @@
+{
+  "id": "coyote",
+  "name": "Coyote",
+  "category": "voyage",
+  "site": "www.moncoyote.com",
+  "implementation": "scraping",
+  "initialStatus": "pending",
+  "description": "Récupère automatiquement vos factures d'abonnement Coyote.",
+  "technicalNote": "LOT 79 (09/09/2026) — L'ANNONCE DEVIENT CONNECTEUR, session par la fenêtre (profil persistant, modèle profil-marchand lot 47).\n\nMESURÉ le 09/09/2026 (sonde anonyme, Chromium du socle, profil jetable, le serveur de production, scripts/lot79-reco-autodoc-coyote.js) : en HTTP nu tout est 403 Cloudflare ; le Chromium complet passe. /fr/users/auth est l'écran d'identification (e-mail + mot de passe, reCAPTCHA dans la page). /fr/users/account/my-invoices demandé SANS session est renvoyé vers /fr/users/auth — d'où verifyUrl = my-invoices, verifyUrlTient: true et renvoiAnonyme: \"connexion\" (preuve par le renvoi, lot 68). Un chemin inventé rend un vrai 404.\n\nRELEVÉ par l'utilisateur sur sa session (09/09/2026, formes seulement) : la page porte DEUX sections — « Mes factures en attente de paiement » et « Mes autres factures » — chacune dépliable ; chaque ligne montre « N° de facture : <n°> », une date, un montant et un bouton « Télécharger ». LES DEUX SECTIONS SONT PARCOURUES : une facture en attente de paiement reste une facture.\n\n⚠ LE BOUTON « PAYER » NE SE TOUCHE JAMAIS : la section « en attente » en porte un en tête, et sa colonne de droite affiche des avertissements de paiement. Chaque clic du connecteur passe par la garde MOTIF_REGLEMENT (payer|régler|règlement|paiement|pay|carte bancaire|prélèvement) qui refuse tout déclencheur au libellé de règlement — le dépliage vise le TITRE de section, le téléchargement vise le seul « Télécharger » de la ligne.\n\nANCRE : remote_id = coyote-facture-<numéro affiché>. issued_on = la date affichée sur la ligne (normalizeFrenchDate puis dateDepuisTexte).\n\n⚠ Données personnelles (§1bis) : montants et avertissements de paiement ne sont NI lus NI journalisés — l'extraction capture le numéro et la date, rien d'autre.\n\nRESTE À MESURER à la première session : la forme exacte du dépliage (le clic du titre replie-t-il une section déjà ouverte ? — d'où la lecture en deux passes fusionnées), la voie du document (clic-document journalise la voie mesurée), et la forme des numéros.\n\nStatut : EXERCÉ ET FONCTIONNEL (lot 80, 10/09/2026). Passage réel : 55 factures listées, 55 déposées, ancres sur le numéro affiché (FR…, APP…, RAPP…). La garde MOTIF_REGLEMENT a tenu en conditions réelles : deux titres de section dépliés, aucun bouton de règlement touché. Le 403 Cloudflare du premier essai venait du socle, corrigé au lot 80. ⚠ FENÊTRE DE SESSION COURTE : mesurée à moins de 4 h 30 (session de 22:50 renvoyée vers /users/auth à 03:19) — c'est une politique du site, comme Hetzner, pas un défaut du connecteur ; l'installation repasse en error et le message dit de rouvrir la connexion. initialStatus pending reste la valeur par défaut à l'installation, comme pour tous les connecteurs.",
+  "fields": [
+    {
+      "key": "session",
+      "label": "Connexion à Coyote",
+      "type": "session",
+      "required": false,
+      "accept": "application/json,.json",
+      "help": "Le bouton « Se connecter à Coyote » ouvre une fenêtre de navigateur dans crabe : saisissez votre adresse e-mail et votre mot de passe Coyote comme d'habitude. La connexion est conservée dans un profil de navigateur sur le serveur et n'est jamais réaffichée."
+    },
+    {
+      "key": "historique",
+      "label": "Historique à récupérer",
+      "type": "history",
+      "default": "depuis",
+      "help": "La page de vos factures est relue à chaque récupération ; une facture déjà déposée n'est ni recliquée ni reproduite."
+    }
+  ],
+  "remoteLogin": {
+    "url": "https://www.moncoyote.com/fr/users/auth",
+    "marker": "",
+    "verifyUrl": "https://www.moncoyote.com/fr/users/account/my-invoices",
+    "verifyUrlTient": true,
+    "renvoiAnonyme": "connexion",
+    "persistent": true,
+    "hint": "Saisissez votre adresse e-mail et votre mot de passe Coyote. Quand votre espace client s'affiche dans la fenêtre, cliquez sur Enregistrer."
+  },
+  "permissions": [
+    {
+      "key": "factures",
+      "scope": "read-write",
+      "description": "Parcourt la page de vos factures Coyote — sections « en attente de paiement » et « autres factures » — télécharge chaque facture par son bouton « Télécharger », puis les dépose sur vos destinations de stockage. Aucun bouton de paiement n'est jamais utilisé."
+    },
+    {
+      "key": "identifiants",
+      "scope": "read",
+      "description": "Votre connexion Coyote, conservée dans un profil de navigateur protégé sur le serveur, utilisée pour la seule lecture de votre espace client — jamais réaffichée, jamais journalisée."
+    }
+  ]
+}

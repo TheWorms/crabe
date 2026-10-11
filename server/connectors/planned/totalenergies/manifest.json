@@ -1,0 +1,8 @@
+{
+  "id": "totalenergies",
+  "name": "TotalEnergies",
+  "category": "energie",
+  "site": "www.totalenergies.fr",
+  "description": "Récupère automatiquement vos factures d'électricité et de gaz TotalEnergies.",
+  "status": "planned"
+}

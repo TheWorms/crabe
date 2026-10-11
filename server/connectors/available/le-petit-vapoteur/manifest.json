@@ -1,0 +1,51 @@
+{
+  "id": "le-petit-vapoteur",
+  "name": "Le Petit Vapoteur",
+  "category": "shopping",
+  "site": "www.lepetitvapoteur.com",
+  "implementation": "scraping",
+  "initialStatus": "pending",
+  "description": "Récupère automatiquement les factures de vos achats Le Petit Vapoteur.",
+  "caveat": "La boutique est protégée par un filtre anti-robot : vous vous connectez vous-même dans une fenêtre, puis crabe lit vos commandes, sans rien cliquer.",
+  "technicalNote": "LOT 99 (11/10/2026) — CONNECTEUR NEUF, ÉCRIT D'APRÈS LA STRUCTURE DE LA VRAIE PAGE, JAMAIS EXERCÉ CONTRE UN COMPTE RÉEL. Il remplace l'annonce du lot 11 (dossier planned/ retiré, entrée de scripts/gen-planned.js purgée, migration 60 remettreEnAttente : la ligne de catalogue héritée de l'annonce portait « available »). L'annonce écartait la boutique du socle PrestaShop : une protection Cloudflare fermait la connexion automatique avant même la saisie (mesuré le 11/08/2026) ; la connexion se fait désormais à la main, dans la fenêtre de crabe (remoteLogin, langueNative : la surcharge de langue de Playwright fait échouer Turnstile, lot 91), sans saisie automatique. NON MESURÉ : si Cloudflare laisse passer le rejeu sans écran qui suit — s'il s'affiche, le connecteur le reconnaît (profil-marchand.estMurAntiRobot) et le dit. ANNONCÉ (code source de la page des commandes enregistré connecté par l'utilisateur le 11/10, structure reprise sans donnée par le prompt du lot 99) : boutique PrestaShop, thème maison ; la liste est servie à https://www.lepetitvapoteur.com/fr/historique-des-commandes, body d'id history et de classe logged ; connexion à /fr/authentification?back=/fr/, déconnexion à /?mylogout (jamais appelée) ; chaque commande est un div.item-cmd — un div.item-cmd-head (état span.cmd-state-<n>, date, « N° de commande » et span.cmd-number, prix, points de fidélité), les produits, puis div.item-cmd-content_actions : div.invoice et son a.invoice-link.pdf « Télécharger la facture », « Voir la commande » (#showOrder) et « Acheter à nouveau » (#reOrder), jamais suivis. L'ADRESSE DE LA FACTURE EST MAL FORMÉE (annoncé) : /fr/index.php?controller=pdf-invoice?id_order=<n> (un second « ? » au lieu de « & ») ; ce que le site en fait n'est pas mesuré. RÈGLE (R2) : la première facture demande l'adresse TELLE QUE LA PAGE LA DONNE ; si ce n'est pas un PDF, sa forme corrigée (&id_order=<n>), une simple lecture ; la forme qui sert le PDF est retenue pour tout le passage, dite une fois au journal et à l'écran ; si aucune ne le sert (et que la session tient), le connecteur s'arrête pour cette boutique et le dit — les factures non demandées comptent comme non obtenues. Dans un bloc, seule une adresse de la boutique portant controller=pdf-invoice est suivie, revérifiée juste avant la demande par onglet-pdf.fluxDeLaPage (le fetch du navigateur, lot 80), refusée si elle ne commence pas par %PDF- ; toute adresse passe d'abord par server/connectors/adresses-interdites.js. ANCRE, DATE, NOM : remote_id le-petit-vapoteur-commande-<id_order> (lu dans le lien) ; date = celle de l'en-tête du bloc ; fichier le-petit-vapoteur_AAAA-MM_<n° de commande>.pdf (à défaut l'id_order), jamais deux fois le même nom. Une commande sans lien de facture est dite, jamais comptée comme un échec. TEMPS : arrêt de lui-même aux 2/3 de CRABE_LIMITE_EXECUTION_MS, ce qui est pris est rendu ; « Depuis la dernière récupération » prend tout ce qui manque à l'archive. CONTRÔLE À L'ENREGISTREMENT : preuveSurFenetre + marqueur mesuré body#history sur la page de liste (lot 49), le lien de déconnexion restant une preuve. JAMAIS EXERCÉ CONTRE UN COMPTE RÉEL : prouvé sur des pages reconstituées fidèles à la structure annoncée, trois variantes de l'adresse mal formée (test/lot99-*.test.js) — l'essai réel est à l'administrateur.",
+  "remoteLogin": {
+    "url": "https://www.lepetitvapoteur.com/fr/authentification?back=/fr/",
+    "marker": "",
+    "verifyUrl": "https://www.lepetitvapoteur.com/fr/historique-des-commandes",
+    "preuveSurFenetre": true,
+    "marqueursFenetre": [
+      { "selecteur": "body#history" }
+    ],
+    "langueNative": true,
+    "hint": "Connectez-vous avec votre adresse e-mail et votre mot de passe Le Petit Vapoteur ; si le site affiche une vérification de sécurité, suivez-la. Quand votre compte s'affiche, cliquez sur Enregistrer."
+  },
+  "fields": [
+    {
+      "key": "session",
+      "label": "Connexion au Petit Vapoteur",
+      "type": "session",
+      "required": false,
+      "accept": "application/json,.json",
+      "help": "Le bouton « Se connecter à Le Petit Vapoteur » ouvre une fenêtre de navigateur dans crabe : connectez-vous comme sur le site, avec votre adresse e-mail et votre mot de passe. La connexion est enregistrée, chiffrée, et n'est jamais réaffichée. Elle finira par expirer : crabe vous demandera alors de la rouvrir."
+    },
+    {
+      "key": "historique",
+      "label": "Historique à récupérer",
+      "type": "history",
+      "default": "depuis",
+      "help": "À chaque récupération, crabe lit la page de vos commandes Le Petit Vapoteur et prend les factures qui ne sont pas encore dans vos documents. La première récupération reprend tout l'historique ; si elle est trop longue pour un seul passage, la suite vient au passage suivant."
+    }
+  ],
+  "permissions": [
+    {
+      "key": "factures",
+      "scope": "read-write",
+      "description": "Lit la liste de vos commandes Le Petit Vapoteur et télécharge la facture PDF de chacune, sans rien cliquer sur la boutique, puis la dépose sur vos destinations de stockage."
+    },
+    {
+      "key": "identifiants",
+      "scope": "read",
+      "description": "La connexion de navigateur que vous avez ouverte vous-même sur Le Petit Vapoteur : ses cookies, chiffrés au repos, rejoués uniquement pour lire vos commandes. Aucun mot de passe n'est stocké ici."
+    }
+  ]
+}

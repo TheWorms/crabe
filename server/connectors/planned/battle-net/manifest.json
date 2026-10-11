@@ -1,0 +1,8 @@
+{
+  "id": "battle-net",
+  "name": "Battle.net",
+  "category": "divertissement",
+  "site": "www.battle.net",
+  "description": "Récupère automatiquement les reçus de vos achats Battle.net.",
+  "status": "planned"
+}

@@ -1,0 +1,52 @@
+{
+  "id": "anthropic",
+  "name": "Anthropic",
+  "category": "ia",
+  "color": "#d97757",
+  "letters": "AN",
+  "site": "claude.ai",
+  "implementation": "scraping",
+  "initialStatus": "pending",
+  "description": "Récupère automatiquement les factures de votre abonnement Claude.",
+  "caveat": "Ce service suit l'abonnement Claude (claude.ai), pas la console développeur. Vous ouvrez la connexion vous-même une fois, dans une fenêtre de navigateur.",
+  "technicalNote": "LOT 24 (13/08/2026) — CHANGEMENT DE PRODUIT, pas correctif d'adresse. Ce connecteur visait platform.claude.com (console développeur, facturation à l'usage de l'API). Il vise désormais claude.ai (abonnement Claude Pro/Max). Ce sont DEUX PRODUITS DIFFÉRENTS, avec deux facturations séparées. ⚠ Une connexion enregistrée avant ce lot ne vaut plus rien ici : elle porte des cookies de platform.claude.com. crabe demandera de la rouvrir, ce n'est pas une panne.\n\nRECONNAISSANCE DE claude.ai DU 13/08/2026, vrai Chromium, aucune saisie, aucun identifiant. (1) claude.ai/login répond 200, titre « Sign in - Claude », servi en français, un champ input[type=email][data-testid=email] et TROIS voies : « Continuer avec Google », « Continuer avec l'e-mail », « Continuer avec SSO ». ⚠ Ceci CONTREDIT le relevé du lot 19 (« claude.ai/login répond 403, titre Just a moment..., interstitiel Cloudflare »), qui avait fondé un arrêt : ce n'est plus vrai, et l'arrêt tombe. (2) Les pages profondes SONT gardées quand le client arrive froid : /settings/billing et /new répondent 403 avec cf-mitigated: challenge. (3) MAIS LA GARDE EST TRANSPORTABLE, mesuré en deux passes comme HeRay chez Hetzner au lot 19 — en fenêtre VISIBLE sur Xvfb (options de remote-browser.js) les quatre adresses répondent 200 sans aucune garde et sans intervention humaine ; le même storageState rejoué HEADLESS répond 200 partout aussi. 10 cookies, sur claude.ai, .claude.ai et .hcaptcha.com. La capture emporte donc la levée de garde, et le planificateur la rejoue sans la redéclencher. (4) /settings/billing EXISTE, et une route témoin le prouve : hors session elle redirige vers /login?from=logout tandis que /nawak-inexistant-temoin rend une vraie page « Page introuvable » — deux réponses différentes, ce qui manquait chez Mistral. (5) /login monte 2 éléments hCaptcha (contre 0 sur la console) : sans effet sur la voie retenue, mais toute connexion scriptée est exclue.\n\nPOURQUOI UNE SESSION CAPTURÉE : la connexion appartient à un fournisseur d'identité TIERS (le compte de l'utilisateur passe par Google). Rien à stocker, et rien qu'un connecteur puisse saisir seul. La session couvre les trois voies sans avoir à les distinguer.\n\nremoteLogin.keepDomains = [claude.ai, anthropic.com] : la connexion traverse accounts.google.com, et la photo de fin de parcours emporterait sinon la session Google de l'utilisateur — de quoi ouvrir sa boîte de courriel, dont crabe n'a aucun usage. Le tri a lieu avant l'essai de session, donc ce qui est vérifié est exactement ce qui est enregistré. claude.com a été RETIRÉ de la liste : c'est le domaine de la console, qui n'est plus la cible.\n\nAUCUN MARQUEUR DE CONNEXION N'EST DÉCLARÉ : il ne se devine pas, il se relève sur la page réelle, session ouverte. La détection de fin de connexion retombe donc sur les trois garde-fous heuristiques de connectors/login-detection.js.\n\nCE QUI N'EST PAS VÉRIFIÉ, et c'est le seul point qui reste : le contenu de la page de facturation DERRIÈRE une session — la forme de la liste des factures et le format servi. Le relevé passe donc par documents-de-page.js et DIT quand il n'a rien reconnu, au lieu d'annoncer « 0 facture » comme un fait.\n\nSTATUT : ÉCRIT MAIS JAMAIS EXERCÉ CONTRE UN COMPTE RÉEL sur ce produit — chargé et installable, mais en « pending » (invisible aux comptes ordinaires) tant qu'une facture n'a pas été récupérée pour de bon.\n\nLOT 68 (28/08/2026) — LA PREUVE DE SESSION PAR LE RENVOI MESURÉ. Trois refus d'enregistrement le 28/08 entre 12:56 et 12:59, session pourtant valide : claude.ai n'affiche AUCUN lien de déconnexion dans son document (il vit dans un menu peint au clic), et l'application RAMÈNE la navigation vers son accueil en gardant la cible en fragment — /settings/billing demandé, /new#settings/billing affiché (URL relevée dans les journaux des trois refus). Le contrôle générique ne pouvait donc ni trouver de marqueur, ni voir l'adresse « tenir ». Or le renvoi des anonymes est mesuré depuis le 13/08 (point 4 ci-dessus) et re-relevé le 28/08 dans les journaux de connexion : hors session, /settings/billing renvoie vers /login?from=logout&returnTo=%2Fsettings%2Fbilling. remoteLogin.renvoiAnonyme = \"connexion\" déclare cette mesure : rester sur claude.ai sans être renvoyé vers la connexion prouve la session, fragment ou pas.",
+  "remoteLogin": {
+    "url": "https://claude.ai/login",
+    "verifyUrl": "https://claude.ai/settings/billing",
+    "keepDomains": [
+      "claude.ai",
+      "anthropic.com"
+    ],
+    "hint": "Connectez-vous à Claude comme vous en avez l'habitude : « Continuer avec Google », « Continuer avec l'e-mail » (un code à six chiffres arrive alors par courriel — gardez votre boîte ouverte à côté, il expire vite) ou « Continuer avec SSO ». Prenez le même chemin que d'habitude, puis laissez la page finir de s'afficher avant d'enregistrer.",
+    "renvoiAnonyme": "connexion"
+  },
+  "fields": [
+    {
+      "key": "session",
+      "label": "Connexion à Claude",
+      "type": "session",
+      "required": false,
+      "accept": "application/json,.json",
+      "help": "Le bouton « Se connecter à Anthropic » ouvre une fenêtre de navigateur dans crabe : connectez-vous à Claude comme sur le site — par Google, par un code reçu par courriel, ou par votre organisation — et la connexion est enregistrée d'elle-même.\nAttention : il s'agit bien de votre abonnement Claude (claude.ai), et non de la console développeur d'Anthropic, qui est un service séparé avec ses propres factures.\nSi vous passez par Google : seule la connexion à Claude est conservée. Les cookies de votre compte Google sont écartés avant tout enregistrement, parce que crabe n'a rien à y faire.\nCette connexion vaut vos identifiants : elle est chiffrée ici et n'est jamais réaffichée. Elle finira par expirer, et crabe vous demandera alors de la rouvrir."
+    },
+    {
+      "key": "historique",
+      "label": "Historique à récupérer",
+      "type": "history",
+      "default": "depuis",
+      "help": "Combien d'années remonter dans vos factures d'abonnement Claude. crabe reprend tout une première fois, puis ne va plus chercher que les nouveautés."
+    }
+  ],
+  "permissions": [
+    {
+      "key": "factures",
+      "scope": "read-write",
+      "description": "Ouvre la page de facturation de votre abonnement Claude pour y lister et télécharger vos factures, puis les dépose sur vos destinations de stockage."
+    },
+    {
+      "key": "identifiants",
+      "scope": "read",
+      "description": "La connexion de navigateur que vous avez ouverte vous-même : les cookies de session de claude.ai, chiffrés au repos, rejoués uniquement pour ouvrir votre page de facturation. Aucun mot de passe n'est stocké ici, et si vous passez par Google, aucun cookie de votre compte Google n'est conservé."
+    }
+  ]
+}
