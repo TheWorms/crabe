@@ -1,0 +1,9 @@
+{
+  "id": "samsung-plus",
+  "name": "Samsung+",
+  "category": "telecom",
+  "site": "www.samsung.com",
+  "description": "Récupère automatiquement vos factures de services et de garanties Samsung.",
+  "unfeasible": "Il n'existe pas aujourd'hui de page web où consulter des factures « Samsung+ » en France : crabe n'a nulle part où aller les chercher.",
+  "status": "planned"
+}

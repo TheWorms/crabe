@@ -1,0 +1,49 @@
+{
+  "id": "hetzner",
+  "name": "Hetzner",
+  "category": "hebergement",
+  "color": "#d50c2d",
+  "letters": "HZ",
+  "site": "www.hetzner.com",
+  "implementation": "scraping",
+  "initialStatus": "pending",
+  "description": "Récupère automatiquement vos factures de serveurs et de services Hetzner.",
+  "caveat": "Vous ouvrez la connexion vous-même une fois, dans une fenêtre de navigateur, double authentification comprise.",
+  "technicalNote": "LOT 20 (12/08/2026) — ÉCRIT MAIS JAMAIS EXERCÉ CONTRE UN COMPTE RÉEL. Chargé et installable, mais en « pending » (invisible aux comptes ordinaires) tant qu'aucune facture n'a été récupérée pour de bon.\n\nLE VERDICT DU LOT 18 A ÉTÉ RENVERSÉ AU LOT 19, sur mesure. accounts.hetzner.com/login redirige (302) vers /_ray/pow — « HeRay », la garde anti-robot maison de Hetzner (server: HeRay), une preuve de travail. Le lot 18 y voyait un mur : dans un Chromium réel mais HEADLESS, la navigation bouclait et la page passait de « Security Check » à « Request on Hold — Potential unusual behavior — Please wait 61s ».\n\nCE QUE LE LOT 19 A MESURÉ, sur le conteneur : ÉTAPE 1, fenêtre VISIBLE (headless:false sur l'Xvfb, mêmes options que server/remote-browser.js) — 302 /login -> 200 /_ray/pow -> 302 /_ray/pow -> 200 /login, titre « Log In - Hetzner Online », formulaire atteint, SANS aucune intervention humaine. ÉTAPE 2, le même état rejoué par un Chromium HEADLESS — 200 /login directement, aucun passage par /_ray/pow. La levée de garde est donc TRANSPORTABLE.\n\nLA NUANCE QUI COMPTE : HeRay juge le CLIENT, pas l'identité. C'est ce qui a permis de le mesurer sans mot de passe. Ce qui reste à prouver relève de l'identité : qu'une session AUTHENTIFIÉE (double authentification comprise) survive elle aussi au rejeu headless. C'est très probable puisque la levée de garde y survit déjà, mais ce n'est pas mesuré, et une 2FA peut lier une session à son navigateur.\n\nPROFIL PERSISTANT NON NÉCESSAIRE : le contexte neuf a suffi à franchir la garde au lot 19. On ne pose donc pas remoteLogin.persistent, qui coûterait un dossier de navigateur en clair sur le disque.\n\nAUCUN MARQUEUR DE CONNEXION N'EST DÉCLARÉ : il ne se devine pas, il se relève sur la page réelle, session ouverte. La détection retombe sur les garde-fous heuristiques de connectors/login-detection.js. À poser au premier essai réel.\n\nCE QUI N'EST PAS VÉRIFIÉ : le contenu de accounts.hetzner.com/invoice derrière une session, la forme de la liste des factures, le format servi. Le connecteur détecte explicitement un retour de la garde HeRay et le DIT — sans quoi l'utilisateur ne verrait qu'un délai dépassé."
+  ,
+  "remoteLogin": {
+    "url": "https://accounts.hetzner.com/login",
+    "verifyUrl": "https://accounts.hetzner.com/invoice",
+    "attendreUrls": ["/_ray/"],
+    "hint": "Une vérification de sécurité de Hetzner peut s'afficher quelques secondes avant le formulaire : laissez-la se dérouler, elle passe toute seule. Connectez-vous ensuite normalement, double authentification comprise — la fenêtre se ferme d'elle-même dès que votre connexion est enregistrée."
+  },
+  "fields": [
+    {
+      "key": "session",
+      "label": "Connexion à Hetzner",
+      "type": "session",
+      "required": false,
+      "accept": "application/json,.json",
+      "help": "Le bouton « Se connecter à Hetzner » ouvre une fenêtre de navigateur dans crabe : connectez-vous comme sur le site, double authentification comprise, et la connexion est enregistrée d'elle-même.\nCette connexion vaut vos identifiants : elle est chiffrée ici et n'est jamais réaffichée. Elle finira par expirer, et crabe vous demandera alors de la rouvrir."
+    },
+    {
+      "key": "historique",
+      "label": "Historique à récupérer",
+      "type": "history",
+      "default": "depuis",
+      "help": "Combien d'années remonter dans vos factures Hetzner. crabe reprend tout une première fois, puis ne va plus chercher que les nouveautés."
+    }
+  ],
+  "permissions": [
+    {
+      "key": "factures",
+      "scope": "read-write",
+      "description": "Ouvre votre espace de facturation Hetzner pour y lister et télécharger vos factures, puis les dépose sur vos destinations de stockage."
+    },
+    {
+      "key": "identifiants",
+      "scope": "read",
+      "description": "La connexion de navigateur que vous avez ouverte vous-même : les cookies de session d'accounts.hetzner.com, chiffrés au repos, rejoués uniquement pour ouvrir votre espace de facturation. Aucun mot de passe n'est stocké ici."
+    }
+  ]
+}

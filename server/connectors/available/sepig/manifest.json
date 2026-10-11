@@ -1,0 +1,45 @@
+{
+  "id": "sepig",
+  "name": "SEPIG",
+  "category": "energie",
+  "site": "www.sepig.fr",
+  "implementation": "scraping",
+  "initialStatus": "pending",
+  "description": "Récupère automatiquement vos factures d'eau SEPIG.",
+  "technicalNote": "LOT 73 (09/09/2026) — ÉBAUCHE SANS PARCOURS, sortie de l'annonce (planned/) par ses gestes : dossier déplacé vers available/, retrait de gen-planned.js, migration 52 (remettreEnAttente). l'utilisateur n'a PAS de compte SEPIG : seule la reconnaissance ANONYME a été faite (reconnaissance anonyme du lot 73).\n\nMESURÉ en visiteur anonyme : SEPIG EAU (distribution d'eau). mon-espace.sepig.fr est une application REACT à page unique, derrière Cloudflare. /fr/connexion : un identifiant, un mot de passe, bouton « Me connecter », reCAPTCHA monté — la connexion ne se soumet pas en programme, d'où la fenêtre visible sur profil persistant. Le serveur rend la MÊME coquille pour tout /fr/... : le témoin /fr/nawak-inexistant-lot73 ET les pages visées (/fr/factures, /fr/mon-espace) finissent toutes sur /fr/connexion pour un anonyme — renvoi NON discriminant, aucune adresse de liste prouvée. D'où AUCUN verifyUrl : la session ne peut pas être contrôlée automatiquement (« sans-controle »), elle s'enregistre sur la confirmation de l'utilisateur.\n\nLE PARCOURS DES FACTURES N'EST PAS ÉCRIT. À RELEVER À LA PREMIÈRE CONNEXION d'un compte réel : (1) l'adresse de la liste des factures une fois connecté ; (2) la forme d'une ligne de facture et son identifiant stable ; (3) la nature du document servi (Content-Type, premiers octets). Rien n'est deviné ici.",
+  "fields": [
+    {
+      "key": "session",
+      "label": "Connexion à SEPIG",
+      "type": "session",
+      "required": false,
+      "accept": "application/json,.json",
+      "help": "Le bouton « Se connecter à SEPIG » ouvre une fenêtre de navigateur dans crabe : saisissez votre identifiant et votre mot de passe, puis résolvez le reCAPTCHA. Quand votre espace client s'affiche, cliquez sur Enregistrer. La connexion est conservée dans un profil de navigateur sur le serveur et n'est jamais réaffichée."
+    },
+    {
+      "key": "historique",
+      "label": "Historique à récupérer",
+      "type": "history",
+      "default": "depuis",
+      "help": "Votre liste de factures sera relue quand le parcours sera écrit ; les documents déjà déposés ne seront pas repris."
+    }
+  ],
+  "remoteLogin": {
+    "url": "https://mon-espace.sepig.fr/fr/connexion",
+    "marker": "",
+    "persistent": true,
+    "hint": "Saisissez votre identifiant et votre mot de passe, résolvez le reCAPTCHA, puis — quand votre espace client s'affiche — cliquez sur Enregistrer. Cette connexion ne peut pas être vérifiée automatiquement : c'est votre clic qui confirme."
+  },
+  "permissions": [
+    {
+      "key": "factures",
+      "scope": "read-write",
+      "description": "Parcourra votre espace client SEPIG et déposera vos factures d'eau sur vos destinations de stockage quand ce parcours sera écrit ; aujourd'hui cette fiche ouvre la connexion et ne récupère encore rien."
+    },
+    {
+      "key": "identifiants",
+      "scope": "read",
+      "description": "Votre connexion SEPIG, conservée dans un profil de navigateur protégé sur le serveur, utilisée pour la seule lecture de votre espace client — jamais réaffichée, jamais journalisée."
+    }
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "id": "autodoc",
+  "name": "AutoDoc",
+  "category": "shopping",
+  "site": "www.auto-doc.fr",
+  "implementation": "scraping",
+  "initialStatus": "pending",
+  "description": "Récupère automatiquement les factures de vos achats de pièces auto AutoDoc.",
+  "technicalNote": "LOT 79 (09/09/2026) — L'ANNONCE DEVIENT CONNECTEUR, session par la fenêtre (profil persistant, modèle profil-marchand lot 47).\n\nMESURÉ le 09/09/2026 (sonde anonyme, Chromium du socle, profil jetable, le serveur de production, scripts/lot79-reco-autodoc-coyote.js) : le site vit sur www.auto-doc.fr — www.autodoc.fr, que l'annonce portait depuis août, est un domaine MORT (erreur SSL), d'où la correction du champ « site ». En HTTP nu tout est 403 Cloudflare (cf-mitigated: challenge) ; le Chromium complet passe. /profile/orders et /profile/order/<x> SANS session sont renvoyés vers L'ACCUEIL (« / »), jamais vers un /login — d'où verifyUrl = /profile/orders et verifyUrlTient: true (y rester prouve, raisonnement lot 40) ; renvoiAnonyme n'est PAS déclaré : le renvoi mesuré vise l'accueil, pas un formulaire de connexion (vocabulaire lot 68). Un chemin inventé rend un vrai 404 : le renvoi de /profile/* est bien une garde de session.\n\nRELEVÉ par l'utilisateur sur sa session (09/09/2026, formes seulement) : liste /profile/orders = une carte par commande (« Numéro de commande : <n°> », date, montant, bouton « Détails de la commande ») ; détail /profile/order/<numéro> = la même carte + un bouton « Télécharger la facture » qui DÉPLIE un menu (« Facture n° 1 », « émise le AAAA.MM.JJ », icône de téléchargement) ; le lien du menu pointe /print-invoice/<jeton JWT propre à la facture>. LE JETON N'EST JAMAIS une ancre ni une ligne de journal (leçon lot 46).\n\nANCRE : remote_id = autodoc-commande-<numéro> ; si une commande porte PLUSIEURS factures, la première garde cette ancre et les suivantes ajoutent -facture-<rang> (une commande vue d'abord avec une facture puis avec deux ne change pas d'ancre). issued_on = la date « émise le AAAA.MM.JJ » lue dans le menu.\n\nRESTE À MESURER à la première session : la liste déroulée (pagination ? tri « Toutes les dates » ? — les formes sont comptées au journal, jamais cliquées), et si une commande peut porter plusieurs factures. La voie du document (téléchargement / onglet / réponse PDF) est journalisée par clic-document au premier passage.\n\n⚠ Données personnelles (§1bis) : les pages portent l'adresse de livraison, le numéro de client et le moyen de paiement — le parcours ne les lit pas, ne les journalise pas, ne les stocke pas (captures regex ciblées : numéro, rang, date d'émission, rien d'autre ; les montants ne sont pas lus).\n\nStatut : EXERCÉ ET FONCTIONNEL (lot 80, 10/09/2026). Premier passage réel : 1 commande vue, 1 facture déposée — voie mesurée « nouvel onglet, flux relu dans l'onglet », 54733 octets, en-tête %PDF-1.4 et %%EOF vérifiés sur le fichier déposé, 3 destinations ok. Ancre autodoc-commande-163458690 = le numéro lu sur la page, jamais le jeton JWT. Second passage : aucune ligne ajoutée (idempotence prouvée). Le 403 Cloudflare du premier essai venait du socle, pas du connecteur : l'onglet était relu par une requête hors navigateur, corrigé au lot 80. initialStatus pending reste la valeur par défaut à l'installation, comme pour tous les connecteurs.",
+  "fields": [
+    {
+      "key": "session",
+      "label": "Connexion à AutoDoc",
+      "type": "session",
+      "required": false,
+      "accept": "application/json,.json",
+      "help": "Le bouton « Se connecter à AutoDoc » ouvre une fenêtre de navigateur dans crabe : connectez-vous à votre compte AutoDoc comme d'habitude. La connexion est conservée dans un profil de navigateur sur le serveur et n'est jamais réaffichée."
+    },
+    {
+      "key": "historique",
+      "label": "Historique à récupérer",
+      "type": "history",
+      "default": "depuis",
+      "help": "La liste de vos commandes est relue à chaque récupération ; une facture déjà déposée n'est ni recliquée ni reproduite."
+    }
+  ],
+  "remoteLogin": {
+    "url": "https://www.auto-doc.fr/",
+    "marker": "",
+    "verifyUrl": "https://www.auto-doc.fr/profile/orders",
+    "verifyUrlTient": true,
+    "persistent": true,
+    "hint": "Ouvrez « Mon compte » sur la page, connectez-vous comme d'habitude, et laissez-vous ramener à votre espace client. Quand vos commandes s'affichent dans la fenêtre, cliquez sur Enregistrer."
+  },
+  "permissions": [
+    {
+      "key": "factures",
+      "scope": "read-write",
+      "description": "Parcourt vos commandes AutoDoc, télécharge chaque facture proposée par la commande, puis les dépose sur vos destinations de stockage."
+    },
+    {
+      "key": "identifiants",
+      "scope": "read",
+      "description": "Votre connexion AutoDoc, conservée dans un profil de navigateur protégé sur le serveur, utilisée pour la seule lecture de votre espace client — jamais réaffichée, jamais journalisée."
+    }
+  ]
+}

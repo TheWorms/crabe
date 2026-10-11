@@ -1,0 +1,57 @@
+{
+  "id": "amazon",
+  "name": "Amazon",
+  "category": "shopping",
+  "color": "#232f3e",
+  "letters": "AZ",
+  "site": "www.amazon.fr",
+  "implementation": "scraping",
+  "description": "Récupère automatiquement vos factures Amazon.",
+  "technicalNote": "Connecteur sur mesure, parcours validé contre un compte réel le 10/08/2026 : 12 commandes et 18 documents relevés sur la seule année 2026, un PDF téléchargé et vérifié (106 539 octets). Session capturée par navigateur distant (16 cookies, ~400 jours) — Amazon exige un code de validation à la connexion et n'accepte qu'une session à la fois. Sans timeFilter, la page ne montre que les trois derniers mois : le sélecteur expose 15 années (2012-2026) et apparaît parfois en double. Les cartes portent « N° de commande » en MINUSCULES dans le DOM. Le menu « Facture » est flottant, hors de la carte : les documents sont rattachés par différence des liens présents avant et après ouverture. Les UUID des PDF sont RÉGÉNÉRÉS à chaque ouverture du menu — la déduplication porte sur numéro de commande + rang, jamais sur l'UUID. Le clic ouvre le PDF dans le même onglet : ces navigations sont annulées pendant le relevé. Amazon limite les accès après des parcours rapprochés : au moins 5 s entre deux pages (CRABE_AMAZON_PAUSE_MS), arrêt immédiat sur vérification anti-robot, et une page sans commande alors que le compte en a est signalée comme limitation, pas comme année vide. Compter environ deux minutes par année de douze commandes.\n\nLOT 68 (28/08/2026) — LA PREUVE DE SESSION PAR LE RENVOI MESURÉ. Rejeu headless de la session enregistrée : /your-orders/orders TIENT (200, page non vide) mais ne porte AUCUN lien de déconnexion que la preuve générique sache lire (le lien d'Amazon est /gp/flex/sign-out, dans un menu survolé) — le contrôle refusait donc une session valide. Sonde anonyme le même jour, profil jetable : /your-orders/orders renvoie vers /ap/signin (titre « Amazon Sign-In », champ mot de passe présent, reconnu comme formulaire par le motif d'authentification), et le témoin /nawak-inexistant-temoin-lot68 rend une vraie 404 « Page introuvable » — la garde ne précède pas le routage. remoteLogin.renvoiAnonyme = \"connexion\" déclare cette mesure : rester sur le site sans être renvoyé vers la connexion prouve la session.",
+  "remoteLogin": {
+    "url": "https://www.amazon.fr/your-orders/orders",
+    "verifyUrl": "https://www.amazon.fr/your-orders/orders",
+    "marker": "Commandes",
+    "hint": "Cochez la case proposée par Amazon pour ne plus avoir à saisir de code.",
+    "renvoiAnonyme": "connexion"
+  },
+  "fields": [
+    {
+      "key": "session",
+      "label": "Connexion à Amazon",
+      "type": "session",
+      "required": false,
+      "accept": "application/json,.json",
+      "help": "Le bouton « Se connecter à Amazon » ouvre une fenêtre de navigateur dans crabe : connectez-vous comme sur le site, la connexion est enregistrée d'elle-même. Elle vaut vos identifiants — elle est chiffrée ici, et jamais réaffichée."
+    },
+    {
+      "key": "historique",
+      "label": "Historique à récupérer",
+      "type": "history",
+      "default": "depuis",
+      "help": "Amazon garde vos commandes depuis l'ouverture de votre compte. Tout reprendre demande beaucoup de temps et sollicite lourdement le site : crabe le fait une fois, puis ne suit plus que l'année en cours."
+    }
+  ],
+  "permissions": [
+    {
+      "key": "factures",
+      "scope": "read-write",
+      "description": "Télécharge les factures et avoirs PDF de vos commandes Amazon.fr, et les dépose sur vos destinations de stockage dans un dossier par compte Amazon."
+    },
+    {
+      "key": "identifiants",
+      "scope": "read",
+      "description": "La connexion à Amazon que vous avez ouverte dans crabe : les cookies de votre session, chiffrés au repos, rejoués uniquement pour atteindre vos commandes. Amazon exigeant un code de validation, aucun mot de passe n'est conservé."
+    },
+    {
+      "key": "informations-compte",
+      "scope": "read",
+      "description": "L'adresse de votre compte Amazon si elle est lisible sur la page, ainsi que la liste des années pendant lesquelles vous avez commandé, pour savoir quoi parcourir."
+    },
+    {
+      "key": "operations-bancaires",
+      "scope": "read",
+      "description": "Le numéro, la date et le montant total de chaque commande, lus sur la liste des commandes pour nommer et dater les factures. Aucun moyen de paiement n'est lu ni conservé."
+    }
+  ]
+}

@@ -1,0 +1,67 @@
+{
+  "id": "ameli",
+  "name": "Ameli",
+  "category": "public",
+  "color": "#3b7dd8",
+  "letters": "A",
+  "site": "www.ameli.fr",
+  "implementation": "scraping",
+  "initialStatus": "pending",
+  "description": "Récupère automatiquement vos relevés mensuels et votre attestation de droits de l'Assurance Maladie.",
+  "technicalNote": "LOT 78 (09/09/2026) — LE CONNECTEUR PASSE DES IDENTIFIANTS À LA SESSION PAR LA FENÊTRE, et propose DEUX SERVICES AU CHOIX (discover + multiselect, modèle Uber lot 72 / Infomaniak lot 25).\n\nPOURQUOI LA FENÊTRE : verdict du 18/08/2026, re-confirmé par l'essai réel du 09/09/2026 (15:48 UTC) — Ameli accepte les identifiants puis exige un code à usage unique (#BoutonGenerationOTP) que crabe ne peut pas recevoir. La connexion s'ouvre donc dans la fenêtre visible (profil persistant) : l'utilisateur saisit son numéro de sécurité sociale, son code personnel ET le code à usage unique. La session vit dans le profil de navigateur.\n\nLES DEUX SERVICES (adresses relevées par l'utilisateur, captures du 09/09/2026) : assure.ameli.fr/compte/aspm/releves-mensuels (une carte par mois, les 12 derniers, la plupart « Aucun paiement », bouton « Afficher plus de relevés » en bas) et assure.ameli.fr/compte/asdo/attestation-droits (sélecteur de bénéficiaire, bouton « Télécharger l'attestation de droits »).\n\nMESURÉ le 09/09/2026 (sonde anonyme, Chromium du socle, profil jetable, le serveur de production) : les deux adresses REDIRIGENT l'anonyme vers ameliconnect.ameli.fr/oauth2/authorize (écran « Me connecter », NIR + code) — d'où verifyUrl = la page des relevés, verifyUrlTient: true et renvoiAnonyme: \"connexion\" (preuve par le renvoi, lot 68 ; oauth2/authorize EST un écran d'authentification). Le témoin inventé /compte/nawak-… rend un « Request Rejected » du pare-feu (F5), PAS le renvoi : le renvoi est bien la garde de session. Aucune garde anti-robot vue (ni DataDome, ni Cloudflare, ni captcha).\n\n⚠ AUCUNE SESSION ENREGISTRÉE au moment du lot 78 : le parcours CONNECTÉ (forme des cartes de mois, effet du bouton « Afficher plus de relevés », effet du bouton d'attestation) est écrit d'après les captures du compte observé et reste À CONFIRMER SUR SESSION. Les extractions sont des motifs de LIBELLÉS relevés (« Afficher plus de relevés », « Aucun paiement », « Télécharger l'attestation ») + nœud le plus profond portant un mois en toutes lettres — jamais des sélecteurs devinés. Le journal dit ce qui ne se retrouve pas. À la première session : relever la vraie forme des cartes, le comportement de la pagination (remplace ou ajoute ?), la voie du document (téléchargement / onglet / réponse PDF — clic-document journalise la voie mesurée), et ce que le clic d'attestation déclenche côté serveur.\n\nANCRES : relevé mensuel → ameli-releve-AAAA-MM (le MOIS, jamais l'empreinte — leçon OUIGO lot 46), issued_on = premier jour du mois. Un mois « Aucun paiement » est un FAIT journalisé, aucun document produit, jamais un échec. Attestation → ameli-attestation-AAAA-MM (mois civil UTC de récupération) : le document est REGÉNÉRÉ à chaque téléchargement (date d'édition du jour, empreinte instable — lot 46 en pire), l'ancre au mois donne au plus UN document par mois, et un second passage le même mois NE CLIQUE MÊME PAS (zéro génération pour rien). Si la première session expose un repère stable (période de validité, date de mise à jour des droits), re-juger l'ancre.\n\nBÉNÉFICIAIRES : le sélecteur de l'attestation est laissé sur son choix par défaut — rien n'a été mesuré sur un compte à plusieurs bénéficiaires, et le journal le dit.\n\n⚠ Données personnelles (santé) : les pages portent prénom, date de naissance, numéro de sécurité sociale, paiements de soins. RIEN de tout cela dans un test, une fixture, un journal ou cette note — les FORMES seulement.\n\nStatut : ÉCRIT MAIS JAMAIS EXERCÉ contre une session réelle (aucune session enregistrée au lot 78). initialStatus pending + migration 54 (remettreEnAttente) tant qu'une récupération réelle n'a pas abouti.",
+  "fields": [
+    {
+      "key": "session",
+      "label": "Connexion à Ameli",
+      "type": "session",
+      "required": false,
+      "accept": "application/json,.json",
+      "help": "Le bouton « Se connecter à Ameli » ouvre une fenêtre de navigateur dans crabe : saisissez votre numéro de sécurité sociale, votre code personnel, puis le code à usage unique qu'Ameli vous envoie — c'est vous qui le recevez, crabe ne peut pas le faire à votre place. La connexion est conservée dans un profil de navigateur sur le serveur et n'est jamais réaffichée."
+    },
+    {
+      "key": "services",
+      "label": "Documents à récupérer",
+      "type": "multiselect",
+      "source": "discover",
+      "help": "Choisissez ce que crabe doit récupérer : vos relevés mensuels de remboursement, votre attestation de droits, ou les deux. Les deux sont proposés cochés."
+    },
+    {
+      "key": "historique",
+      "label": "Historique à récupérer",
+      "type": "history",
+      "default": "depuis",
+      "help": "L'Assurance Maladie garde plusieurs mois de relevés. crabe reprend ce que la page propose une première fois (bouton « Afficher plus de relevés »), puis ne suit plus que l'année en cours. L'attestation de droits, elle, est prise au plus une fois par mois."
+    }
+  ],
+  "remoteLogin": {
+    "url": "https://assure.ameli.fr/PortailAS/appmanager/PortailAS/assure",
+    "marker": "",
+    "verifyUrl": "https://assure.ameli.fr/compte/aspm/releves-mensuels",
+    "verifyUrlTient": true,
+    "renvoiAnonyme": "connexion",
+    "persistent": true,
+    "hint": "Acceptez ou refusez le bandeau, cliquez « Connectez-vous », puis saisissez votre numéro de sécurité sociale, votre code personnel et le code à usage unique qu'Ameli vous envoie. Quand votre compte s'affiche dans la fenêtre, cliquez sur Enregistrer."
+  },
+  "permissions": [
+    {
+      "key": "factures",
+      "scope": "read-write",
+      "description": "Télécharge vos relevés mensuels de l'Assurance Maladie, puis les dépose sur vos destinations de stockage."
+    },
+    {
+      "key": "identifiants",
+      "scope": "read",
+      "description": "Votre connexion Ameli, conservée dans un profil de navigateur protégé sur le serveur, utilisée pour la seule lecture de votre espace — jamais réaffichée, jamais journalisée."
+    },
+    {
+      "key": "documents-contractuels",
+      "scope": "read-write",
+      "description": "Récupère votre attestation de droits à l'Assurance Maladie (au plus une par mois) et la dépose au même endroit que vos relevés."
+    },
+    {
+      "key": "operations-bancaires",
+      "scope": "read",
+      "description": "Les montants et dates de remboursement figurant sur vos relevés. Aucune coordonnée bancaire n'est lue."
+    }
+  ]
+}

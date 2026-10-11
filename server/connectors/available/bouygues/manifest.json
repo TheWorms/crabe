@@ -1,0 +1,51 @@
+{
+  "id": "bouygues",
+  "name": "Bouygues Telecom",
+  "category": "telecom",
+  "color": "#0f2a5f",
+  "letters": "BT",
+  "site": "www.bouyguestelecom.fr",
+  "implementation": "scraping",
+  "description": "Récupère automatiquement vos factures Bouygues Telecom, mobile et Bbox.",
+  "fields": [
+    {
+      "key": "username",
+      "identification": "identifiant",
+      "label": "Adresse e-mail ou numéro",
+      "type": "text",
+      "required": true,
+      "help": "L'identifiant de votre espace client Bouygues Telecom : votre adresse électronique ou votre numéro de ligne, selon ce que vous utilisez pour vous connecter."
+    },
+    {
+      "key": "password",
+      "label": "Mot de passe",
+      "type": "password",
+      "required": true,
+      "help": "Le mot de passe de votre espace client Bouygues Telecom. Il est chiffré ici, jamais réaffiché, et ne sert qu'à y prendre vos factures."
+    },
+    {
+      "key": "historique",
+      "label": "Historique à récupérer",
+      "type": "history",
+      "default": "depuis",
+      "help": "Bouygues Telecom garde plusieurs années de factures. crabe reprend tout une première fois, puis ne suit plus que l'année en cours."
+    }
+  ],
+  "permissions": [
+    {
+      "key": "factures",
+      "scope": "read-write",
+      "description": "Télécharge vos factures mobile et Bbox depuis l'espace client Bouygues Telecom, puis les dépose sur vos destinations de stockage."
+    },
+    {
+      "key": "identifiants",
+      "scope": "read",
+      "description": "Votre identifiant et votre mot de passe Bouygues Telecom, chiffrés au repos, utilisés uniquement pour la connexion à l'espace client."
+    },
+    {
+      "key": "informations-compte",
+      "scope": "read",
+      "description": "Votre numéro de compte de facturation Bouygues Telecom, qui sert à séparer les factures de chaque ligne."
+    }
+  ]
+}

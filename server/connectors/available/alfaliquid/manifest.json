@@ -1,0 +1,50 @@
+{
+  "id": "alfaliquid",
+  "name": "Alfaliquid",
+  "category": "shopping",
+  "site": "www.alfaliquid.com",
+  "implementation": "scraping",
+  "initialStatus": "pending",
+  "description": "Récupère automatiquement les factures de vos commandes Alfaliquid.",
+  "caveat": "Vous vous connectez vous-même, dans une fenêtre, puis crabe lit vos commandes et prend leurs factures, sans rien cliquer.",
+  "technicalNote": "LOT 99 (11/10/2026) — CONNECTEUR NEUF, ÉCRIT D'APRÈS LA STRUCTURE DE LA VRAIE PAGE, JAMAIS EXERCÉ CONTRE UN COMPTE RÉEL. ANNONCÉ (code source de la page des commandes enregistré connecté par l'utilisateur le 11/10, structure reprise sans donnée par le prompt du lot 99) : boutique PrestaShop, thème classique ; la liste est servie à https://www.alfaliquid.com/fr/historique-commandes, body d'id history ; un tableau table.table-history (Référence de commande, Date, Prix total, Paiement, État, Facture, actions), une ligne tbody tr par commande ; la colonne Facture porte, quand la commande en a une, un lien sans texte vers /fr/index.php?controller=pdf-invoice&id_order=<n> ; les actions « Détails » (controller=order-detail) et « Commander à nouveau » (commande?submitReorder=1&id_order=<n>) ; la même liste est répétée pour les petits écrans dans div.orders.table-replace-resp. NON MESURÉ : l'adresse de connexion — déduite comme le fait le socle PrestaShop (index.php?controller=authentication, la forme qui marche sans réécriture d'adresse), sous le préfixe /fr/ que portent les liens de facture de la boutique. PARCOURS, SANS UN CLIC NI UNE SAISIE (un essai lit le fichier) : session capturée par la fenêtre de connexion (remoteLogin, sans profil persistant), rejouée dans un Chromium sans écran (modèle de Gandi) ; navigation vers la liste, arrivée jugée (body#history = la liste ; page de connexion ou champ de mot de passe = renvoi vers la connexion, classé « session expirée » par le lot 91 ; vérification de sécurité du site = message du mur ; autre chose = page illisible) ; lecture du SEUL table.table-history, jamais de la copie pour petits écrans ; pour chaque ligne qui en porte un, le lien controller=pdf-invoice (sur la boutique, en https, id_order numérique, bon de retour et bon de livraison exclus), revérifié juste avant la demande, suivi par onglet-pdf.fluxDeLaPage (le fetch du navigateur dans la page, lot 80) et refusé s'il ne commence pas par %PDF-. Toute adresse passe d'abord par server/connectors/adresses-interdites.js (submitReorder, ReloadOrderID, PBShoppingCart, reOrder, panier, cart, order-follow, return) : « Commander à nouveau » n'est jamais suivi, un lien de facture qui porterait un de ces mots est écarté et dit. ANCRE, DATE, NOM : remote_id alfaliquid-commande-<id_order> (lu dans le lien) ; date = celle de la ligne ; fichier alfaliquid_AAAA-MM_<référence de commande>.pdf (à défaut l'id_order), jamais deux fois le même nom. Une commande sans lien de facture est dite, jamais comptée comme un échec. TEMPS : le passage s'arrête de lui-même aux 2/3 de CRABE_LIMITE_EXECUTION_MS (sinon 45 min) et rend ce qu'il a pris ; « Depuis la dernière récupération » prend tout ce qui manque à l'archive (dans la limite de la conservation). CONTRÔLE À L'ENREGISTREMENT : preuveSurFenetre + marqueur mesuré body#history sur la page de liste (lot 49), le lien de déconnexion restant une preuve. JAMAIS EXERCÉ CONTRE UN COMPTE RÉEL : prouvé sur des pages reconstituées fidèles à la structure annoncée (test/lot99-*.test.js) — l'essai réel est à l'administrateur.",
+  "remoteLogin": {
+    "url": "https://www.alfaliquid.com/fr/index.php?controller=authentication",
+    "marker": "",
+    "verifyUrl": "https://www.alfaliquid.com/fr/historique-commandes",
+    "preuveSurFenetre": true,
+    "marqueursFenetre": [
+      { "selecteur": "body#history" }
+    ],
+    "hint": "Connectez-vous avec votre adresse e-mail et votre mot de passe Alfaliquid. Quand votre compte s'affiche, cliquez sur Enregistrer : crabe vérifie alors la connexion sur la page de vos commandes."
+  },
+  "fields": [
+    {
+      "key": "session",
+      "label": "Connexion à Alfaliquid",
+      "type": "session",
+      "required": false,
+      "accept": "application/json,.json",
+      "help": "Le bouton « Se connecter à Alfaliquid » ouvre une fenêtre de navigateur dans crabe : connectez-vous comme sur le site, avec votre adresse e-mail et votre mot de passe. La connexion est enregistrée, chiffrée, et n'est jamais réaffichée. Elle finira par expirer : crabe vous demandera alors de la rouvrir."
+    },
+    {
+      "key": "historique",
+      "label": "Historique à récupérer",
+      "type": "history",
+      "default": "depuis",
+      "help": "À chaque récupération, crabe lit la page de vos commandes Alfaliquid et prend les factures qui ne sont pas encore dans vos documents. La première récupération reprend tout l'historique ; si elle est trop longue pour un seul passage, la suite vient au passage suivant."
+    }
+  ],
+  "permissions": [
+    {
+      "key": "factures",
+      "scope": "read-write",
+      "description": "Lit la liste de vos commandes Alfaliquid et télécharge la facture PDF de chacune, sans rien cliquer sur la boutique, puis la dépose sur vos destinations de stockage."
+    },
+    {
+      "key": "identifiants",
+      "scope": "read",
+      "description": "La connexion de navigateur que vous avez ouverte vous-même sur Alfaliquid : ses cookies, chiffrés au repos, rejoués uniquement pour lire vos commandes. Aucun mot de passe n'est stocké ici."
+    }
+  ]
+}
