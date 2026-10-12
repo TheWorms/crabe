@@ -1,0 +1,50 @@
+{
+  "id": "e-liquide-fr",
+  "name": "e-liquide-fr",
+  "category": "shopping",
+  "site": "www.e-liquide-fr.com",
+  "implementation": "scraping",
+  "initialStatus": "pending",
+  "description": "Récupère automatiquement les factures de vos commandes e-liquide-fr.",
+  "caveat": "Vous vous connectez vous-même dans une fenêtre ; crabe lit ensuite vos commandes et enregistre chaque facture en PDF, telle que la boutique l'affiche.",
+  "technicalNote": "LOT 100 (11/10/2026) — ESSAYÉ PAR L'UTILISATEUR LE 11/10 : connexion bonne, passage n° 721 en échec. MESURÉ (code source enregistré connecté par l'utilisateur, adresse tapée directement) : la page d'arrivée « Mon compte » — PBUserAccount.asp en lecture directe, titre « Mon Compte », html.is-user-logged, ISO-8859-1, #maincontainer de classes useraccount userdashboard, aucun table.PBTable — porte un MForm (POST, PBUserAccount.asp) réduit à ActionID (caché, 0) et DiscountCoupon (texte, code promotionnel, vide) : ni ReloadMode, ni OrderID, ni champ de pagination ; son menu ul.menulist est fait de javascript:SubmitAction(N,null,0,null,1) (8 « Suivre vos commandes », 10 « Recharger… » JAMAIS, 2, 20, 6, 5, 18, 1, et 11 pour le code promotionnel) — aucun n'est exécuté. Le lot 99 lui avait prêté le formulaire de la page suivante : sa garde a refusé d'envoyer (« ReloadMode autre que 0 »). CORRIGÉ (R1) : ENVOYER_LE_FORMULAIRE reconnaît, au moment de l'envoi, la page où elle est. Page d'arrivée (#maincontainer.userdashboard, pas de table.PBTable, aucun champ de pagination) : seuls les champs ActionID (une fois, servi à 0), DiscountCoupon (une fois, VIDE — sinon rien ne part) et, s'ils y paraissent, ReloadMode (0) et OrderID (vide ou nul) ; seul ActionID passe de 0 à 8, les autres partent tels que servis, rien n'est ajouté. Page « Suivi des commandes » (table.PBTable) : la règle du lot 99, inchangée. Toute autre forme : rien ne part, la page est dite illisible, les NOMS des champs vus (jamais leurs valeurs) au journal. R2 : PagingAPIRowCount n'est lu que sur la page des commandes. R3 : si l'envoi ActionID=8 ne mène pas au tableau des commandes, arrêt, rien de renvoyé, le journal dit le titre de la page reçue et les noms des champs de son MForm (de quoi savoir si SubmitAction fait plus que poser ActionID ; le message du site pour une liste vide n'est pas connu). R4 : dans la fenêtre de connexion, la confirmation d'âge (div.ngdialog.age-gate, mesurée) est une obstruction connue de server/connectors/obstructions.js, retirée de la page sans un clic. NON MESURÉ : ce que SubmitAction ajoute au formulaire avant l'envoi ; la pagination réelle ; l'impression des vraies factures. CODE DU LOT 100 : JAMAIS EXERCÉ CONTRE UN COMPTE RÉEL — prouvé sur des pages reconstituées (test/lot99-e-liquide-fr.test.js, test/lot100-*.test.js) ; l'essai réel est à l'administrateur. ⁂ LOT 99 (11/10/2026) — CONNECTEUR NEUF, ÉCRIT D'APRÈS LA STRUCTURE DES VRAIES PAGES, JAMAIS EXERCÉ CONTRE UN COMPTE RÉEL. ANNONCÉ (code source de la page des commandes et d'une facture enregistrés connecté par l'utilisateur le 11/10, structure reprise sans donnée par le prompt du lot 99) : boutique Oxatis (meta generator) ; connexion à https://www.e-liquide-fr.com/PBUserLogin.asp?CCode=33 ; connecté, la balise html porte la classe is-user-logged ; déconnexion par un bouton ng-click=\"logout()\" (jamais touché) ; la liste des commandes est servie par PBUserAccount.asp en réponse à l'envoi du formulaire form[name=MForm] (POST, action PBUserAccount.asp) avec ActionID à 8 (« Suivi des commandes ») — champs cachés mesurés sur la page « Suivi des commandes », déjà passée par l'envoi : ActionID, OrderID, OrdersPageIdx (1), ReloadMode (0), PagingAPIRowCount (5), PagingAPIHashCode ; un tableau table.PBTable (Numéro span.PBNumber, Date span.PBDate « 3 mars 2025 », Montant TTC, Etat), une ligne par commande et ses actions : « détail » WNDAPIOpenWindow('InvoiceWnd','PBRenderInvoice.asp?…'), « historique » SelectItem(<n>,9), « facture » WNDAPIOpenWindow('InvoiceView','Files/<n>/Orders/<n>/Invoice-AAAA-MM-<n>.htm',…), « Recharger » /PBShoppingCart.asp?ReloadOrderID=<n> (jamais) ; la facture est une page HTML statique en windows-1252, titre « Facture », tableaux #InvoiceAddress, #InvoiceOrder, #InvoiceBody. NON MESURÉ : la pagination (aucun lien de page suivante dans le code enregistré), si les pages .htm exigent la session. PARCOURS, SANS UN CLIC NI UNE SAISIE (un essai lit le fichier) : session capturée par la fenêtre (remoteLogin, sans profil persistant — page.pdf n'existe que sans écran), rejouée dans un Chromium sans écran (modèle de Gandi) ; « Mon compte » jugé (is-user-logged et MForm ; page de connexion PBUserLogin.asp, champ de mot de passe ou classe absente = renvoi vers la connexion, classé « session expirée » par le lot 91). LE SEUL ENVOI (R4 ; règle de la page « Suivi des commandes » depuis le lot 100) : ENVOYER_LE_FORMULAIRE, exécutée dans la page d'un seul tenant, relit MForm au moment de l'envoi et ne l'envoie que vers https://www.e-liquide-fr.com/PBUserAccount.asp, en POST, dans la page, avec les champs tels que la page les a servis (mêmes noms, mêmes valeurs que la lecture qui précède), ReloadMode à 0, OrderID vide ou nul, en ne changeant que ActionID (8) et, pour les pages suivantes, OrdersPageIdx ; sinon rien ne part. PAGINATION (règle du R4, faute de mesure) : tant que la page lue montre exactement PagingAPIRowCount lignes, la suivante est demandée (OrdersPageIdx + 1) ; arrêt sur une page vide, plus courte, ou identique à la précédente (mêmes numéros : « pages suivantes non lues » à l'écran) ; jamais au-delà de 50 pages (250 commandes, borne contre une pagination qui tournerait, dite si atteinte). LA FACTURE (R3) : son adresse est tirée de l'appel WNDAPIOpenWindow('InvoiceView',…) PAR LECTURE DU TEXTE (jamais exécuté) ; sur la boutique, en https, sous /Files/, finissant par .htm, sans paramètre, sans « .. », sans mot interdit (server/connectors/adresses-interdites.js) ; revérifiée, ouverte dans un onglet de la session ; acceptée seulement si elle reste à son adresse, porte le titre « Facture » et #InvoiceBody ; rendue en PDF par le navigateur (page.pdf, A4, fonds compris) SANS RIEN Y CHANGER, refusée si le rendu ne commence pas par %PDF- ; onglet refermé. L'encodage windows-1252 est celui que le navigateur lit : prouvé sur une page d'essai (« € » et accents relus dans le PDF). ANCRE, DATE, NOM : remote_id e-liquide-fr-facture-<numéro lu dans Invoice-<numéro>.htm>, à défaut e-liquide-fr-commande-<n° de la ligne> ; date = celle de la ligne (à défaut le mois du nom du fichier) ; fichier e-liquide-fr_AAAA-MM_<numéro>.pdf, jamais deux fois le même. TEMPS : arrêt de lui-même aux 2/3 de CRABE_LIMITE_EXECUTION_MS, ce qui est pris est rendu ; « Depuis la dernière récupération » prend tout ce qui manque à l'archive. CONTRÔLE À L'ENREGISTREMENT : preuveSurFenetre + marqueur mesuré html.is-user-logged sur « Mon compte » (lot 49) — aucun lien de déconnexion sur ce site, et PBUserLogin.asp échappe au motif commun des pages de connexion. LOT 99 : prouvé sur des pages reconstituées (test/lot99-*.test.js), dont la page d'arrivée était inventée — voir LOT 100.",
+  "remoteLogin": {
+    "url": "https://www.e-liquide-fr.com/PBUserLogin.asp?CCode=33",
+    "marker": "",
+    "verifyUrl": "https://www.e-liquide-fr.com/PBUserAccount.asp",
+    "preuveSurFenetre": true,
+    "marqueursFenetre": [
+      { "selecteur": "html.is-user-logged" }
+    ],
+    "hint": "Connectez-vous avec votre adresse e-mail et votre mot de passe e-liquide-fr. Quand votre espace client s'affiche, cliquez sur Enregistrer."
+  },
+  "fields": [
+    {
+      "key": "session",
+      "label": "Connexion à e-liquide-fr",
+      "type": "session",
+      "required": false,
+      "accept": "application/json,.json",
+      "help": "Le bouton « Se connecter à e-liquide-fr » ouvre une fenêtre de navigateur dans crabe : connectez-vous comme sur le site, avec votre adresse e-mail et votre mot de passe. La connexion est enregistrée, chiffrée, et n'est jamais réaffichée. Elle finira par expirer : crabe vous demandera alors de la rouvrir."
+    },
+    {
+      "key": "historique",
+      "label": "Historique à récupérer",
+      "type": "history",
+      "default": "depuis",
+      "help": "e-liquide-fr montre vos commandes page par page : à chaque récupération, crabe les lit toutes et prend les factures qui ne sont pas encore dans vos documents. La première récupération reprend tout l'historique ; si elle est trop longue pour un seul passage, la suite vient au passage suivant."
+    }
+  ],
+  "permissions": [
+    {
+      "key": "factures",
+      "scope": "read-write",
+      "description": "Lit la liste de vos commandes e-liquide-fr, page après page, et enregistre en PDF la facture de chacune telle que la boutique l'affiche, puis la dépose sur vos destinations de stockage."
+    },
+    {
+      "key": "identifiants",
+      "scope": "read",
+      "description": "La connexion de navigateur que vous avez ouverte vous-même sur e-liquide-fr : ses cookies, chiffrés au repos, rejoués uniquement pour lire vos commandes et vos factures. Aucun mot de passe n'est stocké ici."
+    }
+  ]
+}

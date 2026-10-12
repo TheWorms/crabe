@@ -1,0 +1,47 @@
+{
+  "id": "vistaprint",
+  "name": "VistaPrint",
+  "category": "shopping",
+  "site": "www.vistaprint.fr",
+  "implementation": "scraping",
+  "initialStatus": "pending",
+  "description": "Récupère automatiquement les factures de vos commandes d'impression VistaPrint.",
+  "technicalNote": "LOT 47 (22/08/2026) — ÉBAUCHE : la fiche existe pour que la session puisse être ouverte à la main (fenêtre « Se connecter ») et gardée dans un profil persistant ; LE PARCOURS DES DOCUMENTS N'EST PAS ÉCRIT. Lancé, le connecteur atteint l'espace client, dépose la preuve de liste (lot 31), journalise ce qu'il voit et s'arrête en le disant (aucunDocument, lot 41).\n\nMESURÉ le 22/08/2026, en visiteur anonyme, en production (sonde anonyme, docs/reconnaissance-lot47.md), en DEUX passes — la première visait les chemins anglais (/account, /order-history), qui rendent la même coquille React que le témoin inventé ; les liens de l'en-tête du site (« Mes favoris » → /mon-compte/favoris) ont donné le vrai espace : /mon-compte répond 200 et REDIRIGE l'anonyme vers le SSO account.vista.com/login?state=… (« Connexion | Vista ») — d'où « verifyUrl » /mon-compte et « verifyUrlTient »: true (rester sur /mon-compte est la preuve de session). Le témoin /mon-compte/nawak-inexistant-42 rend 404, comme /mon-compte/commandes et /mon-compte/historique-commandes : la sonde DISCRIMINE, et L'ADRESSE DE LA LISTE DES COMMANDES N'EST PAS CONNUE — elle sera vue à la première session (les libellés que le connecteur journalise serviront à la trouver). Le SSO montre en UN écran : e-mail (#sign-in-email), mot de passe (#signInPassword), une entrée « Se connecter avec un code d'accès » (code à usage unique, au choix de l'utilisateur), boutons Google / Apple / Facebook. AUCUN captcha monté, aucun marqueur anti-robot (server: cloudflare, sans challenge au fetch — contrairement à Decathlon et Bricomarché).\n\nNON MESURÉ, faute de session : l'adresse et la forme de la liste des commandes, le libellé des liens de facture, le format du document, ce que le site demande APRÈS une connexion réussie. La connexion par Google est déconseillée dans la fenêtre pilotée (refus Google mesuré au lot 35, générique) : connexion NATIVE e-mail + mot de passe, ou par code d'accès reçu par e-mail.\n\nLOT 48 (23/08/2026) — aucune fenêtre n'a été ouverte pour VistaPrint le 22/08 (aucune ligne en base). La « verifyUrl » /mon-compte (redirection anonyme vers le SSO account.vista.com mesurée au lot 47, témoin 404 franc) reste NON VÉRIFIÉE sur session.\n\nLOT 50 (23/08/2026) — LA LISTE A ÉTÉ VUE, SUR LE VRAI COMPTE. /mon-compte était la mauvaise page : elle ne contient aucune commande, le connecteur y comptait 0 sur une session valide. RELEVÉ à l'écran par l'utilisateur (forme uniquement, jamais de valeur) : la liste vit sur /oh/ — conteneur [data-testid=\"order-history-application\"], lignes dans une liste ul de li, chaque ligne portant un lien dont le href commence par /od?orderId= (l'identifiant métier est DANS l'adresse : c'est le repère de comptage, et l'ancre d'idempotence du futur parcours). Le détail vit sur /od?orderId=<référence>, marqueurs data-testid=\"order-info-number\" et data-testid=\"order-info-date\". La facture est un <button> au libellé « Télécharger vos factures TVA » — PAS un lien, même piège que le <bl-button> de Boulanger ; ce que son clic déclenche N'A PAS été mesuré (le module clic-document guettera les trois voies quand le parcours sera écrit). SONDÉ en anonyme depuis la production le même jour : /oh/ répond 200 à tout le monde (aucune redirection mesurable au fetch), mais la page anonyme (390 Ko) ne porte ni order-history-application ni orderId= — la preuve de session se fait donc sur ces marqueurs, servis au seul compte connecté, lien de déconnexion en filet. Le parcours de récupération n'est PAS dans le lot 50 : ce lot corrige l'adresse et le comptage, rien d'autre.\n\nLOT 51 (23/08/2026) — LE PARCOURS EST ÉCRIT, mesuré par sonde sur le vrai compte (chiffres masqués). Le détail vit sur /od?orderId=<référence> (la référence métier est dans l'adresse du lien que porte chaque ligne de /oh/) et affiche les marqueurs relevés : data-testid=\"order-info-number\" (« Numéro de commande: … ») et data-testid=\"order-info-date\" (« Date de la commande: … », date française en toutes lettres — c'est elle qui donne issued_on). Le bouton « Télécharger vos factures TVA » est un <button type=\"button\"> (classes swan-button) sans lien : son clic MESURÉ appelle un service de génération (vatinvoicegenerator.orders.vpsvc.com/…/order/<référence>/pdf, réponse application/pdf) puis déclenche un TÉLÉCHARGEMENT — voie « téléchargement direct », UN document pour la commande, AUCUNE boîte de choix malgré le pluriel du libellé (l'hypothèse du choix multiple ne s'est pas vérifiée). clic-document guette quand même les trois voies et journalise celle qui sert. L'ancre d'idempotence est vistaprint-<référence de commande en majuscules> — jamais une empreinte du PDF (lot 46) ; une commande déjà déposée n'est même pas rouverte. Le statut reste pending tant que la fiche n'a pas été prononcée après validation sur compte réel.",
+  "fields": [
+    {
+      "key": "session",
+      "label": "Connexion à VistaPrint",
+      "type": "session",
+      "required": false,
+      "accept": "application/json,.json",
+      "help": "Le bouton « Se connecter à VistaPrint » ouvre une fenêtre de navigateur dans crabe : fermez le bandeau de cookies s'il s'affiche, puis connectez-vous avec votre e-mail et votre mot de passe VistaPrint (ou par code d'accès reçu par e-mail) — évitez « Continuer via Google », souvent refusé dans cette fenêtre. La connexion est conservée dans un profil de navigateur sur le serveur et n'est jamais réaffichée."
+    },
+    {
+      "key": "historique",
+      "label": "Historique à récupérer",
+      "type": "history",
+      "default": "depuis",
+      "help": "La liste de vos commandes est relue en entier à chaque récupération ; les documents déjà déposés ne sont pas repris."
+    }
+  ],
+  "remoteLogin": {
+    "url": "https://www.vistaprint.fr/mon-compte",
+    "marker": "",
+    "verifyUrl": "https://www.vistaprint.fr/mon-compte",
+    "verifyUrlTient": true,
+    "persistent": true,
+    "hint": "Fermez d'abord le bandeau de cookies s'il s'affiche, puis connectez-vous avec votre e-mail et votre mot de passe VistaPrint (ou par code d'accès reçu par e-mail) — pas par Google. Quand votre espace client s'affiche, enregistrez la connexion."
+  },
+  "permissions": [
+    {
+      "key": "factures",
+      "scope": "read-write",
+      "description": "Parcourt vos commandes d'impression VistaPrint et dépose leurs factures TVA sur vos destinations de stockage. Une commande déjà déposée n'est pas reprise."
+    },
+    {
+      "key": "identifiants",
+      "scope": "read",
+      "description": "Votre connexion VistaPrint, conservée dans un profil de navigateur protégé sur le serveur, utilisée pour la seule lecture de votre espace client — jamais réaffichée, jamais journalisée."
+    }
+  ]
+}

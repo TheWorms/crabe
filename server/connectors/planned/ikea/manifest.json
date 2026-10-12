@@ -1,0 +1,8 @@
+{
+  "id": "ikea",
+  "name": "IKEA",
+  "category": "shopping",
+  "site": "www.ikea.com",
+  "description": "Récupère automatiquement les factures de vos achats IKEA.",
+  "status": "planned"
+}

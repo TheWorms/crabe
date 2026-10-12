@@ -1,0 +1,50 @@
+{
+  "id": "eau-ile-de-france",
+  "name": "Eau d'Île-de-France",
+  "category": "energie",
+  "site": "connexion.leaudiledefrance.fr",
+  "implementation": "scraping",
+  "initialStatus": "pending",
+  "description": "Récupère automatiquement vos factures d'eau de l'Eau d'Île-de-France.",
+  "caveat": "Vous vous connectez vous-même, dans une fenêtre. Ensuite, crabe prend une à une les factures de l'historique de votre espace client — seulement celles du contrat affiché sur la page.",
+  "technicalNote": "LOT 102 (11/10/2026) — CONNECTEUR NEUF, ÉCRIT D'APRÈS LA STRUCTURE DE LA VRAIE PAGE, JAMAIS EXERCÉ CONTRE UN COMPTE RÉEL. ANNONCÉ (code source de la page des factures enregistré connecté par l'utilisateur le 11/10, structure reprise sans donnée par le prompt du lot 102) : espace client Salesforce Experience Cloud (composants Lightning Web Components c-icl-…, ombre synthétique) ; page https://connexion.leaudiledefrance.fr/espace-particuliers/s/factures, titre « Mes Factures », body.comm-page-custom-factures, contenu dessiné par script après #auraLoadingBox ; l'historique est le composant c-icl-contrat-factures-histo (« HISTORIQUE DE MES FACTURES ») : une ligne d'en-tête (Date, Numéro de facture, Montant, Statut, Téléchargement), puis une ligne div.slds-grid.slds-p-around_medium par facture — la date (lightning-formatted-date-time, JJ/MM/AAAA), le numéro (24 chiffres, en texte), le montant, le statut, et div.download, qui porte data-url (un jeton chiffré) et data-numfacture (le numéro) : ni lien ni bouton. Ressources servies depuis rock-vedif.my.site.com, rock-vedif.my.salesforce.com, rock-vedif.file.force.com et rock-vedif--c.visualforce.com. PARCOURS : session capturée par la fenêtre de connexion (remoteLogin, sans profil persistant), rejouée dans un Chromium sans écran ; arrivée par l'adresse de la page des factures, jamais par le menu ; attente que l'historique soit dessiné (en-tête présent, plus de chargement, stable), bornée à 45 s ; lecture par le moteur de sélecteurs de Playwright, qui travaille dans un monde isolé — jamais par une requête du document dans la page, que l'ombre synthétique de LWC peut filtrer. Pour chaque ligne : la date, le numéro lu dans le texte ET dans data-numfacture (s'ils diffèrent, la ligne est écartée et dite), la présence de div.download ; le jeton data-url n'est jamais lu. UN SEUL CLIC, UN SEUL GESTE (un essai lit le fichier) : l'icône de téléchargement d'une ligne, par une seule fonction, sur c-icl-contrat-factures-histo div.download[data-numfacture=\"<numéro lu>\"], recontrôlée au moment du clic (un seul élément, visible, dans l'historique, portant ce numéro) ; un clic à la fois, le suivant seulement quand le précédent a rendu son document ou échoué. Le document est pris par le socle clic-document (téléchargement, onglet ou réponse) et refusé s'il ne commence pas par %PDF- ; rien n'est lu d'une adresse hors des domaines du site (option adressePermise du socle, lot 102) ; un onglet ouvert par le clic est refermé. TOUT LE RESTE ARRÊTE : une fenêtre, une boîte du navigateur (refusée), une autre page, un message d'erreur Salesforce (#auraErrorMask visible), un onglet sur un autre domaine, rien, un document qui n'est pas un PDF — plus aucun clic pendant le passage, rien n'est rempli, les factures déjà prises sont gardées, le message le dit. JAMAIS : « Payer ma facture », « Modifier mes coordonnées », « Télécharger une attestation de contrat », « Signaler un changement », « J'emménage / Je déménage », « Comprendre mon solde », les onglets, le menu, « Mon profil », « Déconnexion », la bulle de discussion. ANCRE, DATE, NOM : remote_id eau-ile-de-france-facture-<numéro> ; date = celle de la ligne ; fichier eau-ile-de-france_AAAA-MM_facture-<numéro>.pdf. Seul le contrat affiché est lu : « Tous mes contrats » n'est pas parcouru. TEMPS : arrêt de lui-même aux 2/3 de CRABE_LIMITE_EXECUTION_MS (sinon 45 min), en rendant ce qui est pris ; « Depuis la dernière récupération » prend tout ce qui manque à l'archive (dans la limite de la conservation). CONTRÔLE À L'ENREGISTREMENT : preuveSurFenetre — l'adresse de la page des factures tenue dans la fenêtre et le marqueur c-icl-contrat-factures-histo. NON MESURÉ : l'effet réel du clic ; l'adresse de la page de connexion, et ce que la page des factures sert à un visiteur non connecté (le connecteur juge sur l'adresse d'authentification et le champ de mot de passe visible) ; un historique vide ou long ; plusieurs contrats ; la chaîne de certificats vue par le Chromium sans écran (au lot 97, le serveur n'envoyait pas son certificat intermédiaire). JAMAIS EXERCÉ CONTRE UN COMPTE RÉEL : prouvé sur des pages reconstituées (test/lot102-*.test.js) — l'essai réel est à l'administrateur.",
+  "remoteLogin": {
+    "url": "https://connexion.leaudiledefrance.fr/espace-particuliers/s/factures",
+    "marker": "",
+    "verifyUrl": "https://connexion.leaudiledefrance.fr/espace-particuliers/s/factures",
+    "preuveSurFenetre": true,
+    "marqueursFenetre": [
+      { "selecteur": "c-icl-contrat-factures-histo" }
+    ],
+    "hint": "Connectez-vous avec les identifiants de votre espace client de l'Eau d'Île-de-France. Quand la page de vos factures s'affiche, cliquez sur Enregistrer : crabe vérifie alors la connexion sur cette page."
+  },
+  "fields": [
+    {
+      "key": "session",
+      "label": "Connexion à l'Eau d'Île-de-France",
+      "type": "session",
+      "required": false,
+      "accept": "application/json,.json",
+      "help": "Le bouton « Se connecter à Eau d'Île-de-France » ouvre une fenêtre de navigateur dans crabe : connectez-vous comme sur le site, avec les identifiants de votre espace client. La connexion est enregistrée, chiffrée, et n'est jamais réaffichée. Elle finira par expirer : crabe vous demandera alors de la rouvrir."
+    },
+    {
+      "key": "historique",
+      "label": "Historique à récupérer",
+      "type": "history",
+      "default": "depuis",
+      "help": "À chaque récupération, crabe lit l'historique des factures de votre contrat et prend celles qui ne sont pas encore dans vos documents. La première récupération reprend tout l'historique affiché ; si elle est trop longue pour un seul passage, la suite vient au passage suivant."
+    }
+  ],
+  "permissions": [
+    {
+      "key": "factures",
+      "scope": "read-write",
+      "description": "Lit l'historique des factures de votre contrat sur l'espace client de l'Eau d'Île-de-France et télécharge chaque facture par son icône de téléchargement — le seul élément que crabe clique —, puis la dépose sur vos destinations de stockage."
+    },
+    {
+      "key": "identifiants",
+      "scope": "read",
+      "description": "La connexion de navigateur que vous avez ouverte vous-même sur l'espace client de l'Eau d'Île-de-France : ses cookies, chiffrés au repos, rejoués uniquement pour lire vos factures. Aucun mot de passe n'est stocké ici."
+    }
+  ]
+}

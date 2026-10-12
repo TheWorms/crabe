@@ -1,0 +1,39 @@
+{
+  "id": "bunny-net",
+  "name": "Bunny.net",
+  "category": "hebergement",
+  "color": "#ff7300",
+  "letters": "BN",
+  "site": "bunny.net",
+  "implementation": "api",
+  "description": "Récupère automatiquement vos factures d'hébergement et de diffusion Bunny.net.",
+  "technicalNote": "API officielle api.bunny.net, en-tête AccessKey, pas de scraping. Deux sources lues : GET /billing (billing records, PDF sur /billing/summary/{id}/pdf) et GET /billing/payment-requests (comptes en facturation différée, PDF sur /billing/payment-request-invoice/{id}/pdf). Les identifiants des deux séries sont des entiers indépendants, d'où les remoteId préfixés record- et paiement-. Aucune route de facturation ne donne d'identifiant de compte : accountId reste null. Validé sur le compte réel de l'utilisateur au lot 17.",
+  "fields": [
+    {
+      "key": "accessKey",
+      "label": "Clé d'API",
+      "type": "password",
+      "required": true,
+      "help": "Sur bunny.net, cliquez sur votre photo de profil en haut à droite, puis « Edit account details » : la clé se trouve dans la section « API Key ». Copiez-la telle quelle.\n⚠ À savoir avant de la coller : Bunny.net n'a qu'UNE clé par compte, et elle ouvre tout votre espace — pas seulement la facturation. Il n'existe pas de droit plus restreint à lui donner. crabe ne s'en sert que pour lister vos factures et les télécharger."
+    },
+    {
+      "key": "historique",
+      "label": "Historique à récupérer",
+      "type": "history",
+      "default": "depuis",
+      "help": "Bunny.net garde toute votre facturation depuis l'ouverture de votre compte. crabe reprend tout une première fois, puis ne suit plus que l'année en cours."
+    }
+  ],
+  "permissions": [
+    {
+      "key": "factures",
+      "scope": "read-write",
+      "description": "Appelle l'API officielle de facturation de Bunny.net pour lister et télécharger vos factures, puis les dépose sur vos destinations de stockage."
+    },
+    {
+      "key": "identifiants",
+      "scope": "read",
+      "description": "Votre clé d'API Bunny.net, chiffrée au repos. C'est la clé du compte : elle ouvre aussi le reste de votre espace Bunny.net, crabe ne s'en sert que pour la facturation."
+    }
+  ]
+}

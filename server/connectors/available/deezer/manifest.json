@@ -1,0 +1,56 @@
+{
+  "id": "deezer",
+  "name": "Deezer",
+  "category": "divertissement",
+  "color": "#a238ff",
+  "letters": "DZ",
+  "site": "www.deezer.com",
+  "implementation": "scraping",
+  "initialStatus": "pending",
+  "description": "Surveille l'historique des paiements de votre compte Deezer.",
+  "caveat": "Deezer ne fournit aucune facture PDF : le reçu n'existe qu'en page à consulter. crabe imprime ce reçu officiel (en français) en PDF, comme le bouton « Imprimer » du site — aucun contenu n'est fabriqué.",
+  "technicalNote": "LOT 37 (18/08/2026) — PAGE RÉELLE MESURÉE EN SESSION OUVERTE (session capturée d'un compte réel, rejouée headless en production). « initialStatus »: « pending ».\n\nLE LOT 36 CHERCHAIT UN LIEN QUI N'EXISTE PAS : /fr/account ne porte aucun lien « Historique des paiements ». CHEMIN RÉEL MESURÉ : www.deezer.com/fr/account → fermer la fenêtre d'incitation « Deezer Premium » (chakra-portal, elle intercepte TOUS les clics) → BOUTON « Gérer mon abonnement » (pas un lien, aucun data-testid) → NOUVEL ONGLET payment.deezer.com/?<jeton> → #page_subscription et #subscription_invoices (« Payment history »). L'accès direct à payment.deezer.com sans jeton renvoie à l'accueil par payment/back.php : inutile de coder cette adresse en dur.\n\nLIGNES : div[data-payment-history-listitem], 21 mesurées sur un compte réel (de 2013 à 2026), DONT 18 EN aria-hidden=\"true\" (repli « voir plus ») — toutes prises depuis le DOM, un relevé du rendu visible en verrait 3 sur 21. Prix : span[data-testid=\"payment_history_price\"]. Date : JJ/MM/AAAA dans le texte. La page est servie EN ANGLAIS malgré la locale française : aucun sélecteur ne dépend du texte.\n\nLE REÇU N'EST PAS UN PDF, MESURÉ : a[data-testid=\"link-to-invoice\"] → payment.deezer.com/?cip=<jeton> → Content-Type text/html, reçu OFFICIEL complet à l'écran (logo, e-mail, « Numéro de reçu » GGL_I_…, date, abonnement, Total HT / TVA / Total TTC, Deezer S.A., RCS Paris, n° de TVA FR41898969852, bouton « Imprimer »), AUCUN lien PDF dedans. Le lot 37 disait « aucun PDF n'existe » : c'est TOUJOURS VRAI — le site n'en sert pas — mais depuis le LOT 41 (19/08/2026) crabe IMPRIME désormais le reçu officiel : page.pdf() A4 avec fonds, exactement ce que ferait le bouton « Imprimer » du site, aucun contenu fabriqué. La page arrive souvent EN ANGLAIS : la version FRANÇAISE s'obtient par le <select id=\"footer-lang-select\"> du pied de page (chaque option porte une adresse cip= différente ; l'option française se reconnaît à son texte « Français ») et c'est ELLE qu'on archive. PREUVES d'impression (le PDF de Chromium encode le texte en glyphes, il ne se relit pas) : la SOURCE porte le numéro de reçu et « Total TTC » avant le rendu, les octets commencent par %PDF-, le poids dépasse un seuil (rendu blanc = échec dit à voix haute). remoteId = le numéro de reçu (GGL_I_…), nom deezer_<AAAA-MM>_<numéro>.pdf. Le type d'un reçu est RE-MESURÉ à chaque exécution — si Deezer sert un jour du PDF direct, le journal le dira. Le cip= est un jeton : jamais dans un nom, un journal, un message.\n\nPIÈGE : div[role=\"alert\"]#payment-alert (« An error occurred with your bank details… ») est présent EN PERMANENCE, masqué, parent data-has-error=\"false\" sur une page saine. Seul data-has-error=\"true\" signale un incident réel — jamais le texte.\n\nCONTRÔLE DE SESSION : verifyUrl = /fr/account. Marqueur mesuré : [data-testid=\"topbar-profile\"] (1 connecté, 0 anonyme — l'anonyme est renvoyé vers account.deezer.com/fr/login/), ajouté aux PREUVES_FORTES de preuve-connexion.js.\n\nPOURQUOI UNE SESSION CAPTURÉE : une double authentification ou un code par e-mail peuvent s'intercaler. keepDomains = [deezer.com].\n\nLOT 68 (28/08/2026) — LE RENVOI DES ANONYMES DEVIENT LA PREUVE DÉCLARÉE. La preuve de session reposait sur un sélecteur propre au site ([data-testid=\"topbar-profile\"], mesuré le 18/08/2026) ajouté à la liste générique — un traitement recopié, fragile si Deezer renomme son en-tête. La mesure du 18/08 disait déjà l'essentiel : hors session, /fr/account renvoie vers account.deezer.com/fr/login/. remoteLogin.renvoiAnonyme = \"connexion\" déclare cette mesure : rester sur le site sans être renvoyé vers la connexion prouve la session. Le sélecteur mesuré reste en place — deux preuves valent mieux qu'une, et la plus précise conclut la première.",
+  "remoteLogin": {
+    "url": "https://account.deezer.com/fr/login/",
+    "verifyUrl": "https://www.deezer.com/fr/account",
+    "keepDomains": [
+      "deezer.com"
+    ],
+    "hint": "Connectez-vous à Deezer avec votre adresse e-mail et votre mot de passe. Évitez « Continuer avec Google » : cette voie ne fonctionne pas dans une fenêtre pilotée par un programme. Laissez la page finir de s'afficher avant d'enregistrer.",
+    "renvoiAnonyme": "connexion"
+  },
+  "fields": [
+    {
+      "key": "session",
+      "label": "Connexion à Deezer",
+      "type": "session",
+      "required": false,
+      "accept": "application/json,.json",
+      "help": "Le bouton « Se connecter à Deezer » ouvre une fenêtre de navigateur dans crabe : connectez-vous avec votre adresse e-mail et votre mot de passe Deezer, et la connexion est enregistrée d'elle-même.\nCette connexion vaut vos identifiants : elle est chiffrée ici et n'est jamais réaffichée. Elle finira par expirer, et crabe vous demandera alors de la rouvrir."
+    },
+    {
+      "key": "historique",
+      "label": "Historique à récupérer",
+      "type": "history",
+      "default": "depuis",
+      "help": "Combien d'années remonter dans vos factures d'abonnement. crabe reprend tout une première fois, puis ne va plus chercher que les nouveautés."
+    }
+  ],
+  "permissions": [
+    {
+      "key": "factures",
+      "scope": "read-write",
+      "description": "Ouvre l'historique des paiements de votre compte Deezer pour le lire et vous dire ce qui existe. Aujourd'hui Deezer ne fournit aucune facture PDF : rien n'est déposé sur vos destinations tant que ça ne change pas."
+    },
+    {
+      "key": "identifiants",
+      "scope": "read",
+      "description": "La connexion de navigateur que vous avez ouverte vous-même : les cookies de session de deezer.com, chiffrés au repos, rejoués uniquement pour ouvrir votre page de paiements. Aucun mot de passe n'est stocké ici."
+    },
+    {
+      "key": "operations-bancaires",
+      "scope": "read",
+      "description": "Les dates et les montants de vos paiements Deezer, tels que l'historique des paiements les affiche. Ils servent à nommer et à dater vos factures, et à savoir lesquelles ont déjà été récupérées."
+    }
+  ]
+}
