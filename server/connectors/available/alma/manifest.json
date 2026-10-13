@@ -1,0 +1,55 @@
+{
+  "id": "alma",
+  "name": "Alma",
+  "category": "banque",
+  "site": "portal.getalma.eu",
+  "implementation": "scraping",
+  "initialStatus": "pending",
+  "description": "Récupère automatiquement le reçu de chacune de vos échéances Alma payées.",
+  "caveat": "Vous vous connectez vous-même, dans une fenêtre. Ensuite, crabe prend un reçu par échéance payée, sur la page de chaque achat.",
+  "technicalNote": "LOT 104 (11/10/2026) — CONNECTEUR NEUF, ÉCRIT D'APRÈS LA STRUCTURE DE LA VRAIE PAGE, JAMAIS EXERCÉ CONTRE UN COMPTE RÉEL. Il remplace l'annonce (dossier planned/ retiré, entrée de scripts/gen-planned.js purgée, migration 63). ANNONCÉ (code source de la page du compte, de ses deux onglets, et d'une page d'achat sans et avec la fenêtre du reçu, enregistrés connectés par l'utilisateur le 11/10, structure reprise sans donnée par le prompt du lot 104) : application React aux classes générées instables — seuls des data-testid, rôles et textes sont lus. Page du compte https://portal.getalma.eu/account/customer_account_<id> (identifiant jamais écrit, lu dans l'adresse d'arrivée), data-testid=account-logged-in-button au compte connecté ; onglets div[role=button] « Achats en cours », « Achats terminés » ; cartes data-testid=customer-portal-card-payment_<id>, sans adresse ; page d'achat https://portal.getalma.eu/payment_<id> : section data-testid=schedule, lignes data-testid=payment-schedule-line-installment_<id> (role=button) — date sans année, montant, badge « Payé » ; data-testid=purchase-detail porte la date d'achat avec l'année. Un clic sur une ligne payée ouvre role=dialog data-testid=reactModal : « Payé », la date (payment-card-next-installment-date), data-testid=download-receipt « Télécharger le reçu », la croix data-testid=modal-close-button. GESTES (liste fermée et gelée, une seule fonction faireLeGeste, un essai lit le fichier) : les deux onglets (texte exact) ; une ligne d'échéance LUE, recontrôlée : seule, visible, portant encore « Payé » et la date lue — une ligne non payée n'est jamais touchée ; « Télécharger le reçu » dans la fenêtre qui montre « Payé » et la date de cette ligne ; la croix de cette fenêtre. Rien d'autre ; rien n'est rempli. Le reçu est pris par le socle clic-document (téléchargement, onglet ou réponse), seulement depuis portal.getalma.eu et api.getalma.eu (adressePermise), refusé sans %PDF- ; sinon plus aucun geste pendant le passage, dit. Navigation : le portail, et https://portal.getalma.eu/payment_<id lu> seulement (server/connectors/adresses-refusees.js). ANCRE, DATE, NOM : alma-recu-installment_<id> ; date de l'échéance, année déduite de la date d'achat (datesDesEcheances : chaque échéance prend la première année qui la place au jour de l'achat ou après, et à la précédente ou après) ; alma_AAAA-MM_recu-<10 derniers caractères>.pdf. CONTRÔLE À L'ENREGISTREMENT : preuveSurFenetre, adresse du portail tenue et marqueur [data-testid=\"account-logged-in-button\"]. NON MESURÉ : l'adresse d'arrivée après connexion (le connecteur exige la page du compte, sinon page illisible), l'effet réel de « Télécharger le reçu », une ligne non payée. Prouvé sur des pages reconstituées (test/lot104-*.test.js) — l'essai réel est à l'administrateur. LOT 105 (12/10/2026) — ESSAI RÉEL DU 12/10 : connexion confirmée dans la fenêtre, puis rejeu renvoyé vers la connexion. MESURÉ dans le script public du portail (lecture anonyme) : la session vit dans le sessionStorage du navigateur (customer-portal-session, un jeton d'accès), que la capture par storageState ne porte pas ; sans elle, le portail renvoie vers /login. D'où remoteLogin.stockageDeSession : la fenêtre lit ce stockage pour https://portal.getalma.eu à la capture, l'enregistre chiffré avec les cookies ; le connecteur le restaure avant la première navigation (context.addInitScript, clés absentes seulement) et le relit en fin de passage — le journal dit le nombre de clés, jamais un nom ni une valeur. Une capture d'avant ce lot n'a pas ce stockage : il faut se reconnecter. Page /login/marketing-optin (« Restez au courant des bons plans », h1 « Bienvenue sur votre portail Alma », boutons « Non merci » et « Je m'inscris », mesurée sur la page enregistrée) : plus jugée page de connexion ; CINQUIÈME GESTE nonMerci — le bouton de texte exact « Non merci », sur cette seule adresse, la page portant son titre et « Je m'inscris » à côté, une fois par passage ; « Je m'inscris » jamais cliqué. L'écran #initial-loader est attendu, jamais retiré. Une vraie page de connexion lève une session expirée (err.expirationCertaine : orange, se reconnecter), plus jamais « réessayez dans quelques heures ».",
+  "remoteLogin": {
+    "url": "https://portal.getalma.eu/",
+    "marker": "",
+    "verifyUrl": "https://portal.getalma.eu/",
+    "preuveSurFenetre": true,
+    "marqueursFenetre": [
+      {
+        "selecteur": "[data-testid=\"account-logged-in-button\"]"
+      }
+    ],
+    "stockageDeSession": [
+      "https://portal.getalma.eu"
+    ],
+    "hint": "Connectez-vous avec votre compte Alma. Si Alma vous propose sa lettre d'information, cliquez « Non merci ». Quand la page « Bonjour » de votre compte s'affiche, avec vos achats, cliquez sur Enregistrer."
+  },
+  "fields": [
+    {
+      "key": "session",
+      "label": "Connexion à Alma",
+      "type": "session",
+      "required": false,
+      "accept": "application/json,.json",
+      "help": "Le bouton « Se connecter à Alma » ouvre une fenêtre de navigateur dans crabe : connectez-vous comme sur le site. La connexion est enregistrée, chiffrée, et n'est jamais réaffichée. Elle finira par expirer : crabe vous demandera alors de la rouvrir."
+    },
+    {
+      "key": "historique",
+      "label": "Historique à récupérer",
+      "type": "history",
+      "default": "depuis",
+      "help": "À chaque récupération, crabe lit vos achats et prend le reçu des échéances payées qui ne sont pas encore dans vos documents. La première récupération reprend tout ; si elle est trop longue pour un seul passage, la suite vient au passage suivant."
+    }
+  ],
+  "permissions": [
+    {
+      "key": "factures",
+      "scope": "read-write",
+      "description": "Lit vos achats Alma et, pour chaque échéance payée, ouvre sa fenêtre et télécharge son reçu — la ligne d'échéance payée, « Télécharger le reçu » et la croix de la fenêtre sont, avec les deux onglets d'achats et « Non merci » quand Alma propose sa lettre d'information, les seuls éléments que crabe clique —, puis le dépose sur vos destinations de stockage."
+    },
+    {
+      "key": "identifiants",
+      "scope": "read",
+      "description": "La connexion de navigateur que vous avez ouverte vous-même sur votre espace Alma : ses cookies et la session que le portail garde dans le navigateur, chiffrés au repos, rejoués uniquement pour lire vos documents. Aucun mot de passe n'est stocké ici."
+    }
+  ]
+}

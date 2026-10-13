@@ -1,0 +1,8 @@
+{
+  "id": "france-travail",
+  "name": "France Travail",
+  "category": "public",
+  "site": "www.francetravail.fr",
+  "description": "Récupère automatiquement vos attestations et vos courriers France Travail.",
+  "status": "planned"
+}

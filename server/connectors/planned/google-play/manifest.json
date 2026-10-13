@@ -1,0 +1,9 @@
+{
+  "id": "google-play",
+  "name": "Google Play",
+  "category": "divertissement",
+  "site": "play.google.com",
+  "description": "Récupère automatiquement les reçus de vos achats et abonnements Google Play.",
+  "unfeasible": "La connexion à Google Play passe obligatoirement par le compte Google, et Google refuse cette connexion à un programme. Tant que ce refus reste en place, crabe ne peut pas récupérer ces reçus.",
+  "status": "planned"
+}

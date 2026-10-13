@@ -1,0 +1,8 @@
+{
+  "id": "volotea",
+  "name": "Volotea",
+  "category": "voyage",
+  "site": "www.volotea.com",
+  "description": "Récupère automatiquement les justificatifs de vos vols Volotea.",
+  "status": "planned"
+}
