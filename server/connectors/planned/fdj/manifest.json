@@ -1,0 +1,9 @@
+{
+  "id": "fdj",
+  "name": "FDJ",
+  "category": "divertissement",
+  "site": "www.fdj.fr",
+  "description": "Récupère automatiquement vos relevés de compte joueur FDJ.",
+  "unfeasible": "Le site de la FDJ bloque les programmes avant même sa page d'accueil. Tant que cette protection reste en place, crabe ne peut pas y récupérer vos relevés.",
+  "status": "planned"
+}

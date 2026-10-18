@@ -1,0 +1,54 @@
+{
+  "id": "totalenergies",
+  "name": "TotalEnergies",
+  "category": "energie",
+  "site": "www.totalenergies.fr",
+  "implementation": "scraping",
+  "initialStatus": "pending",
+  "description": "Récupère automatiquement vos factures d'électricité et de gaz TotalEnergies.",
+  "caveat": "Vous vous connectez vous-même, dans une fenêtre. Ensuite, crabe lit la liste de vos factures et les télécharge, sans rien cliquer. Les échéanciers ne sont pas pris.",
+  "technicalNote": "LOT 109 (13/10/2026) — CONNECTEUR NEUF, ÉCRIT D'APRÈS LA STRUCTURE D'UNE PAGE ENREGISTRÉE PAR UN UTILISATEUR, JAMAIS EXERCÉ CONTRE UN COMPTE RÉEL. Il remplace l'annonce (dossier planned/ retiré, entrée de scripts/gen-planned.js purgée, migration 65). ANNONCÉ (structure seule, docs/reconnaissance-lot109.md) : site TYPO3 ; connexion /clients/connexion (« Déjà client », adresse e-mail et mot de passe : c'est l'utilisateur qui se connecte, le connecteur ne saisit rien) ; liste /clients/mes-factures/mon-historique-de-factures, titre et h1 « Mon historique de factures », lien de déconnexion …?logintype=logout (lu, jamais suivi) ; deux panneaux déjà dans la page, #js--historique-container-elec et -gaz (data-energie elec/gaz), l'un caché ; un document = .detail-facture (.detail-facture__label : type en strong puis « N° … » ; __date JJ/MM/AAAA ; __statut ; __montant) ; son lien a.btn--telecharger, dans le .detail-facture ou dans le bloc replié que commande le bouton qui le contient (aria-controls), adresse de même origine ?tx_demmfacture_historique[action]=telecharger&…[controller]=Historique&…[id]=<jeton>&cHash=<haché>, data-trackingz-action. AUCUN GESTE : aucun clic (les onglets d'énergie appellent energieParDefaut, qui modifie le compte), aucune saisie, aucun formulaire ; une seule navigation (la liste) ; le document pris par le fetch de la page (onglet-pdf.fluxDeLaPage), sur l'adresse d'un lien lu, refusé sans %PDF-. LISTE FERMÉE (recontrôlée avant chaque requête et posée sur le réseau du navigateur : toute requête qui la porte est avortée) : logintype=logout, energieParDefaut, duplicata, gerer-mes-comptes, mes-coordonnees-bancaires, modification-du-mot-de-passe. FACTURE = type contenant « facture » (sans accent ni casse) ET lien non marqué ECHEANCIER ; échéanciers et types inconnus ignorés et comptés par type ; sans numéro lisible, sans lien unique ou au lien refusé : non prise, comptée (jamais d'ancre sur le jeton ni le cHash). ANCRE, DATE, NOM : totalenergies-<electricite|gaz>-<type>-<numéro> ; date du document ; totalenergies_AAAA-MM_<énergie>-<type>-<numéro>.pdf. Liste lue sans facture = succès qui le dit ; factures vues, aucune obtenue = échec. NON MESURÉ : la forme d'une FACTURE (les 4 documents de la page enregistrée sont des échéanciers), ce que sert le lien, une liste de plus de 8 documents (seule la page servie est lue, la pagination est dite au journal), un chargement par script (le connecteur attend une liste stable). Prouvé sur une page inventée (test/lot109-*.test.js) — l'essai réel reste à faire. LOT 110 (18/10/2026) — RETOUR D'UN UTILISATEUR (0.1.8, plusieurs essais) : 403 et « arrivée jugée mur » à la récupération, cookie datadome posé — la vérification de sécurité du site (DataDome) laissait passer la fenêtre et arrêtait la récupération, qui tournait dans un Chromium invisible et un contexte neuf. ALIGNÉ sur les connecteurs qui passent DataDome (Darty, SNCF Connect) : remoteLogin.persistent (la fenêtre ouvre le profil persistant du service) et récupération dans CE profil, rouvert dans un Chromium visible sous Xvfb par profil-marchand.surLeProfil (naviguer: false : la liste fermée posée avant la première requête, aucun bandeau fermé). Rien d'autre (aucune empreinte faussée, aucun captcha résolu). Une connexion capturée avant ce lot n'a pas de profil : la rouvrir une fois. Non vérifiable ici : seul un essai réel le dira.",
+  "remoteLogin": {
+    "url": "https://www.totalenergies.fr/clients/connexion",
+    "marker": "",
+    "verifyUrl": "https://www.totalenergies.fr/clients/mes-factures/mon-historique-de-factures",
+    "persistent": true,
+    "preuveSurFenetre": true,
+    "marqueursFenetre": [
+      {
+        "selecteur": "h1",
+        "texte": "Mon historique de factures"
+      }
+    ],
+    "hint": "Connectez-vous avec votre compte client TotalEnergies (« Déjà client »), comme sur le site. Quand votre espace client s'affiche, cliquez sur Enregistrer : crabe vérifie alors la connexion sur la page de vos factures."
+  },
+  "fields": [
+    {
+      "key": "session",
+      "label": "Connexion à TotalEnergies",
+      "type": "session",
+      "required": false,
+      "accept": "application/json,.json",
+      "help": "Le bouton « Se connecter à TotalEnergies » ouvre une fenêtre de navigateur dans crabe : connectez-vous comme sur le site. La connexion est conservée dans un profil de navigateur sur le serveur, et n'est jamais réaffichée. Elle finira par expirer : crabe vous demandera alors de la rouvrir."
+    },
+    {
+      "key": "historique",
+      "label": "Historique à récupérer",
+      "type": "history",
+      "default": "depuis",
+      "help": "À chaque récupération, crabe lit la liste de vos factures d'électricité et de gaz et prend celles qui ne sont pas encore dans vos documents. La première récupération reprend toute la liste affichée ; si elle est trop longue pour un seul passage, la suite vient au passage suivant."
+    }
+  ],
+  "permissions": [
+    {
+      "key": "factures",
+      "scope": "read-write",
+      "description": "Lit la liste de vos factures d'électricité et de gaz sur votre espace client TotalEnergies et télécharge chaque facture par son lien, sans rien cliquer ni modifier sur votre compte, puis la dépose sur vos destinations de stockage."
+    },
+    {
+      "key": "identifiants",
+      "scope": "read",
+      "description": "La connexion de navigateur que vous avez ouverte vous-même sur votre espace client TotalEnergies : ses cookies, chiffrés au repos, rejoués uniquement pour lire vos factures. Aucun mot de passe n'est stocké ici."
+    }
+  ]
+}

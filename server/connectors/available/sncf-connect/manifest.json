@@ -1,0 +1,46 @@
+{
+  "id": "sncf-connect",
+  "name": "SNCF Connect",
+  "category": "voyage",
+  "color": "#0c131f",
+  "letters": "SC",
+  "site": "www.sncf-connect.com",
+  "initialStatus": "pending",
+  "description": "Récupère automatiquement les justificatifs de voyage de vos trajets passés sur SNCF Connect.",
+  "technicalNote": "LOT 43 (20/08/2026) — MESURÉ SUR LA SESSION RÉELLE (sonde en lecture seule, en production) : « Télécharger votre justificatif » n'est PAS un téléchargement. C'est un lien `target=\"_blank\"` vers monbillet.sncf, et la page d'arrivée (`monbillet.sncf/e-billet`) EST le PDF : `document.contentType` vaut `application/pdf`, aucun formulaire, aucun bouton, aucune action à faire. Le connecteur lit donc le PDF dans la RÉPONSE de l'onglet (aucune requête nouvelle ; à défaut, une relecture de la même adresse dans le même contexte), puis referme l'onglet — voir `lireDocumentDeLOnglet`. Le panneau « Vos justificatifs » est un TIROIR MUI (`div[role=\"dialog\"][aria-modal=\"true\"]`, `MuiDrawer-paper…`) rendu en PORTAIL directement sous `body` : il n'est l'ancêtre d'aucun nœud du détail du voyage, `LIRE_PANNEAU` le cherche depuis les DÉCLENCHEURS (dialogue du premier déclencheur, sinon plus bas ancêtre commun, élargi jusqu'au titre sans avaler la navigation). Le bouton d'e-mail reste JAMAIS cliqué.\n\nLOT 31 (14/08/2026) — ÉCRIT MAIS JAMAIS EXÉCUTÉ CONTRE UN VRAI COMPTE. « initialStatus »: « pending ». ⚠ LA PAGE DES VOYAGES N'A JAMAIS ÉTÉ VUE : www.sncf-connect.com est muré par une vérification anti-robot (DataDome) qui rend un interstitiel `ct.captcha-delivery.com` + objet `dd={rt:'i',…}` au curl (HTTP 403, 779 octets) ET une page au corps VIDE au Chromium réel sans profil (mesuré en production). Le parcours suit donc un relevé d'écran réel du 14/08/2026 (onglets « À venir »/« Passés », « Voir le détail du voyage » vers /trips/detail, section « Vos justificatifs » en panneau latéral) et DÉCRIT au journal ce qu'il voit quand il ne trouve pas.\n\nAUTHENTIFICATION PARTAGÉE : « Mon Identifiant SNCF » (auth.monidentifiant.sncf), le même que OUIGO — module commun connectors/auth-sncf.js. Enchaînement MESURÉ au navigateur réel avec une adresse inexistante : /u/login/identifier (adresse e-mail, bouton « Se connecter ») PUIS /u/login/password (le mot de passe, sur un second écran) — c'est un Auth0 « Universal Login ». Aucun captcha vu sur ces deux écrans ; une validation supplémentaire APRÈS le mot de passe n'est pas mesurable sans compte — si elle existe, la fenêtre visible la laisse franchir à la main.\n\nSESSION : profil de navigateur persistant par service (profils-navigateur/<userId>/sncf-connect), recette PrestaShop Addons du lot 30 — l'utilisateur se connecte lui-même dans la fenêtre visible, la levée de la garde anti-robot voyage avec le profil, les récupérations rouvrent le profil sous Xvfb en mode visible avec --disable-blink-features=AutomationControlled. Une session OUIGO ne vaut PAS pour SNCF Connect : chaque service a ses cookies d'application et son jeton anti-robot ; l'identité commune fait seulement que l'écran de connexion peut ne pas redemander le mot de passe si le profil détient déjà une session Mon Identifiant SNCF.\n\nLES DEUX JUSTIFICATIFS (relevé d'écran du 14/08) : le justificatif d'ACHAT — la preuve de paiement, celle qui fait office de facture — n'est PAS téléchargeable : « Obtenir le justificatif par e-mail », disponible jusqu'au 31/08/2027. Le justificatif de VOYAGE se télécharge (« Télécharger votre justificatif »). Le connecteur récupère le second, ne clique JAMAIS le bouton d'e-mail (déclencher un envoi appartient à l'utilisateur), nomme ses fichiers « justificatif-voyage » pour ne pas les faire passer pour des factures, et re-vérifie à CHAQUE exécution si un téléchargement direct du justificatif d'achat est apparu — auquel cas il le prendrait.\n\nPARCOURS : onglet « Passés » déroulé EN ENTIER (« voir plus » cliqué s'il existe, défilement sinon, arrêt quand le compte de voyages ne bouge plus). Le détail s'ouvre sur la même adresse pour tous les voyages (/trips/detail) : la liste est rejouée entre chaque voyage. L'identifiant distant d'un justificatif est l'empreinte SHA-256 de son contenu — stable, et aucun identifiant de voyage n'est lisible dans l'application.\n\nCE QUI N'EST PAS VÉRIFIÉ, ET C'EST BEAUCOUP : toute la structure réelle de /app/trips (les motifs de texte des onglets, boutons et panneaux sont ceux du relevé d'écran), le comportement du profil persistant face à DataDome en Xvfb, la présence d'une pagination différente du défilement, et la forme des dates affichées.",
+  "fields": [
+    {
+      "key": "session",
+      "label": "Connexion à SNCF Connect",
+      "type": "session",
+      "required": false,
+      "accept": "application/json,.json",
+      "help": "Le bouton « Se connecter à SNCF Connect » ouvre une fenêtre de navigateur dans crabe : connectez-vous comme sur le site (adresse e-mail puis mot de passe, sur deux écrans). La connexion est conservée dans un profil de navigateur sur le serveur — nécessaire pour ce site, protégé par une vérification anti-robot — et n'est jamais réaffichée.\nÀ savoir : crabe récupère le JUSTIFICATIF DE VOYAGE de chaque trajet passé. Le justificatif d'ACHAT (la preuve de paiement) n'est pas téléchargeable : SNCF l'envoie par e-mail — sur le site : Mes voyages → le voyage → Vos justificatifs → « Obtenir le justificatif par e-mail ». crabe ne déclenche jamais cet envoi à votre place."
+    },
+    {
+      "key": "historique",
+      "label": "Historique à récupérer",
+      "type": "history",
+      "default": "depuis",
+      "help": "L'onglet « Passés » est parcouru en entier à chaque récupération ; les justificatifs déjà déposés ne sont pas repris."
+    }
+  ],
+  "remoteLogin": {
+    "url": "https://www.sncf-connect.com/",
+    "marker": "Passés",
+    "persistent": true,
+    "hint": "Cliquez « Se connecter » en haut de la page, puis suivez les deux écrans : votre adresse e-mail, puis votre mot de passe (« Mon Identifiant SNCF »). Si une vérification de sécurité apparaît, laissez-la se terminer. Quand vos voyages s'affichent, enregistrez la connexion."
+  },
+  "permissions": [
+    {
+      "key": "factures",
+      "scope": "read-write",
+      "description": "Parcourt vos voyages passés sur SNCF Connect et télécharge leurs justificatifs de voyage, puis les dépose sur vos destinations de stockage. Le bouton d'envoi d'e-mail du justificatif d'achat n'est jamais cliqué."
+    },
+    {
+      "key": "identifiants",
+      "scope": "read",
+      "description": "Votre connexion SNCF Connect, conservée dans un profil de navigateur chiffré sur le serveur, utilisée pour la seule lecture de vos voyages."
+    }
+  ]
+}

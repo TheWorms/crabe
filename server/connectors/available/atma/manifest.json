@@ -1,0 +1,48 @@
+{
+  "id": "atma",
+  "name": "Atma Kitchenware",
+  "category": "shopping",
+  "site": "atmakitchenware.fr",
+  "implementation": "scraping",
+  "initialStatus": "pending",
+  "description": "Reconstitue un reçu pour chacune de vos commandes Atma Kitchenware — la boutique ne fournit pas de facture.",
+  "technicalNote": "LOT 74 (09/09/2026) — PARCOURS ÉCRIT, MESURÉ SUR LA SESSION RÉELLE. La reconnaissance anonyme du lot 72 reste valable (boutique Shopify, espace client « comptes clients » sur shopify.com/<boutique>, code à usage unique par e-mail, domaineEspaceClient=shopify.com, identifiant de boutique lu du renvoi, jamais codé en dur).\n\nMESURÉ le 09/09/2026 SUR LA SESSION ENREGISTRÉE : NI la liste /account/orders NI le détail d'une commande ne proposent de facture, de reçu ou de téléchargement (motifs facture|invoice|reçu|receipt|télécharg|download|PDF : rien sur les deux pages). crabe reconstitue donc UN REÇU PAR COMMANDE par le gabarit commun (releve-reconstitue, nature « recu », bandeau non négociable en tête de chaque page).\n\nFORMES MESURÉES : liste = un bloc article par commande, titre h2[id^=\"order-\"] (« Commande #NNNNN »), lien de détail a[href*=\"/account/orders/<id numérique>\"] ; les classes CSS sont générées (jamais d'ancrage dessus) ; « Acheter à nouveau » (/cart/…) et « Retourner ma commande » (/a/return) sont des liens à effet, JAMAIS suivis. Détail = « Confirmée le 3 févr. 2026 » (dates françaises abrégées, aucun datetime ISO), « Statut du traitement de la commande : … », sections « Articles de la commande » puis « Totaux de la commande » (sous-total, expédition, total, taxes incluses, tous affichés — recopiés, jamais recalculés) ; la section « Détails de la commande » (adresse, contact) n'est pas reprise. Ancre remote_id = atma-commande-<numéro> : elle désigne la COMMANDE — si la boutique sert un jour une vraie facture, le même identifiant la désignera et le remplacement sera un geste de code assumé (rien de codé aujourd'hui).\n\nÀ SURVEILLER À L'USAGE : aucune pagination observée (liste courte au moment de la mesure) — si la boutique pagine un jour, le compte du journal le dira ; le compte de commandes vient du sélecteur mesuré h2[id^=\"order-\"].",
+  "fields": [
+    {
+      "key": "session",
+      "label": "Connexion à Atma Kitchenware",
+      "type": "session",
+      "required": false,
+      "accept": "application/json,.json",
+      "help": "Le bouton « Se connecter à Atma Kitchenware » ouvre une fenêtre de navigateur dans crabe : saisissez votre adresse e-mail, puis le code à usage unique qu'Atma (par Shopify) vous envoie par e-mail. La connexion est conservée dans un profil de navigateur sur le serveur et n'est jamais réaffichée."
+    },
+    {
+      "key": "historique",
+      "label": "Historique à récupérer",
+      "type": "history",
+      "default": "depuis",
+      "help": "La liste de vos commandes est relue en entier à chaque récupération ; une commande dont le reçu est déjà déposé n'est ni rouverte ni reproduite."
+    }
+  ],
+  "remoteLogin": {
+    "url": "https://atmakitchenware.fr/account",
+    "marker": "",
+    "verifyUrl": "https://atmakitchenware.fr/account",
+    "verifyUrlTient": true,
+    "domaineEspaceClient": "shopify.com",
+    "persistent": true,
+    "hint": "Saisissez votre adresse e-mail, puis le code à usage unique reçu par e-mail. Quand votre espace client s'affiche dans la fenêtre, cliquez sur Enregistrer."
+  },
+  "permissions": [
+    {
+      "key": "factures",
+      "scope": "read-write",
+      "description": "Parcourt vos commandes Atma Kitchenware et dépose sur vos destinations de stockage un reçu reconstitué par commande — la boutique ne fournit pas de facture, et chaque reçu dit en toutes lettres qu'il est produit par crabe."
+    },
+    {
+      "key": "identifiants",
+      "scope": "read",
+      "description": "Votre connexion Atma Kitchenware, conservée dans un profil de navigateur protégé sur le serveur, utilisée pour la seule lecture de votre espace client — jamais réaffichée, jamais journalisée."
+    }
+  ]
+}

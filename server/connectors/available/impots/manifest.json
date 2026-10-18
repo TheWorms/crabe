@@ -1,0 +1,67 @@
+{
+  "id": "impots",
+  "name": "Impots.gouv.fr",
+  "category": "public",
+  "color": "#000091",
+  "letters": "IG",
+  "site": "cfspart.impots.gouv.fr",
+  "implementation": "scraping",
+  "description": "Récupère automatiquement vos avis d'impôt et déclarations.",
+  "technicalNote": "Connecteur sur mesure. La page documents.do a été entièrement refaite (gabarit DSFR) — vu connecté le 04/10/2026. Même adresse (documents.do?n=0), mais les dix années (2017 à 2026) et leurs 68 documents sont TOUS dans le DOM au chargement, SANS aucun clic ni dépliage : les onglets ne font que montrer ou cacher. La page porte les mêmes documents EN DOUBLE, disposition mobile (div.fr-accordions-group.fr-hidden-md, ids docRwd-/docLieRwd-) et disposition bureau (div.fr-hidden.fr-unhidden-md .fr-tabs, ids doc-/docLie-/titre-) : on ne lit QUE le bureau, sinon chaque document est compté deux fois (136 liens pour 68 documents). L'année vient du title de l'onglet role=tab #tab-<k> ; le titre d'un principal est le TEXTE du lien h3 a.extLinkDis (href Affichage_Document_PDF?idEnsua=…), celui d'un associé le p#titreLie sous une carte .repertoire, avec son jeton dans un input caché (déjà présent, volet replié). Le document se prend par fetch DANS la page (même empreinte TLS que Chromium), repli par clic du lien du titre. Session capturée par navigateur distant : numéro fiscal, mot de passe puis code de sécurité ; FranceConnect volontairement évité. La déduplication porte sur le libellé + l'année, JAMAIS sur idEnsua (clé d'accès, non un identifiant stable). PIÈGE corrigé, antérieur au changement : huit groupes de documents portent le MÊME titre la même année (Notification d'avis à tiers détenteur, Mise en demeure de payer…) — l'ancre nue n'en gardait qu'un ; un discriminant de rang (AAAA#titre#2) les rapporte tous, le rang compté depuis le plus ancien (bas du DOM). LE RANG ENTRE AUSSI DANS LE NOM DE FICHIER (lot 88, mesuré le 05/10/2026) : le dépôt se fait par nom de fichier, et des ancres distinctes sous un même nom (AAAA_titre.pdf) faisaient remplacer le fichier d'un autre document sur les stockages — 14 membres de groupe déposés, 8 fichiers archivés écrasés, 10 lignes gagnées sur 24 annoncées. Chaque membre à rang est nommé AAAA_titre_<rang>.pdf ; le membre qui reprend l'ancre nue garde le nom simple, aucun fichier existant n'est renommé, et les noms sont stables d'un passage à l'autre (rang compté depuis le plus ancien, un document neuf ne décale personne). Le socle porte en plus une garde générale au dépôt : un nom déjà pris par une ligne d'ancre différente se journalise, et si la taille diffère aussi, le document est déposé sous le premier nom libre avec sa propre ligne — rien n'est plus jamais remplacé. Garde principale : liste blanche d'adresses (documents.do, Affichage_Document_PDF?idEnsua), clicAutorise en second filet. SESSION ET REJEUX (lot 87, ERRATUM au lot 89 — tout mesuré le 05/10/2026) : avec l'ancien enchaînement (un contrôle de validité par rejeu sur documents.do SANS paramètre ?n=0, suivi d'un autre rejeu 1 à 20 secondes plus tard), le second rejeu était renvoyé vers j_spring_security_logout.ex puis /deconnexion2 puis / (clé de requête logout), et le site fermait la session sur TOUT le portail (déconnexion globale) — passages n° 638/639, « aucune année ». Le lot 87 en avait conclu « la connexion ne se rejoue qu'une fois » : DÉMENTI le même jour, 11:09-11:16, avec le nouvel enchaînement (aucun contrôle à l'enregistrement) — une même capture a été rejouée TROIS fois en huit minutes (passages n° 644/645/646, tous servis, plus court intervalle 44 s). La cause des déconnexions de la nuit n'est pas isolée ; deux pistes, non départagées : deux rejeux à quelques secondes d'intervalle, ou l'adresse du contrôle demandée sans ?n=0. La clé rejeuUnique garde son nom, HISTORIQUE : elle signifie « pas de contrôle par rejeu à l'enregistrement » — aucun navigateur lancé avec la capture, test() n'ouvre pas de navigateur, la récupération qui suit l'enregistrement est elle-même la preuve de session. Ce comportement reste justifié : c'est l'enchaînement d'avant qui, mesuré, perdait la session. Le connecteur juge son arrivée (jugerArrivee : liste / session fermée / connexion demandée / liste illisible / page inattendue), journalise la chaîne des réponses de navigation et la différence de cookies (noms seulement), et rend son état de navigateur final après un passage réussi (sessionRenouvelee) pour que le passage suivant parte de l'état le plus récent. Durée de vie de session courte : le JSESSIONID (/enp) porte une échéance de 30 minutes — la planification mensuelle ne peut pas réussir sans connexion fraîche.",
+  "remoteLogin": {
+    "url": "https://cfspart.impots.gouv.fr/",
+    "verifyUrl": "https://cfspart.impots.gouv.fr/enp/documents.do",
+    "verifyUrlTient": true,
+    "renvoiAnonyme": "connexion",
+    "rejeuUnique": true,
+    "marker": "Documents",
+    "hint": "Saisissez votre numéro fiscal, votre mot de passe, puis le code de sécurité demandé. Ne passez pas par FranceConnect : le parcours direct est plus stable."
+  },
+  "fields": [
+    {
+      "key": "session",
+      "label": "Connexion à impots.gouv.fr",
+      "type": "session",
+      "required": false,
+      "accept": "application/json,.json",
+      "help": "Le bouton « Se connecter à Impots.gouv.fr » ouvre une fenêtre de navigateur dans crabe : connectez-vous comme sur le site, puis cliquez sur Enregistrer — la récupération démarre toute seule juste après, et c'est elle qui confirme la connexion. Elle vaut vos identifiants : elle est chiffrée ici, et jamais réaffichée. Le portail la referme vite — reconnectez-vous au moment où vous voulez récupérer vos documents."
+    },
+    {
+      "key": "numeroFiscal",
+      "identification": "identifiant",
+      "label": "Numéro fiscal",
+      "type": "text",
+      "required": false,
+      "help": "13 chiffres, en haut de votre dernier avis. Facultatif : il sert seulement à nommer le dossier de vos documents, et crabe le lit sur le portail s'il le trouve."
+    },
+    {
+      "key": "historique",
+      "label": "Historique à récupérer",
+      "type": "history",
+      "default": "depuis",
+      "help": "Le portail garde une dizaine d'années de documents. Tout reprendre demande plusieurs minutes, chaque document devant être ouvert un par un : crabe le fait une fois, puis ne suit plus que l'année en cours."
+    }
+  ],
+  "permissions": [
+    {
+      "key": "factures",
+      "scope": "read-write",
+      "description": "Télécharge les documents PDF de votre espace particulier — avis d'impôt, déclarations, accusés de réception, avis de situation déclarative — et les dépose sur vos destinations de stockage, dans un dossier par année. Ces documents contiennent des INFORMATIONS FISCALES : revenus, impôt dû, composition du foyer."
+    },
+    {
+      "key": "identifiants",
+      "scope": "read",
+      "description": "La connexion à impots.gouv.fr que vous avez ouverte dans crabe : les cookies de votre session, chiffrés au repos, rejoués uniquement pour atteindre vos documents. Le portail exigeant un code de sécurité, aucun mot de passe n'est conservé."
+    },
+    {
+      "key": "documents-contractuels",
+      "scope": "read-write",
+      "description": "Vos déclarations de revenus et les accusés de réception qui les accompagnent, tels que le portail les met à disposition. Leur contenu n'est ni lu ni analysé : le fichier est déposé tel quel."
+    },
+    {
+      "key": "informations-compte",
+      "scope": "read",
+      "description": "Votre numéro fiscal — 13 chiffres identifiant le foyer — s'il est lisible sur la page, ainsi que la liste des années pour lesquelles des documents existent, pour savoir quoi parcourir. Il nomme le dossier de destination de vos documents."
+    }
+  ]
+}

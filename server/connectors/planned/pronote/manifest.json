@@ -1,0 +1,9 @@
+{
+  "id": "pronote",
+  "name": "Pronote",
+  "category": "administratif",
+  "site": "www.index-education.com",
+  "description": "Récupère automatiquement les documents de l'espace Pronote de votre établissement.",
+  "caveat": "Chaque établissement a sa propre adresse Pronote : vous l'indiquerez au moment de la connexion.",
+  "status": "planned"
+}

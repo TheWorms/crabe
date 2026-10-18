@@ -1,0 +1,53 @@
+{
+  "id": "private-sport-shop",
+  "name": "Private Sport Shop",
+  "category": "shopping",
+  "site": "www.privatesportshop.fr",
+  "implementation": "scraping",
+  "initialStatus": "pending",
+  "description": "Récupère automatiquement les factures de vos commandes Private Sport Shop.",
+  "caveat": "Vous vous connectez vous-même, dans une fenêtre. Ensuite, crabe ouvre chaque commande de votre historique et y prend ses factures.",
+  "technicalNote": "LOT 104 (11/10/2026) — CONNECTEUR NEUF, ÉCRIT D'APRÈS LA STRUCTURE DE LA VRAIE PAGE, JAMAIS EXERCÉ CONTRE UN COMPTE RÉEL. Il remplace l'annonce (dossier planned/ retiré, entrée de scripts/gen-planned.js purgée, migration 63). ANNONCÉ (code source de « Mes commandes », de l'historique et d'une commande, enregistrés connectés par l'utilisateur le 11/10, structure reprise sans donnée par le prompt du lot 104) : application Vue ; /sales/order/history/ (h1[data-selector-orders-title] « Mes commandes ») : commandes récentes (aucune chez l'utilisateur) et « Voir les commandes précédentes » ; /historical/orders (« Historique des commandes ») : une carte [data-selector-account-card] par commande — lien /historical/orders/<n> de texte « #<n> », « Date », « Total », « Statut », « Voir la commande » ; /historical/orders/<n> : h1 « Détails de la commande », « Commande #<n> | Date de commande … », select#invoice-download-select[data-selector-invoice-download-select] : une option vide puis une option par document, value JSON {\"type\":\"invoice\",\"id\":<n>}. UN SEUL GESTE (un essai lit le fichier) : choisir, par une seule fonction, une option LUE sur cette page dont la value est un JSON de type exactement invoice et d'id entier, recontrôlée au moment du choix (une seule liste, visible, une seule option de cette value) ; les autres types sont dits au journal, sans identifiant, jamais choisis. Le document est pris par le socle clic-document, seulement depuis www.privatesportshop.fr et api.sportpursuit.com (préchargée par les pages), refusé sans %PDF- ; sinon plus aucun geste pendant le passage, dit. JAMAIS : le panier (checkout.privatesportshop.fr), les retours (/ProductReturn/…), les moyens de paiement, « Déconnexion » — navigation limitée aux deux listes et aux détails lus (server/connectors/adresses-refusees.js). ANCRE, DATE, NOM : private-sport-shop-facture-<id> ; date de commande ; private-sport-shop_AAAA-MM_facture-<id>.pdf. CONTRÔLE À L'ENREGISTREMENT : preuveSurFenetre, adresse de l'historique tenue et marqueur h1[data-selector-orders-title]. NON MESURÉ : la pagination de l'historique (seule la page affichée est lue, et c'est dit au journal), la forme des commandes récentes (lues si leur lien a la forme d'un détail de l'historique, sinon comptées et dites), les autres types de document, ce que fait le choix d'une option. Prouvé sur des pages reconstituées (test/lot104-*.test.js) — l'essai réel est à l'administrateur.",
+  "remoteLogin": {
+    "url": "https://www.privatesportshop.fr/historical/orders",
+    "marker": "",
+    "verifyUrl": "https://www.privatesportshop.fr/historical/orders",
+    "preuveSurFenetre": true,
+    "marqueursFenetre": [
+      {
+        "selecteur": "h1[data-selector-orders-title]",
+        "texte": "Historique des commandes"
+      }
+    ],
+    "hint": "Connectez-vous avec votre compte Private Sport Shop. Quand l'historique de vos commandes s'affiche, cliquez sur Enregistrer : crabe vérifie alors la connexion sur cette page."
+  },
+  "fields": [
+    {
+      "key": "session",
+      "label": "Connexion à Private Sport Shop",
+      "type": "session",
+      "required": false,
+      "accept": "application/json,.json",
+      "help": "Le bouton « Se connecter à Private Sport Shop » ouvre une fenêtre de navigateur dans crabe : connectez-vous comme sur le site. La connexion est enregistrée, chiffrée, et n'est jamais réaffichée. Elle finira par expirer : crabe vous demandera alors de la rouvrir."
+    },
+    {
+      "key": "historique",
+      "label": "Historique à récupérer",
+      "type": "history",
+      "default": "depuis",
+      "help": "À chaque récupération, crabe lit l'historique de vos commandes et prend les factures qui ne sont pas encore dans vos documents. La première récupération reprend tout l'historique affiché ; si elle est trop longue pour un seul passage, la suite vient au passage suivant."
+    }
+  ],
+  "permissions": [
+    {
+      "key": "factures",
+      "scope": "read-write",
+      "description": "Lit l'historique de vos commandes Private Sport Shop et, pour chacune, choisit ses factures dans la liste « Télécharger une facture » — le seul geste de crabe sur le site —, puis les dépose sur vos destinations de stockage."
+    },
+    {
+      "key": "identifiants",
+      "scope": "read",
+      "description": "La connexion de navigateur que vous avez ouverte vous-même sur votre compte Private Sport Shop : ses cookies, chiffrés au repos, rejoués uniquement pour lire vos documents. Aucun mot de passe n'est stocké ici."
+    }
+  ]
+}
