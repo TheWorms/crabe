@@ -1,0 +1,54 @@
+{
+  "id": "atelier-du-portable",
+  "name": "L'Atelier du Portable",
+  "category": "shopping",
+  "site": "www.atelierduportable.com",
+  "implementation": "scraping",
+  "description": "Récupère automatiquement les factures de vos pièces et réparations d'ordinateur portable.",
+  "technicalNote": "Connecteur SUR MESURE, pas une boutique PrestaShop : WordPress. Parcours revalidé de bout en bout le 11/08/2026 contre le compte réel — 4 commandes lues, 4 PDF valides. CONNEXION DIRECTE, sur le domaine des COMMANDES : https://www.piece-pc-portable.com/connexion/ (et non atelierduportable.com). Se connecter sur la vitrine puis passer sur piece-pc-portable.com laissait le connecteur bloqué sans une ligne au journal : les cookies ne franchissent pas la frontière de domaine, et le second site a sa propre page de connexion. Un seul domaine, la question disparaît. Le connecteur passait auparavant par navigateur distant, sans qu'aucune raison technique ne l'impose : le formulaire ne demande qu'un identifiant et un mot de passe, sans captcha ni code. FORMULAIRE WordPress standard, relevé sur le site : input[type=text] name=log id=user_login, input[type=password] name=pwd id=user_pass, et un input[type=submit] name=wp-submit — PAS un <button>. La page porte en outre un <button type=button> sans texte (l'œil du mot de passe) écrit AVANT lui dans le DOM : un sélecteur de bouton expirait au bout de vingt secondes sans rien soumettre. D'où la soumission par la touche Entrée depuis le champ mot de passe, qui ne désigne aucun bouton. La preuve de connexion est l'URL finale hors formulaire (/compte/), puis la page des COMMANDES réellement servie : le site n'affiche pas de lien de déconnexion sur toutes ses pages. Les commandes se lisent dans le TEXTE de la page — « Commande N° WEB070526334252 du 07/05/2026 (terminé) » — parce que les trois sections (non validées, en cours, terminées) n'ont pas la même structure HTML mais écrivent la même phrase. La liste ne porte AUCUN lien de facture (vérifié : zéro), mais l'adresse se construit à partir du numéro : https://www.piece-pc-portable.com/inter_renvoi.php?dir=FACT&num_com=<numéro> — les 4 adresses testées renvoient HTTP 200, application/pdf, PDF valide. Ouvrir la fiche de chaque commande est donc inutile. Le CONTENU fait foi : une réponse qui ne commence pas par %PDF- est ignorée avec sa raison au journal. Le remoteId est le numéro WEB…, stable. Des identifiants refusés arrêtent le connecteur : aucune nouvelle tentative, insister sur un formulaire peut faire bloquer le compte. IDENTIFICATION : le site demande un IDENTIFIANT, pas une adresse électronique. Le champ déclare « identification »: « identifiant », d'où son libellé et son aide. Sa clé reste « email » : elle nomme un emplacement déjà rempli dans les configurations enregistrées.",
+  "fields": [
+    {
+      "key": "email",
+      "identification": "identifiant",
+      "type": "text",
+      "required": true,
+      "help": "Votre identifiant de connexion au site, pas un e-mail."
+    },
+    {
+      "key": "motDePasse",
+      "label": "Mot de passe du site",
+      "type": "password",
+      "required": false,
+      "help": "Le mot de passe de votre compte sur le site. Il est chiffré ici et ne sert qu'à ouvrir votre espace client pour y prendre vos factures."
+    },
+    {
+      "key": "historique",
+      "label": "Historique à récupérer",
+      "type": "history",
+      "default": "depuis",
+      "help": "Le site garde toutes vos commandes. crabe reprend tout une première fois, puis ne suit plus que l'année en cours."
+    }
+  ],
+  "permissions": [
+    {
+      "key": "factures",
+      "scope": "read-write",
+      "description": "Télécharge les factures PDF de vos commandes de pièces et de réparations, et les dépose sur vos destinations de stockage, dans un dossier par année. Elles contiennent le détail des pièces commandées, leur prix et votre adresse de livraison."
+    },
+    {
+      "key": "identifiants",
+      "scope": "read",
+      "description": "Votre identifiant et votre mot de passe du site, chiffrés au repos. Ils servent uniquement à ouvrir votre espace client pour atteindre vos commandes sur piece-pc-portable.com. Ils ne sont transmis qu'au site lui-même, jamais à un tiers, et n'apparaissent dans aucun journal."
+    },
+    {
+      "key": "operations-bancaires",
+      "scope": "read",
+      "description": "Les numéros et les dates de vos commandes de pièces, tels que le site les affiche dans « Vos commandes ». Ils servent à nommer et à dater vos factures, et à savoir lesquelles ont déjà été récupérées."
+    },
+    {
+      "key": "informations-compte",
+      "scope": "read",
+      "description": "Votre adresse électronique, si elle est lisible sur la page, pour nommer le dossier de vos documents. Aucune autre information de profil n'est lue : ni nom, ni adresse postale, ni moyen de paiement."
+    }
+  ]
+}

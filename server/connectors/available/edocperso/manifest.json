@@ -1,0 +1,46 @@
+{
+  "id": "edocperso",
+  "name": "eDocPerso",
+  "category": "administratif",
+  "color": "#2563eb",
+  "letters": "EP",
+  "site": "edocperso.fr",
+  "implementation": "api",
+  "initialStatus": "pending",
+  "description": "Récupère automatiquement les bulletins de paie et documents déposés dans votre coffre-fort numérique eDocPerso.",
+  "technicalNote": "LOT 31 (14/08/2026) — ÉCRIT MAIS JAMAIS EXÉCUTÉ CONTRE UN VRAI COMPTE. D'où « initialStatus »: « pending ». Il passera « available » quand un document réel aura été récupéré, et pas avant.\n\nRECONNAISSANCE (14/08/2026, sans identifiants — curl + lecture du code livré au navigateur). eDocPerso est une application Vue qui sert la même coquille HTML (1 348 octets) sur toutes ses routes : les données passent par une API JSON sous /edp-back (constante qe=\"/edp-back\" du paquet index). Routes relevées DANS LE CODE de l'application (assets/*.js, non minifiées côté chemins) puis SONDÉES : GET /edp-back/api/v1/login → 405 Method Not Allowed (la route existe, POST attendu) ; GET /edp-back/api/v1/folders sans jeton → 401. La sonde discrimine.\n\nCONNEXION : POST /edp-back/api/v1/login, corps JSON {email, password} (machine de connexion : credentials = {email:\"\", password:\"\"}). Le jeton revient dans l'EN-TÊTE de réponse « Set-Authorization » (pas dans le corps) ; l'application le range en localStorage.authToken et l'envoie ensuite en « Authorization: Bearer … ». Une réponse sans Set-Authorization mais avec un corps {loginUrl} désigne une connexion d'entreprise déléguée (SSO/FranceConnect) que crabe ne peut pas suivre — le message le dit. Rafraîchissement possible via /api/v1/auth/refresh-token ; non utilisé, une récupération tient largement dans la vie du jeton, et un 401 en cours de route est signalé comme session tombée.\n\nARBORESCENCE : GET /api/v1/folders (jeton) rend les dossiers — les onglets « Mes Employeurs » et les dossiers (ex. un dossier par employeur) sont des nœuds de cet arbre. Les documents d'un dossier : POST /api/v1/documents, corps {paging:{limit:1000, offset:0}, folderId} — c'est un POST DE LISTAGE, relevé tel quel dans documents.http. Le connecteur pagine par offset tant que la page est pleine, et parcourt TOUS les dossiers (le tableau de bord « Mes derniers documents » ne montre que les derniers — même piège que le menu des années de Materiel.net).\n\nTÉLÉCHARGEMENT : POST /api/v1/documents/download, corps {documentIds:[id], folderIds:[]} — un seul identifiant rend le fichier même (content-disposition), plusieurs rendraient un zip (download.utils). Le CONTENU fait foi : seuls les %PDF- sont déposés, le reste est compté et dit.\n\nCORBEILLE : jamais parcourue, PAR CONSTRUCTION. La page Corbeille de l'application passe par un chargeur dédié (« loadAllDeletedDocuments », TrashPage) : le listage normal par dossier ne rend pas les documents supprimés, et le connecteur n'appelle jamais ce chargeur. Par précaution supplémentaire, tout dossier dont le nom évoque la corbeille est écarté de la descente. L'aide de l'application précise que la corbeille se vide au bout de 30 jours.\n\nDONNÉES DE PAIE : la règle « rien de secret dans un journal » s'applique en entier. Les journaux de ce connecteur ne portent NI titre de document, NI nom de dossier (le nom d'un employeur est une donnée), NI montant — uniquement des comptes et des identifiants internes tronqués.\n\nL'ANNÉE DE RANGEMENT vient de la PÉRIODE lue dans le titre du document (« Bulletins 12/2025 » → 2025), à défaut d'une date portée par l'API, jamais de la date de récupération.\n\nCE QUI N'EST PAS VÉRIFIÉ, faute de compte : la forme exacte des réponses /folders et /documents (le connecteur tolère un tableau nu, une enveloppe {folders|documents|data|content|items} et des enfants imbriqués {children|subFolders|folders}), les noms des champs de date (plusieurs candidats sont lus), la présence d'une éventuelle validation supplémentaire à la connexion, et le comportement de la pagination au-delà de 1 000 documents par dossier.",
+  "fields": [
+    {
+      "key": "email",
+      "identification": "email",
+      "type": "email",
+      "required": true
+    },
+    {
+      "key": "motDePasse",
+      "label": "Mot de passe",
+      "type": "password",
+      "required": true,
+      "help": "Celui de votre compte eDocPerso. Si vous l'avez oublié, utilisez « Mot de passe oublié ? » sur edocperso.fr, puis revenez saisir le nouveau ici."
+    },
+    {
+      "key": "historique",
+      "label": "Historique à récupérer",
+      "type": "history",
+      "default": "depuis",
+      "help": "Votre coffre garde tous les documents déposés. crabe reprend tout une première fois, puis ne suit plus que les nouveautés."
+    }
+  ],
+  "permissions": [
+    {
+      "key": "factures",
+      "scope": "read-write",
+      "description": "Appelle l'interface de programmation d'eDocPerso pour parcourir vos dossiers, lister vos documents et les télécharger, puis les dépose sur vos destinations de stockage. La corbeille n'est jamais ouverte, rien n'est modifié dans votre coffre."
+    },
+    {
+      "key": "identifiants",
+      "scope": "read",
+      "description": "Votre adresse électronique et votre mot de passe eDocPerso, chiffrés au repos, utilisés pour la seule connexion au coffre."
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "id": "semailles",
+  "name": "Semailles",
+  "category": "shopping",
+  "site": "www.semailles.com",
+  "implementation": "prestashop",
+  "description": "Récupère automatiquement les factures de vos achats de semences Semailles.",
+  "technicalNote": "Boutique sous PrestaShop : aucun code propre à écrire. Elle deviendra fonctionnelle en même temps que les neuf autres, le jour où le connecteur générique PrestaShop existe.",
+  "status": "planned"
+}

@@ -1,0 +1,52 @@
+{
+  "id": "battle-net",
+  "name": "Battle.net",
+  "category": "divertissement",
+  "site": "account.battle.net",
+  "implementation": "scraping",
+  "initialStatus": "pending",
+  "description": "Récupère automatiquement le détail de vos achats Battle.net, enregistré en PDF.",
+  "caveat": "Vous vous connectez vous-même, dans une fenêtre. Le site ne fournit pas de facture : crabe enregistre en PDF la page de détail de chaque achat.",
+  "technicalNote": "LOT 104 (11/10/2026) — CONNECTEUR NEUF, ÉCRIT D'APRÈS LA STRUCTURE DE LA VRAIE PAGE, JAMAIS EXERCÉ CONTRE UN COMPTE RÉEL. Il remplace l'annonce (dossier planned/ retiré, entrée de scripts/gen-planned.js purgée, migration 63 : la ligne de catalogue héritée de l'annonce portait « available »). ANNONCÉ (code source de la liste et d'un détail enregistrés connectés par l'utilisateur le 11/10, structure reprise sans donnée par le prompt du lot 104) : application Vue ; liste https://account.battle.net/transactions, h1 « Historique des achats », en-tête blz-nav-battlenet portant l'attribut authenticated (son attribut user — BattleTag, courriel — n'est jamais lu) ; onglets button.meka-tab__inner, « Achats » choisi ; liste « Région » jamais touchée ; tableau div.transactions-table table.table, une ligne tr.hoverable par achat (date, article, total, statut, lien /transactions/<commande>/<facture> de texte le numéro de commande) ; pagination ul[role=menubar] sous le tableau, liens href=\"#\" : la page suivante se dessine par script. Détail /transactions/<commande>/<facture> : h1 « Détails de la commande », carte « Commande #<commande> », « Numéro de facture » ; aucun lien de téléchargement. UN SEUL GESTE (un essai lit le fichier) : le lien « Suivant » (div.transactions-table ul[role=\"menubar\"] a[role=\"menuitem\"], texte exact), par une seule fonction, recontrôlé au moment du clic (seul, visible, sous le tableau qui montre encore les numéros lus) ; la page suivante doit montrer d'autres numéros, sinon arrêt dit ; 50 pages au plus. LE DOCUMENT : chaque détail est ouvert par l'adresse lue dans le lien (https://account.battle.net/transactions/<commande>[/<facture>], sans requête, sans mot refusé — server/connectors/adresses-refusees.js), dans un onglet de la session ; jugé (titre, carte de cette commande, numéro de facture égal à l'adresse), puis imprimé par le navigateur (page.pdf, A4, fonds compris) sans rien y changer — le chemin d'e-liquide-fr. L'en-tête du site s'imprime avec la page (non mesuré). ANCRE, DATE, NOM : battle-net-facture-<facture>, à défaut battle-net-commande-<commande> ; date de la ligne ; battle-net_AAAA-MM_facture-<facture>.pdf. TEMPS : arrêt aux 2/3 de CRABE_LIMITE_EXECUTION_MS, ce qui est pris est rendu. CONTRÔLE À L'ENREGISTREMENT : preuveSurFenetre, adresse de la liste tenue et marqueur blz-nav-battlenet[authenticated]. NON MESURÉ : la page de connexion, la région choisie à l'arrivée, un historique vide ou de plus de deux pages, « Suivant » sur la dernière page, ce que l'impression montre. Prouvé sur des pages reconstituées (test/lot104-*.test.js) — l'essai réel est à l'administrateur. LOT 105 (12/10/2026) — ESSAI RÉEL DU 12/10 : liste, connexion et « Suivant » bons, aucun document. Page 2 : les liens de détail portent une requête (forme non mesurée) ; un lien dont le chemin est exactement /transactions/<commande>/<facture> est accepté avec sa requête et crabe suit le chemin seul (le journal dit, par page, les noms des paramètres, jamais leurs valeurs) ; tout autre chemin reste écarté. Détail : les dix refus tombaient à la première lecture, avant que la carte soit dessinée (le titre « Commande #… » paraît avant le corps). Le détail attend désormais sa carte dessinée — plus de classe d'attente placeholder…, le titre, le libellé « Numéro de facture » suivi d'une valeur — 45 s au plus (la borne d'une navigation) ; le numéro est lu à côté de son libellé (jamais par la classe blz-text-capitalize-first, que porte aussi le statut), comparé sans espaces ; un écart ne conclut que s'il tient 2 s, et le journal dit la forme lue (longueur, chiffres, libellé, carte provisoire), jamais la valeur.",
+  "remoteLogin": {
+    "url": "https://account.battle.net/transactions",
+    "marker": "",
+    "verifyUrl": "https://account.battle.net/transactions",
+    "preuveSurFenetre": true,
+    "marqueursFenetre": [
+      {
+        "selecteur": "blz-nav-battlenet[authenticated]"
+      }
+    ],
+    "hint": "Connectez-vous avec votre compte Battle.net. Quand l'historique de vos achats s'affiche, cliquez sur Enregistrer : crabe vérifie alors la connexion sur cette page."
+  },
+  "fields": [
+    {
+      "key": "session",
+      "label": "Connexion à Battle.net",
+      "type": "session",
+      "required": false,
+      "accept": "application/json,.json",
+      "help": "Le bouton « Se connecter à Battle.net » ouvre une fenêtre de navigateur dans crabe : connectez-vous comme sur le site. La connexion est enregistrée, chiffrée, et n'est jamais réaffichée. Elle finira par expirer : crabe vous demandera alors de la rouvrir."
+    },
+    {
+      "key": "historique",
+      "label": "Historique à récupérer",
+      "type": "history",
+      "default": "depuis",
+      "help": "À chaque récupération, crabe lit l'historique de vos achats et enregistre ceux qui ne sont pas encore dans vos documents. La première récupération reprend tout l'historique ; si elle est trop longue pour un seul passage, la suite vient au passage suivant."
+    }
+  ],
+  "permissions": [
+    {
+      "key": "factures",
+      "scope": "read-write",
+      "description": "Lit l'historique de vos achats Battle.net — en passant d'une page à l'autre par le lien « Suivant », le seul élément que crabe clique —, enregistre en PDF la page de détail de chaque achat, puis la dépose sur vos destinations de stockage."
+    },
+    {
+      "key": "identifiants",
+      "scope": "read",
+      "description": "La connexion de navigateur que vous avez ouverte vous-même sur votre compte Battle.net : ses cookies, chiffrés au repos, rejoués uniquement pour lire vos documents. Aucun mot de passe n'est stocké ici."
+    }
+  ]
+}

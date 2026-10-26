@@ -1,0 +1,59 @@
+# crabe — démarrage en une commande : docker compose up -d
+#
+# Aucune configuration préalable n'est nécessaire : la base se crée toute
+# seule, la phrase secrète est générée au premier démarrage et écrite dans
+# data/phrase-secrete (le journal dit comment la lire, sans jamais l'afficher),
+# et le premier écran est la création de votre compte.
+
+services:
+  crabe:
+    # L'image publiée. Ou construisez localement : décommentez `build: .`
+    # et remplacez éventuellement l'image par un nom à vous.
+    image: ghcr.io/theworms/crabe:latest
+    # build: .
+
+    ports:
+      # Le port de l'application (pas un port 80 : crabe vit très bien
+      # derrière votre reverse proxy, ou tout seul sur ce port). Ouvert en
+      # IPv4 seulement : en IPv6, Docker fait passer les connexions sous sa
+      # propre adresse, et crabe ne pourrait plus savoir si elles viennent de
+      # votre réseau local.
+      - "0.0.0.0:3000:3000"
+
+    volumes:
+      # TOUT ce qui doit survivre vit là : base, secrets, documents, profils
+      # de navigateur. Sauvegardez ce dossier, vous sauvegardez crabe.
+      - ./data:/data
+
+    environment:
+      # Voir .env.example pour la liste complète et le détail de chaque
+      # variable. Rien n'est obligatoire pour démarrer.
+      #
+      # Fixez la phrase secrète vous-même plutôt que de la laisser se
+      # générer, si vous préférez la tenir hors du volume :
+      # CRABE_MASTER_PASSPHRASE: "une-phrase-longue-et-privee"
+      #
+      # Vérification de mise à jour (coupée par défaut) — le dépôt GitHub
+      # interrogé une fois par jour au plus :
+      CRABE_UPDATE_REPO: "TheWorms/crabe"
+      TZ: "Europe/Paris"
+
+    # Chromium a besoin de plus de mémoire partagée que les 64 Mo par défaut.
+    shm_size: "1gb"
+
+    # Un vrai processus 1 dans le conteneur : il transmet l'arrêt à crabe et
+    # récolte les processus que laissent les navigateurs (sans lui, ils restent
+    # « zombies » jusqu'au prochain redémarrage du conteneur).
+    init: true
+
+    # Plafond de mémoire — facultatif, à régler selon votre machine. Chaque
+    # récupération ouvre un navigateur Chromium, gourmand en mémoire. Sans
+    # plafond, une machine à court de mémoire peut se figer tout entière au lieu
+    # d'arrêter le seul navigateur en cause : c'est arrivé le 1er octobre 2026,
+    # quand vingt-deux récupérations sont parties en même temps et que crabe est
+    # resté figé plus d'une journée (depuis, elles passent une à une). La bonne
+    # valeur dépend de votre machine : la ligne ci-dessous est un exemple, à
+    # 3 Go ; retirez le « # » pour l'imposer.
+    # mem_limit: 3g
+
+    restart: unless-stopped

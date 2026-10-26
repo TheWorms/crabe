@@ -1,0 +1,8 @@
+{
+  "id": "klarna",
+  "name": "Klarna",
+  "category": "banque",
+  "site": "www.klarna.com",
+  "description": "Récupère automatiquement vos échéanciers et reçus de paiement Klarna.",
+  "status": "planned"
+}

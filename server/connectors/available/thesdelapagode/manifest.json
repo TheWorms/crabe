@@ -1,0 +1,50 @@
+{
+  "id": "thesdelapagode",
+  "name": "Les Thés de la Pagode",
+  "category": "shopping",
+  "color": "#5b6f3a",
+  "letters": "TP",
+  "site": "www.thesdelapagode.com",
+  "implementation": "scraping",
+  "initialStatus": "pending",
+  "description": "Récupère automatiquement les factures de vos commandes Les Thés de la Pagode.",
+  "caveat": "Pas encore essayé sur un vrai compte. Vous vous connectez vous-même, dans une fenêtre ; crabe lit vos commandes et prend leurs factures, sans rien cliquer.",
+  "technicalNote": "LOT 110 (18/10/2026) — CONNECTEUR NEUF, JAMAIS EXERCÉ CONTRE UN COMPTE RÉEL, ÉCRIT D'APRÈS UNE RECONNAISSANCE PUBLIQUE (cinq requêtes GET sans compte, docs/reconnaissance-lot110.md) : boutique PrestaShop (objet de page « prestashop » standard, cookies « PrestaShop-… », contrôleurs standard ; version non lisible), thème maison « antadis ». MESURÉ : l'historique des commandes est /fr/historique-commandes, et il renvoie un visiteur anonyme vers /fr/connexion?back=history (302) ; /fr/mon-compte renvoie vers /fr/connexion?back=my-account ; formulaire de connexion standard (form#login-form, champs email et password, bouton #submit-login) ; liens de facture au contrôleur pdf-invoice (/fr/index.php?controller=pdf-invoice) ; déconnexion /fr/?mylogout= ; un lien « Gérer mes cookies » (régie non identifiée) ; aucune garde anti-robot vue. NON VÉRIFIÉ : la page de l'historique CONNECTÉE — sa forme est présumée celle du thème PrestaShop standard (body#history, un tableau dont l'en-tête dit « Référence », un lien pdf-invoice&id_order=<n> par commande facturée) ; si la page diffère, le connecteur le dit et ne conclut pas « aucune facture ». Le marqueur de la fenêtre (body#history) est lui aussi présumé, non vérifié. Connexion par l'utilisateur dans la fenêtre ; lecture sans un clic ; factures seulement (ni avoirs, ni bons de livraison, ni retours) ; ancre sur la référence de commande lue dans la ligne (jamais sur un jeton) ; une ligne sans référence lisible est refusée ; PDF par le fetch de la page, refusé s'il n'est pas un PDF ; adresses de déconnexion, de compte, d'adresses, de mot de passe, de panier, de commande, d'avoirs et de retours refusées jusque sur le réseau du navigateur.",
+  "remoteLogin": {
+    "url": "https://www.thesdelapagode.com/fr/connexion?back=history",
+    "marker": "",
+    "verifyUrl": "https://www.thesdelapagode.com/fr/historique-commandes",
+    "preuveSurFenetre": true,
+    "marqueursFenetre": [{ "selecteur": "body#history" }],
+    "hint": "Connectez-vous avec votre adresse e-mail et votre mot de passe Les Thés de la Pagode. Si un bandeau de cookies recouvre la page, fermez-le. Quand l'historique de vos commandes s'affiche, cliquez sur Enregistrer : crabe vérifie alors la connexion sur cette page."
+  },
+  "fields": [
+    {
+      "key": "session",
+      "label": "Connexion aux Thés de la Pagode",
+      "type": "session",
+      "required": false,
+      "accept": "application/json,.json",
+      "help": "Le bouton « Se connecter à Les Thés de la Pagode » ouvre une fenêtre de navigateur dans crabe : connectez-vous comme sur le site, avec votre adresse e-mail et votre mot de passe. La connexion est enregistrée, chiffrée, et n'est jamais réaffichée. Elle finira par expirer : crabe vous demandera alors de la rouvrir."
+    },
+    {
+      "key": "historique",
+      "label": "Historique à récupérer",
+      "type": "history",
+      "default": "depuis",
+      "help": "À chaque récupération, crabe lit la page de vos commandes Les Thés de la Pagode et prend les factures qui ne sont pas encore dans vos documents. La première récupération reprend tout l'historique ; si elle est trop longue pour un seul passage, la suite vient au passage suivant."
+    }
+  ],
+  "permissions": [
+    {
+      "key": "factures",
+      "scope": "read-write",
+      "description": "Lit la liste de vos commandes Les Thés de la Pagode et télécharge la facture PDF de chacune, sans rien cliquer sur la boutique, puis la dépose sur vos destinations de stockage."
+    },
+    {
+      "key": "identifiants",
+      "scope": "read",
+      "description": "La connexion de navigateur que vous avez ouverte vous-même sur Les Thés de la Pagode : ses cookies, chiffrés au repos, rejoués uniquement pour lire vos commandes. Aucun mot de passe n'est stocké ici."
+    }
+  ]
+}
