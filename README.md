@@ -341,26 +341,32 @@ Et côté administration — le catalogue, la politique de sécurité, les rôle
 
 ## Signaler un problème
 
-Une récupération échoue et son message ne suffit pas ? Dans
-**Administration › Logs › Connecteurs**, la ligne de cet échec a un bouton
-**Rapport** : il télécharge la version de crabe et de ses outils, et tout le
-déroulé de la récupération, page par page, jusqu'à l'endroit où elle s'est
-arrêtée — ce que crabe cherchait et ce qu'il a trouvé à la place. Quand la page
-a pu être relevée, c'est une archive : avec le texte, la structure de la page
-(chaque texte remplacé par sa longueur) et une capture où chaque texte et
-chaque image sont effacés. crabe en a retiré les noms de compte, les adresses
-e-mail, les adresses IP, les jetons et le détail des adresses web. Relisez-le,
-puis joignez-le à une [issue](https://github.com/TheWorms/crabe/issues) en
-disant ce que vous attendiez.
+Un service n'arrive plus à récupérer vos documents ? Il suffit d'activer les
+logs et de nous les envoyer : ils disent, page par page, ce que crabe a fait,
+ce qu'il cherchait et ce qu'il a trouvé à la place — de quoi corriger sans
+avoir de compte sur ce service.
 
-Pour voir chaque étape d'un service, même quand il réussit :
+1. **Activez les logs** : dans **Administration › Logs › Réglages**, ouvrez
+   « Le déroulé complet » et « Le rapport lisible à l'écran » (ils sont fermés
+   par défaut).
+2. **Relancez le service** : sur sa fiche, **Récupérer maintenant**.
+3. **Envoyez-nous le rapport** : dans **Administration › Logs › Connecteurs**,
+   sur la ligne de cette récupération, **Détail** montre son déroulé, et
+   **Rapport** le télécharge. Joignez le fichier à une
+   [issue](https://github.com/TheWorms/crabe/issues) en disant ce que vous
+   attendiez.
+
+crabe retire du rapport les noms de compte, les adresses e-mail, les numéros
+de téléphone, les adresses IP, les jetons et le détail des adresses web. Quand
+la page a pu être relevée, c'est une archive : avec le texte, la structure de
+la page (chaque texte remplacé par sa longueur) et une capture où chaque texte
+et chaque image sont effacés. Relisez-le quand même avant de l'envoyer.
+
+Pour suivre chaque étape d'un service, même quand il réussit :
 
 ```bash
 docker compose exec crabe node bin/crabe.js recuperer <service> --detail
 ```
-
-La commande suit la récupération à l'écran et range son rapport dans
-`data/rapports/<n°>/`.
 
 ---
 
