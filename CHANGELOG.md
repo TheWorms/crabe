@@ -6,6 +6,18 @@ Pour mettre à jour votre crabe : [docs/MISE-A-JOUR.md](docs/MISE-A-JOUR.md) (En
 
 ---
 
+## 0.2.7 — échéanciers TotalEnergies, Private Sport Shop plus patient (01/11/2026)
+
+### Connecteurs
+- **TotalEnergies récupère aussi vos échéanciers** (« Échéancier d'activation », « Avenant d'échéancier »). Pour un compte mensualisé, ce sont eux qui font office de factures : la facture de régularisation ne vient qu'une fois l'an. Un échéancier encore « en cours », sans document à télécharger, est compté sans être tenu pour manqué.
+- **Private Sport Shop ne se trompe plus sur un jeton expiré.** Quand le jeton d'accès du site a expiré, sa page des commandes renvoyait vers l'accueil, et crabe concluait au bout de 45 secondes que la page avait changé. Il reconnaît maintenant l'accueil en quelques secondes, attend que le site ait renouvelé le jeton, et rouvre la page des commandes, deux fois au plus.
+- **Le refus d'accès de Cloudflare est reconnu** (« Attention Required! », vu sur Le Petit Vapoteur). crabe disait que la page des commandes « ne ressemblait plus » à celle qu'il connaît ; il dit maintenant que le site a présenté sa vérification de sécurité, et qu'il faut rouvrir la connexion depuis la fiche du service. Vaut pour toutes les boutiques qui partagent cette lecture.
+
+### Installation
+- crabe demande désormais **Node.js 22 ou plus récent** (Node 20 n'est plus maintenu). L'image Docker n'est pas concernée : elle embarque son propre Node.
+
+---
+
 ## 0.2.6 — un rapport qui suffit à refaire une lecture (26/10/2026)
 
 ### Signaler un problème

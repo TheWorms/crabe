@@ -184,6 +184,11 @@ async function estMurAntiRobot(page) {
     // « Just a moment… » et « Un instant… » (relevé sur bricomarche.com le
     // 22/08/2026, avec le corps « Vérification de sécurité en cours »).
     if (/^(just a moment|un instant)/i.test(document.title || '')) return true;
+    // Son refus d'accès, en 403 : « Attention Required! | Cloudflare » (relevé
+    // sur lepetitvapoteur.com, récupération n° 912 du 01/11/2026, « Sorry, you
+    // have been blocked »). Le titre seul : `#cf-error-details` est aussi sur
+    // ses pages d'erreur 5xx, qui disent un site en panne, pas un mur.
+    if (/^attention required!/i.test(document.title || '')) return true;
     if ([...document.querySelectorAll('iframe[src]')].some((f) =>
       /challenges\.cloudflare\.com|geo\.captcha-delivery\.com/i.test(f.src))) return true;
     const texte = (document.body?.innerText || '').trim();

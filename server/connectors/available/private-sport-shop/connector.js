@@ -87,6 +87,18 @@ const PAS_ATTENTE_MS = 400;
 const STABLE_MS = 1_500;
 const STABLE_VIDE_MS = 5_000;
 const DELAI_GESTE_MS = 10_000;
+/**
+ * 0.2.7 — le renvoi vers l'accueil (récupération n° 888, 26/10/2026). La page
+ * des commandes répond 200, puis renvoie d'elle-même vers l'accueil quand le
+ * jeton d'accès (`access_token`) a expiré, pendant que le site en fabrique un
+ * neuf. crabe attendait 45 s un titre qui ne pouvait pas venir. Désormais :
+ * l'accueil reconnu en 3 s, le jeton neuf attendu, la page des commandes
+ * rouverte — deux fois au plus.
+ */
+const ACCUEIL_STABLE_MS = 3_000;
+const DELAI_JETON_MS = 20_000;
+const ESSAIS_APRES_ACCUEIL = 2;
+const COOKIE_JETON = 'access_token';
 
 const LIMITE_EXECUTION_DEFAUT_MS = 45 * 60 * 1000;
 const PART_DU_TEMPS = 2 / 3;
@@ -382,15 +394,35 @@ async function lire(page, fonction) {
   return page.evaluate(fonction).catch(() => null);
 }
 
+/** L'adresse est-elle l'accueil du site (son chemin `/`) ? Pure. */
+function estAccueil(url) {
+  try {
+    const u = new URL(String(url || ''));
+    return u.hostname === HOTE && (u.pathname === '/' || u.pathname === '');
+  } catch {
+    return false;
+  }
+}
+
 /** Attend une liste de commandes, au titre attendu, stable ; ne lève jamais. */
 async function attendreLaListe(page, titreAttendu) {
   const debut = Date.now();
   let signature = null;
   let stableDepuis = 0;
+  let accueilDepuis = 0;
   let vue = null;
   for (;;) {
     vue = await lire(page, LIRE_LA_LISTE);
     if (vue && (estPageDeConnexion(vue.url) || vue.motDePasse)) return { verdict: 'connexion', raison: 'renvoyé vers une page de connexion', vue };
+    // 0.2.7 : renvoyé vers l'accueil — inutile d'attendre le titre 45 s.
+    if (vue && estAccueil(vue.url)) {
+      accueilDepuis ||= Date.now();
+      if (Date.now() - accueilDepuis >= ACCUEIL_STABLE_MS) {
+        return { verdict: 'accueil', raison: 'renvoyé vers l\'accueil du site (jeton d\'accès expiré, vraisemblablement)', vue };
+      }
+    } else {
+      accueilDepuis = 0;
+    }
     if (vue && vue.titre === titreAttendu) {
       const forme = JSON.stringify(vue.cartes.map((c) => c.liens));
       if (forme !== signature) {
@@ -577,13 +609,34 @@ function erreurPageIllisible(detail) {
   return err;
 }
 
+/** Attend que le site ait posé un jeton d'accès valable ; rend vrai s'il est là. */
+async function attendreLeJeton(page) {
+  const fin = Date.now() + DELAI_JETON_MS;
+  for (;;) {
+    const cookies = await page.context().cookies().catch(() => []);
+    if (cookies.some((c) => c.name === COOKIE_JETON && (c.expires === -1 || c.expires * 1000 > Date.now()))) return true;
+    if (Date.now() >= fin) return false;
+    await page.waitForTimeout(PAS_ATTENTE_MS).catch(() => {});
+  }
+}
+
 async function arriverSurLHistorique(page, log) {
-  const erreur = await naviguer(page, URL_HISTORIQUE);
-  if (erreur) log(`${ID} : le chargement de l'historique a échoué — ${erreur}.`);
-  const arrivee = await attendreLaListe(page, 'Historique des commandes');
-  log(`${ID} : arrivée jugée « ${arrivee.verdict} » — ${arrivee.raison}.`);
+  let arrivee;
+  for (let essai = 0; ; essai++) {
+    const erreur = await naviguer(page, URL_HISTORIQUE);
+    if (erreur) log(`${ID} : le chargement de l'historique a échoué — ${erreur}.`);
+    arrivee = await attendreLaListe(page, 'Historique des commandes');
+    log(`${ID} : arrivée jugée « ${arrivee.verdict} » — ${arrivee.raison}.`);
+    if (arrivee.verdict !== 'accueil' || essai >= ESSAIS_APRES_ACCUEIL) break;
+    const jeton = await attendreLeJeton(page);
+    log(`${ID} : ${jeton ? 'jeton d\'accès présent' : `pas de jeton d'accès après ${DELAI_JETON_MS / 1000} s`} — `
+      + `nouvel essai de l'historique (${essai + 2} sur ${ESSAIS_APRES_ACCUEIL + 1}).`);
+  }
   if (arrivee.verdict === 'connexion') throw profilMarchand.erreurRenvoiVersAuthentification(NOM, arrivee.raison);
   if (arrivee.verdict === 'mur') throw new Error(profilMarchand.messageMur(NOM));
+  if (arrivee.verdict === 'accueil') {
+    throw erreurPageIllisible(`renvoyé vers l'accueil du site à chacun des ${ESSAIS_APRES_ACCUEIL + 1} essais`);
+  }
   if (arrivee.verdict !== 'liste') throw erreurPageIllisible(arrivee.raison);
   return arrivee.vue;
 }
@@ -781,6 +834,7 @@ module.exports = {
   test,
   fetchInvoices,
   // exportés pour les tests
+  estAccueil,
   lireSession,
   pourLeJournal,
   adresseDuDetail,

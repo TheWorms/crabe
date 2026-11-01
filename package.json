@@ -1,13 +1,13 @@
 {
   "name": "crabe",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "description": "Gestionnaire de factures auto-hébergé, multi-compte",
   "type": "commonjs",
   "main": "server/index.js",
   "private": true,
   "license": "AGPL-3.0-only",
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "bin": {
     "crabe": "bin/crabe.js"

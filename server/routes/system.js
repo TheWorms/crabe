@@ -21,6 +21,7 @@ const passwordPolicy = require('../auth/password');
 const settings = require('../settings');
 const applog = require('../applog');
 const mailer = require('../mailer');
+const horloge = require('../horloge');
 const emailTemplates = require('../email-templates');
 const { config } = require('../config');
 const version = require('../version');
@@ -66,7 +67,8 @@ router.get('/', requireAnyAdminPermission, (req, res) => {
   const runs = one(
     `SELECT COUNT(*) AS total,
             SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END) AS ok
-       FROM run_logs WHERE started_at > datetime('now', '-30 days')`
+       FROM run_logs WHERE started_at > ?`,
+    new Date(horloge.maintenant().getTime() - 30 * 86400000).toISOString().slice(0, 19).replace('T', ' ')
   );
 
   const reliability = runs.total ? Math.round((runs.ok / runs.total) * 1000) / 10 : 100;

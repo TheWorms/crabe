@@ -36,7 +36,7 @@
       "label": "Historique à récupérer",
       "type": "history",
       "default": "depuis",
-      "help": "À chaque récupération, crabe lit la liste de vos factures d'électricité et de gaz et prend celles qui ne sont pas encore dans vos documents. La première récupération reprend toute la liste affichée ; si elle est trop longue pour un seul passage, la suite vient au passage suivant."
+      "help": "À chaque récupération, crabe lit la liste de vos factures et de vos échéanciers d'électricité et de gaz (pour un compte mensualisé, ce sont eux qui font office de factures) et prend ceux qui ne sont pas encore dans vos documents. La première récupération reprend toute la liste affichée ; si elle est trop longue pour un seul passage, la suite vient au passage suivant."
     }
   ],
   "permissions": [

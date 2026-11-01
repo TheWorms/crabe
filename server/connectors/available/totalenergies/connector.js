@@ -63,8 +63,14 @@
  *
  * Une FACTURE = un `.detail-facture` dont le type contient « facture » (sans
  * accent ni casse) ET dont le lien n'a pas `data-trackingz-action="ECHEANCIER"`.
- * Les échéanciers et les types inconnus sont ignorés et COMPTÉS au journal
- * par type (le type seul, jamais un numéro). Une facture sans numéro lisible,
+ * 0.2.7 (issue n° 3 du dépôt public) : un ÉCHÉANCIER (« Échéancier
+ * d'activation », « Avenant d'échéancier », ou un lien marqué ECHEANCIER) se
+ * prend aussi, aux mêmes contrôles — pour un compte mensualisé, ce sont les
+ * documents de facturation, la facture de régularisation ne venant qu'une fois
+ * l'an. Ancre au type court (« echeancier », « avenant ») ; sans numéro
+ * lisible, sur sa date ; sans lien (« En cours »), compté sans être manqué.
+ * Les types inconnus sont ignorés et COMPTÉS au journal par type (le type
+ * seul, jamais un numéro). Une facture sans numéro lisible,
  * sans lien unique ou au lien refusé n'est pas prise, et comptée : jamais
  * d'ancre sur le jeton ni sur le `cHash`.
  *
@@ -313,9 +319,17 @@ function typeEnAncre(type) {
   return sansAccent(type).replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '').slice(0, 16).replace(/-$/, '') || 'document';
 }
 
-/** L'ancre d'une facture : énergie, type, numéro lu. Pure. */
-function remoteIdFacture({ energie, type, numero }) {
-  return `${ID}-${ENERGIES[energie].ancre}-${typeEnAncre(type)}-${numero}`;
+/**
+ * L'ancre d'un document : énergie, type, numéro lu. Pure.
+ *
+ * 0.2.7 : un échéancier (jamais pris avant) a un type COURT, son premier mot —
+ * « echeancier », « avenant » —, pour que son nom de fichier reste lisible
+ * (au-delà de 40 signes, le nommage commun met une empreinte). Les ancres des
+ * factures ne changent pas : celles déjà rangées restent reconnues.
+ */
+function remoteIdFacture({ energie, type, numero, nature = 'facture' }) {
+  const enAncre = nature === 'echeancier' ? (sansAccent(type).match(/[a-z0-9]+/) || ['echeancier'])[0] : typeEnAncre(type);
+  return `${ID}-${ENERGIES[energie].ancre}-${enAncre}-${numero}`;
 }
 
 /** Le type tel qu'il se dit au journal : ses mots, aucun chiffre. Pure. */
@@ -335,9 +349,20 @@ function analyserDocument(brut) {
   // La marque d'un seul de ses liens suffit à faire d'un document un échéancier.
   const marque = liens.find((l) => String(l?.action ?? '').trim().toUpperCase() === ACTION_ECHEANCIER);
   const nature = natureDuDocument({ type, action: marque ? marque.action : (liens[0]?.action ?? '') });
-  if (nature !== 'facture') return { nature, type };
+  // 0.2.7 (issue n° 3) : pour un compte mensualisé, les échéanciers SONT les
+  // documents de facturation (« Échéancier d'activation », « Avenant
+  // d'échéancier ») — ils se prennent comme les factures, mêmes contrôles.
+  // Un échéancier encore sans lien (« En cours ») n'a pas de document : il est
+  // compté, jamais tenu pour manqué.
+  if (nature !== 'facture' && nature !== 'echeancier') return { nature, type };
+  if (nature === 'echeancier' && !liens.length) return { nature: 'echeancier-sans-document', type };
   if (!ENERGIES[brut?.energie]) return { nature: 'refusee', type, raison: 'énergie inconnue' };
-  const numero = numeroDuLibelle(brut.ligneNumero);
+  // Un échéancier sans numéro lisible (« N° --------- », vu sur la page
+  // enregistrée) s'ancre sur sa date : un échéancier se dit par son type et
+  // sa date. Jamais sur le jeton du lien.
+  const date = pageDocs.dateDepuisTexte(brut.date);
+  const numero = numeroDuLibelle(brut.ligneNumero)
+    || (nature === 'echeancier' && date ? date.replace(/-/g, '') : null);
   if (!numero) return { nature: 'refusee', type, raison: 'aucun numéro lisible' };
   if (liens.length !== 1) {
     return { nature: 'refusee', type, raison: liens.length ? `${liens.length} liens de téléchargement` : 'aucun lien de téléchargement' };
@@ -347,7 +372,7 @@ function analyserDocument(brut) {
   const adresse = lienDeTelechargement(liens[0].href);
   if (!adresse) return { nature: 'refusee', type, raison: 'lien qui n\'est pas un téléchargement de la liste' };
   return {
-    nature: 'facture',
+    nature,
     type,
     energie: brut.energie,
     numero,
@@ -367,19 +392,20 @@ const compterPar = (carte, cle) => carte.set(cle, (carte.get(cle) || 0) + 1);
 function lireLesDocuments(bruts) {
   const analyses = (bruts || []).map(analyserDocument);
   const ancres = new Map();
-  for (const a of analyses) if (a.nature === 'facture') compterPar(ancres, remoteIdFacture(a));
+  const aPrendre = (a) => a.nature === 'facture' || a.nature === 'echeancier';
+  for (const a of analyses) if (aPrendre(a) && a.numero) compterPar(ancres, remoteIdFacture(a));
   const factures = [];
   const refusees = [];
   const echeanciers = new Map();
   const inconnus = new Map();
   for (const [rang, a] of analyses.entries()) {
-    if (a.nature === 'facture' && ancres.get(remoteIdFacture(a)) > 1) {
-      refusees.push({ rang, type: a.type, raison: 'la même facture figure deux fois' });
-    } else if (a.nature === 'facture') {
+    if (aPrendre(a) && ancres.get(remoteIdFacture(a)) > 1) {
+      refusees.push({ rang, type: a.type, raison: 'le même document figure deux fois' });
+    } else if (aPrendre(a)) {
       factures.push({ ...a, rang, remoteId: remoteIdFacture(a) });
     } else if (a.nature === 'refusee') {
       refusees.push({ rang, type: a.type, raison: a.raison });
-    } else if (a.nature === 'echeancier') {
+    } else if (a.nature === 'echeancier-sans-document') {
       compterPar(echeanciers, typeAuJournal(a.type));
     } else {
       compterPar(inconnus, typeAuJournal(a.type));
@@ -411,10 +437,10 @@ function nommer(documents) {
 
 const pluriel = (n, un, plusieurs) => `${n} ${n > 1 ? plusieurs : un}`;
 
-/** « 3 échéanciers ignorés », « 1 document d'un autre type ignoré ». Pure. */
+/** « 1 échéancier en cours, sans document », « 1 document d'un autre type ignoré ». Pure. */
 function phraseDesIgnores(lecture) {
   const morceaux = [];
-  if (lecture.nbEcheanciers) morceaux.push(pluriel(lecture.nbEcheanciers, 'échéancier ignoré', 'échéanciers ignorés'));
+  if (lecture.nbEcheanciers) morceaux.push(pluriel(lecture.nbEcheanciers, 'échéancier en cours, sans document', 'échéanciers en cours, sans document'));
   if (lecture.nbInconnus) morceaux.push(pluriel(lecture.nbInconnus, 'document d\'un autre type ignoré', 'documents d\'un autre type ignorés'));
   return morceaux.join(', ');
 }
@@ -425,8 +451,8 @@ function phraseDesIgnores(lecture) {
  */
 function phraseAucuneFacture(lecture) {
   const ignores = phraseDesIgnores(lecture);
-  return `Aucune facture pour l'instant${ignores ? ` ; ${ignores}` : ''}. `
-    + `Votre historique ${NOM} a bien été lu, électricité et gaz : crabe n'y prend que les factures.`;
+  return `Aucune facture ni aucun échéancier à prendre pour l'instant${ignores ? ` ; ${ignores}` : ''}. `
+    + `Votre historique ${NOM} a bien été lu, électricité et gaz : crabe y prend les factures et les échéanciers.`;
 }
 
 /**
@@ -436,15 +462,15 @@ function phraseAucuneFacture(lecture) {
 function precisionDuPassage(b, lecture) {
   const phrases = [];
   const ignores = phraseDesIgnores(lecture);
-  phrases.push(`— ${NOM} : ${pluriel(lecture.factures.length + lecture.refusees.length, 'facture lue', 'factures lues')} `
+  phrases.push(`— ${NOM} : ${pluriel(lecture.factures.length + lecture.refusees.length, 'document lu', 'documents lus')} (factures et échéanciers) `
     + 'dans votre historique (électricité et gaz)'
     + (b.deja ? `, ${b.deja} déjà dans vos documents` : '')
     + (ignores ? ` ; ${ignores}` : '')
     + '.');
   if (lecture.refusees.length) {
     phrases.push(lecture.refusees.length > 1
-      ? `${lecture.refusees.length} factures n'ont pas été prises : elles ne se lisaient pas de façon sûre (le journal dit pourquoi).`
-      : 'Une facture n\'a pas été prise : elle ne se lisait pas de façon sûre (le journal dit pourquoi).');
+      ? `${lecture.refusees.length} documents n'ont pas été pris : ils ne se lisaient pas de façon sûre (le journal dit pourquoi).`
+      : 'Un document n\'a pas été pris : il ne se lisait pas de façon sûre (le journal dit pourquoi).');
   }
   if (b.interruption === 'temps') {
     phrases.push(`La récupération a pris tout le temps permis : ${pluriel(b.restantes, 'facture attend', 'factures attendent')} `
@@ -732,9 +758,9 @@ async function arriverSurLaListe(page, log) {
       + `${b.pages > 1 ? ` ; la pagination annonce ${b.pages} pages : seuls les documents servis dans la page sont lus` : ''}`
       + `${b.liensSansDocument ? ` ; ${pluriel(b.liensSansDocument, 'lien de téléchargement', 'liens de téléchargement')} sans document, ignoré(s)` : ''}.`);
   }
-  for (const [type, n] of lecture.echeanciers) log(`${ID} : ignoré — « ${type} » (échéancier) : ${n}.`);
+  for (const [type, n] of lecture.echeanciers) log(`${ID} : sans document — « ${type} » (échéancier en cours) : ${n}.`);
   for (const [type, n] of lecture.inconnus) log(`${ID} : ignoré — « ${type} » (type inconnu) : ${n}.`);
-  for (const r of lecture.refusees) log(`${ID} : facture non prise — « ${typeAuJournal(r.type)} » : ${r.raison}.`);
+  for (const r of lecture.refusees) log(`${ID} : document non pris — « ${typeAuJournal(r.type)} » : ${r.raison}.`);
   return { lecture, energies: connues.length };
 }
 
@@ -788,9 +814,9 @@ async function fetchInvoices(config, ctx = {}) {
       }
       aPrendre.push(f);
     }
-    log(`${ID} : liste lue — ${lecture.lus} document(s) : ${lecture.factures.length} facture(s) lisible(s), `
-      + `${lecture.refusees.length} non prise(s), ${lecture.nbEcheanciers} échéancier(s) et ${lecture.nbInconnus} `
-      + `d'un autre type ignorés ; ${bilan.deja} déjà dans l'archive, ${aPrendre.length} à prendre, `
+    log(`${ID} : liste lue — ${lecture.lus} document(s) : ${lecture.factures.length} document(s) lisible(s) (factures et échéanciers), `
+      + `${lecture.refusees.length} non pris, ${lecture.nbEcheanciers} échéancier(s) en cours sans document, ${lecture.nbInconnus} `
+      + `d'un autre type ignoré(s) ; ${bilan.deja} déjà dans l'archive, ${aPrendre.length} à prendre, `
       + `${bilan.horsPeriode} hors période.`);
 
     // La preuve exigée par le socle (lot 31) : la liste a été LUE, session
@@ -812,7 +838,7 @@ async function fetchInvoices(config, ctx = {}) {
         break;
       }
       tentees++;
-      const qui = `facture ${i + 1} sur ${aPrendre.length} (${ENERGIES[f.energie].phrase})`;
+      const qui = `${f.nature === 'echeancier' ? 'échéancier' : 'facture'} ${i + 1} sur ${aPrendre.length} (${ENERGIES[f.energie].phrase})`;
       // Recontrôlée juste avant la requête : la liste fermée, et la forme exacte.
       const adresse = motInterdit(f.adresse) === null ? lienDeTelechargement(f.adresse) : null;
       const obtenu = adresse
@@ -821,7 +847,7 @@ async function fetchInvoices(config, ctx = {}) {
       if (obtenu.ok) {
         serie.reussite();
         invoices.push({ ...f, buffer: obtenu.buffer });
-        log(`${ID} : ${qui} — récupérée (${obtenu.buffer.length} octets).`);
+        log(`${ID} : ${qui} — obtenu (${obtenu.buffer.length} octets).`);
         continue;
       }
       manqueesAuTelechargement++;

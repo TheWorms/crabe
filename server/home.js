@@ -30,6 +30,7 @@ const causeEchec = require('./connectors/cause-echec');
 // remplacée là où un message est servi (connectors/site-hors-ligne.js).
 const { sansReessaiPromis } = require('./connectors/site-hors-ligne');
 const tz = require('./timezone');
+const horloge = require('./horloge');
 
 /**
  * Catalogue des blocs. L'ordre de ce tableau est l'ordre par défaut, celui de
@@ -392,7 +393,7 @@ function documentsParConnecteur(userId) {
  * @returns {Array<{periode: string, debut: Date, fin: Date}>} du plus ancien
  *          au mois en cours
  */
-function moisDuFuseau(nombre = GRAPHIQUE_MOIS, maintenant = new Date()) {
+function moisDuFuseau(nombre = GRAPHIQUE_MOIS, maintenant = horloge.maintenant()) {
   const fuseau = settings.timezone();
   const ici = tz.partsInZone(maintenant, fuseau);
   const mois = [];
