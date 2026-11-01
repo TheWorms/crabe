@@ -1441,6 +1441,32 @@ const MIGRATIONS = [
       database.exec('CREATE INDEX IF NOT EXISTS idx_entretiens_couple ON entretiens_session(user_id, connector_id, at)');
     },
   },
+  {
+    id: 72,
+    name: 'le carnet d\'identifiants',
+    // 0.2.13 (décisions du compte observé du 01/11/2026) : Profil › Identifiants, propre
+    // à chaque compte ; une fiche s'y relie (connector_installs.carnet_id) ;
+    // les fiches existantes ne bougent pas. Les secrets y sont chiffrés et
+    // liés à leur compte et à leur entrée (XChaCha20-Poly1305).
+    //
+    // Additive : revenir au code d'avant laisse une table et une colonne que
+    // personne ne lit (les fiches reliées retrouvent leurs propres champs).
+    up(database) {
+      addColumn(database, 'connector_installs', 'carnet_id', 'INTEGER');
+      database.exec(`CREATE TABLE IF NOT EXISTS carnet_identifiants (
+          id          INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          -- Le nom choisi par le compte (« Perso », « Boulot ») : pas un secret.
+          libelle     TEXT    NOT NULL,
+          -- {identifiant, motDePasse}, chiffré et LIÉ à « compte <user_id>, entrée
+          -- <id> » (crypto.chiffrerLie, XChaCha20-Poly1305).
+          secret      TEXT    NOT NULL,
+          created_at  TEXT    NOT NULL DEFAULT (datetime('now')),
+          updated_at  TEXT    NOT NULL DEFAULT (datetime('now'))
+        );`);
+      database.exec('CREATE INDEX IF NOT EXISTS idx_carnet_user ON carnet_identifiants(user_id)');
+    },
+  },
 ];
 
 /**

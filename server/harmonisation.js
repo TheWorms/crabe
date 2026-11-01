@@ -590,7 +590,7 @@ async function verifierPrealables(plan, destinationsChargees) {
  * @throws {Error} 409 si un chantier est déjà en cours, ou si une
  *   synchronisation forcée tourne
  */
-function demarrer({ userId, username = null }) {
+function demarrer({ userId, username = null, laisserDouteux = false }) {
   const destinationSync = require('./destinations/sync');
   if (destinationSync.isRunning()) {
     const err = new Error(
@@ -610,7 +610,7 @@ function demarrer({ userId, username = null }) {
     label: 'renommage des documents',
     phase: 'renommage',
     convention,
-    tache: () => executerChantier(userId, username, convention),
+    tache: () => executerChantier(userId, username, convention, { laisserDouteux }),
   });
 }
 
@@ -730,11 +730,17 @@ function lancerSousVerrou({ userId, username, label, phase, convention, tache })
 }
 
 /** Le chantier lui-même — préalables, puis ligne à ligne. */
-async function executerChantier(userId, username, convention) {
+async function executerChantier(userId, username, convention, { laisserDouteux = false } = {}) {
   const plan = construirePlan(userId, convention);
   const destinationsChargees = chargerDestinations({ userId, username });
 
-  await verifierPrealables(plan, destinationsChargees);
+  // « Renommer quand même » (0.2.13) : les noms douteux restent tels quels —
+  // le plan ne les renomme de toute façon jamais, ils cessent seulement de
+  // bloquer les autres. Une collision, elle, bloque toujours.
+  await verifierPrealables(laisserDouteux ? { ...plan, douteux: [] } : plan, destinationsChargees);
+  if (laisserDouteux && plan.douteux.length) {
+    applog.info('harmonisation', `Renommage lancé en laissant ${plan.douteux.length} nom(s) douteux tels quels.`, { userId, username });
+  }
 
   if (!plan.entrees.length) {
     etat.message = 'Rien à renommer : tous les documents portent déjà la convention choisie.';

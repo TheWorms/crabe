@@ -128,6 +128,9 @@ CREATE TABLE IF NOT EXISTS connector_installs (
   disabled_at      TEXT,
   -- Migration 71 : 1 = pas de visite d'entretien pour ce service.
   entretien_off    INTEGER NOT NULL DEFAULT 0,
+  -- Migration 72 : l'entrée du carnet dont la fiche suit les identifiants
+  -- (NULL : ceux de la fiche).
+  carnet_id        INTEGER,
   UNIQUE (user_id, connector_id)
 );
 
@@ -286,6 +289,22 @@ CREATE TABLE IF NOT EXISTS entretiens_session (
 );
 
 CREATE INDEX IF NOT EXISTS idx_entretiens_couple ON entretiens_session(user_id, connector_id, at);
+
+-- Le carnet d'identifiants (0.2.13, migration 72) : Profil › Identifiants. Une
+-- fiche s'y relie par connector_installs.carnet_id ; rien n'y entre d'office.
+CREATE TABLE IF NOT EXISTS carnet_identifiants (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  -- Le nom choisi par le compte (« Perso », « Boulot ») : pas un secret.
+  libelle     TEXT    NOT NULL,
+  -- {identifiant, motDePasse}, chiffré et LIÉ à « compte <user_id>, entrée
+  -- <id> » (crypto.chiffrerLie, XChaCha20-Poly1305).
+  secret      TEXT    NOT NULL,
+  created_at  TEXT    NOT NULL DEFAULT (datetime('now')),
+  updated_at  TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_carnet_user ON carnet_identifiants(user_id);
 
 -- La file d'attente des récupérations (lot 90) : une seule tourne à la fois,
 -- les autres attendent ici leur tour. Une ligne naît à la mise en file et

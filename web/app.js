@@ -892,6 +892,9 @@ document.addEventListener('click', (event) => {
 async function loadConnectors() {
   const data = await api('/connectors');
   state.connectors = data.connectors;
+  // 0.2.13 : le carnet du compte, pour le choix de la fiche. Son absence (un
+  // serveur plus ancien) n'empêche rien : la fiche garde ses champs.
+  state.carnet = (await api('/carnet').catch(() => ({ entrees: [] }))).entrees || [];
   // Catégories et comptes viennent du serveur : une liste écrite en dur ici
   // aurait été à tenir à jour à chaque catégorie ajoutée, et le compte affiché
   // aurait pu diverger de ce que la grille montre réellement.
@@ -6323,9 +6326,62 @@ function fieldHelp(help) {
   </div>`;
 }
 
+/**
+ * Le choix des identifiants d'une fiche (0.2.13) : ceux de la fiche, ou une
+ * entrée du carnet. Affiché devant le premier des deux champs, seulement pour
+ * un service installé, et seulement s'il y a un carnet ou un lien.
+ */
+function choixCarnet(connector) {
+  const entrees = state.carnet || [];
+  const lie = connector.carnet;
+  if (!connector.installed || (!entrees.length && !lie)) return '';
+  const options = entrees.map((e) => `<option value="${Number(e.id)}"${lie?.id === e.id ? ' selected' : ''}>`
+    + `Carnet : ${esc(e.libelle)}${e.identifiant ? ` — ${esc(e.identifiant)}` : ''}</option>`).join('');
+  return `<div class="field">
+    <label>Identifiants</label>
+    <select onchange="relierAuCarnet('${esc(connector.id)}', this.value)">
+      <option value="">Saisis dans cette fiche</option>${options}
+    </select>
+    <div class="field-help">${lie
+      ? `Ce service suit l'entrée « ${esc(lie.libelle)} » du carnet : la changer dans Profil › Identifiants la change pour tous les services qui la suivent.`
+      : 'Vous pouvez aussi choisir une entrée de votre carnet (Profil › Identifiants).'}</div>
+  </div>`;
+}
+
+async function relierAuCarnet(connectorId, valeur) {
+  try {
+    await api(`/connectors/${encodeURIComponent(connectorId)}/carnet`, { method: 'PUT', body: { carnetId: valeur ? Number(valeur) : null } });
+    await loadConnectors();
+    openModal(connectorId, { edit: true });
+    showToast(valeur ? 'Ce service suit maintenant l\'entrée du carnet.' : 'Ce service reprend les identifiants de sa fiche.');
+  } catch (err) {
+    showToast(err.message);
+  }
+}
+
 /** Un champ du formulaire de configuration, selon son type. */
 function connectorField(connector, field) {
   const help = fieldHelp(field.help);
+
+  // 0.2.13 : le choix du carnet devant le premier champ d'identifiants ; une
+  // fiche reliée montre l'entrée suivie au lieu des deux champs.
+  const champs = connector.champsIdentifiants;
+  if (champs && (field.key === champs.cleIdentifiant || field.key === champs.cleMotDePasse)) {
+    const premier = field.key === (champs.cleIdentifiant || champs.cleMotDePasse);
+    const devant = premier ? choixCarnet(connector) : '';
+    if (connector.carnet) {
+      return devant + (premier
+        ? `<div class="field"><label>${esc(field.label)}</label>
+             <div class="field-help">${esc(connector.carnet.identifiant || '—')} — mot de passe de l'entrée « ${esc(connector.carnet.libelle)} »</div>
+           </div>`
+        : '');
+    }
+    if (devant) return devant + connectorFieldSeul(connector, field, help);
+  }
+  return connectorFieldSeul(connector, field, help);
+}
+
+function connectorFieldSeul(connector, field, help) {
 
   if (field.type === 'select') {
     return `<div class="field">
@@ -8147,6 +8203,24 @@ async function finishRemoteLogin(view) {
     return;
   }
 
+  // 0.2.12 : des identifiants différents de ceux de la fiche ont été tapés
+  // dans la fenêtre — on propose de les garder, avant la fermeture ; le
+  // serveur n'envoie jamais les identifiants, seulement la question.
+  if (view.proposerIdentifiants) {
+    const oui = confirm(
+      `Enregistrer l'adresse et le mot de passe que vous venez de taper pour ${view.connectorName || 'ce service'} ?\n\n`
+      + 'crabe les remplira tout seul à la prochaine connexion. Ils sont gardés chiffrés et ne sont jamais réaffichés.'
+    );
+    try {
+      // L'adresse du service en toutes lettres : la fenêtre d'un stockage
+      // (même base `rbBase`) ne propose jamais d'identifiants.
+      await api(`/connectors/${encodeURIComponent(view.connectorId)}/remote-login/identifiants`, { method: 'POST', body: { enregistrer: oui } });
+      if (oui) showToast('Identifiants enregistrés : la prochaine connexion les remplira toute seule.');
+    } catch (err) {
+      if (oui) showToast(err.message || 'Les identifiants n\'ont pas pu être enregistrés.');
+    }
+  }
+
   closeRemoteLogin();
   // Le verdict de réussite est AFFICHÉ, pas seulement déduit de la fermeture :
   // le message du serveur porte le nombre de cookies gardés (lot 48).
@@ -8307,9 +8381,78 @@ function showProfilPage(name, el, { historique = 'ajouter' } = {}) {
   if (name === 'stockage') renderProfilStorage();
   if (name === 'fichiers') renderProfilFichiers();
   if (name === 'connecteurs') renderProfilConnList();
+  if (name === 'identifiants') renderProfilCarnet();
   if (name === 'permissions') { closePermDetail(); renderPermList(); }
   if (name === 'compte') renderDeletionZone();
   if (name === 'contact') renderMyTickets();
+}
+
+// ─── Profil › Identifiants : le carnet (0.2.13) ─────────────────────────────
+
+async function renderProfilCarnet() {
+  const liste = $('carnet-liste');
+  if (!liste) return;
+  let entrees = [];
+  try {
+    entrees = (await api('/carnet')).entrees || [];
+  } catch (err) {
+    liste.innerHTML = `<div class="empty-state">${esc(err.message)}</div>`;
+    return;
+  }
+  state.carnet = entrees;
+  const nom = (id) => (state.connectors || []).find((c) => c.id === id)?.name || id;
+  liste.innerHTML = entrees.length
+    ? `<table class="data-table wide"><thead><tr><th>Nom</th><th>Identifiant</th><th>Services reliés</th><th></th></tr></thead><tbody>
+      ${entrees.map((e) => `<tr>
+        <td data-label="Nom" style="color:var(--text);">${esc(e.libelle)}</td>
+        <td data-label="Identifiant">${e.lisible ? esc(e.identifiant || '—') : '<span class="badge-pill amber">illisible</span>'}</td>
+        <td data-label="Services reliés">${e.services.length ? esc(e.services.map(nom).join(', ')) : '<span class="text-faint">aucun</span>'}</td>
+        <td data-label=""><button class="btn-mini" onclick="ouvrirEntreeCarnet(${Number(e.id)})">Modifier</button>
+          <button class="btn-mini" onclick="supprimerEntreeCarnet(${Number(e.id)})">Supprimer</button></td>
+      </tr>`).join('')}</tbody></table>`
+    : `<div class="empty-state">Votre carnet est vide. « + Ajouter » crée une entrée ; reliez-la ensuite depuis la fiche d'un service.</div>`;
+}
+
+/** Le formulaire d'une entrée : `id` null pour une nouvelle. Le mot de passe n'est jamais prérempli. */
+function ouvrirEntreeCarnet(id) {
+  const e = id ? (state.carnet || []).find((x) => x.id === id) : null;
+  $('carnet-form').innerHTML = `<div class="sheet-form">
+    <div class="field"><label>Nom</label><input id="carnet-libelle" maxlength="60" value="${esc(e?.libelle || '')}" placeholder="Perso, Boulot…"></div>
+    <div class="field"><label>Identifiant (adresse e-mail)</label><input id="carnet-identifiant" value="${esc(e?.identifiant || '')}" autocomplete="off"></div>
+    <div class="field"><label>Mot de passe</label><input id="carnet-motdepasse" type="password" autocomplete="new-password"
+      placeholder="${e ? '•••••••• (inchangé)' : ''}">${e ? '<div class="field-help">Laissez vide pour garder le mot de passe actuel.</div>' : ''}</div>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="$('carnet-form').innerHTML = ''">Annuler</button>
+      <button class="btn-primary" onclick="enregistrerEntreeCarnet(${e ? Number(e.id) : 'null'})">Enregistrer</button>
+    </div>
+  </div>`;
+}
+
+async function enregistrerEntreeCarnet(id) {
+  const corps = {
+    libelle: $('carnet-libelle').value,
+    identifiant: $('carnet-identifiant').value,
+    motDePasse: $('carnet-motdepasse').value,
+  };
+  try {
+    await api(id ? `/carnet/${id}` : '/carnet', { method: id ? 'PUT' : 'POST', body: corps });
+  } catch (err) {
+    return void showToast(err.message);
+  }
+  $('carnet-form').innerHTML = '';
+  showToast(id ? 'Entrée modifiée.' : 'Entrée ajoutée au carnet.');
+  await renderProfilCarnet();
+}
+
+async function supprimerEntreeCarnet(id) {
+  if (!confirm('Supprimer cette entrée du carnet ?')) return;
+  try {
+    await api(`/carnet/${id}`, { method: 'DELETE' });
+  } catch (err) {
+    return void showToast(err.message);
+  }
+  showToast('Entrée supprimée.');
+  await renderProfilCarnet();
 }
 
 /** Bloc « Double authentification » du profil, cohérent avec la politique. */
@@ -9362,7 +9505,9 @@ function blocHarmonisation(data) {
         ${plan.douteux.slice(0, 10).map((d) => `<br><code>${esc(d.filename)}</code> — ${esc(d.motif)}`).join('')}
         ${plan.douteux.length > 10 ? `<br>… et ${fmt.number(plan.douteux.length - 10)} autre(s).` : ''}
         ${plan.collisions.length ? `<br>${fmt.number(plan.collisions.length)} collision(s) : deux documents aboutiraient au même nom dans le même dossier.` : ''}
-        <br>Le renommage ne démarrera pas tant qu'il en reste un seul.
+        <br>${plan.collisions.length
+          ? 'Le renommage ne démarrera pas tant qu\'il reste une collision.'
+          : '« Renommer quand même » renomme les autres et laisse ceux-ci sous leur nom actuel.'}
       </div>`
     : '';
 
@@ -9383,7 +9528,10 @@ function blocHarmonisation(data) {
     <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap;">
       <button class="btn-primary" style="width:auto;padding:11px 18px;"
               ${h.running || bloquants || (!plan.aRenommer && !journal.interrompu) ? 'disabled' : ''}
-              onclick="lancerHarmonisation(${plan.aRenommer}, ${plan.mouvements})">Renommer maintenant</button>
+              onclick="lancerHarmonisation(${plan.aRenommer}, ${plan.mouvements})">Renommer maintenant</button>${plan.douteux.length && !plan.collisions.length && (plan.aRenommer || journal.interrompu) && !h.running
+        ? `<button class="btn-mini" style="padding:11px 18px;font-size:13px;"
+                   onclick="lancerHarmonisation(${plan.aRenommer}, ${plan.mouvements}, ${plan.douteux.length})">Renommer quand même</button>`
+        : ''}
       ${journal.annulable && !h.running
         ? `<button class="btn-mini danger" style="padding:11px 18px;font-size:13px;"
                    onclick="annulerHarmonisation(${journal.gestes})">Tout annuler — remettre les anciens noms</button>`
@@ -9411,14 +9559,15 @@ async function choisirConvention(id, titre) {
 }
 
 /** Lance (ou reprend) le renommage de l'existant — après confirmation. */
-async function lancerHarmonisation(aRenommer, mouvements) {
+async function lancerHarmonisation(aRenommer, mouvements, douteux = 0) {
   if (!confirm(
     `Renommer ${aRenommer} document(s) déjà déposés (${mouvements} mouvement(s) de fichiers sur vos destinations) ?\n\n`
+    + (douteux ? `${douteux} document(s) au nom non reconnu garderont leur nom actuel.\n\n` : '')
     + 'crabe sauvegarde d\'abord sa base et vérifie que chaque destination répond. '
     + 'L\'opération peut être annulée ensuite depuis cette page.'
   )) return;
   try {
-    await api('/users/me/fichiers/harmonisation', { method: 'POST' });
+    await api('/users/me/fichiers/harmonisation', { method: 'POST', body: douteux ? { laisserDouteux: true } : undefined });
   } catch (err) {
     showToast(err.message);
   }

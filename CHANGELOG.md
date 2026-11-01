@@ -6,6 +6,29 @@ Pour mettre à jour votre crabe : [docs/MISE-A-JOUR.md](docs/MISE-A-JOUR.md) (En
 
 ---
 
+## 0.2.13 — le carnet d'identifiants (01/11/2026)
+
+### Identifiants
+- **Un carnet d'identifiants, dans Profil › Identifiants.** Une adresse et un mot de passe, sous un nom (« Perso », « Boulot ») ; la fiche d'un service s'y relie par son choix « Identifiants ». Une entrée reliée à plusieurs services se change une fois, dans le carnet, et tous la suivent — récupérations, fenêtre de connexion, remplissage automatique.
+- Rien n'entre dans le carnet d'office : les fiches existantes gardent leurs identifiants tant que vous ne les reliez pas. Une entrée encore reliée à un service ne se supprime pas. « Enregistrer ces identifiants » depuis la fenêtre range dans la fiche du service, qui ne suit alors plus d'entrée.
+- Chaque entrée est chiffrée (XChaCha20-Poly1305, sous une clé dérivée de la phrase secrète par Argon2id) et liée à son compte : recopiée ailleurs dans la base, elle ne se déchiffre pas. Un mot de passe n'est jamais réaffiché.
+
+### Fichiers
+- **Les reçus reconstitués ne bloquent plus le renommage.** Leur forme (`<service>_recu-reconstitue_<commande>.pdf`) n'était reconnue par aucune règle : sous « Sans le nom du service », ils restaient « douteux » et le renommage refusait de démarrer. Ils perdent maintenant le nom du service comme les autres documents (`recu-reconstitue_<commande>.pdf`), et les prochains se déposent ainsi.
+- **« Renommer quand même ».** S'il reste des documents au nom non reconnu (et aucune collision), ce bouton renomme les autres et les laisse sous leur nom actuel ; il n'est plus nécessaire de les traiter d'abord.
+
+### Interne
+- Migration 72 (additive) : la table du carnet et le lien d'une fiche.
+
+---
+
+## 0.2.12 — enregistrer depuis la fenêtre ce qu'on y a tapé (01/11/2026)
+
+### Fenêtre de connexion
+- **« Enregistrer ces identifiants pour la prochaine fois ? »** Quand vous vous connectez en tapant votre adresse et votre mot de passe dans la fenêtre « Se connecter », crabe vous le propose une fois la connexion confirmée, si ce ne sont pas déjà ceux de la fiche du service. Oui : ils sont rangés, chiffrés, dans la fiche, et la prochaine connexion les remplit toute seule. Non : ils sont oubliés aussitôt. Ils ne sont jamais réaffichés ni écrits dans un journal, et ne restent en mémoire que le temps de la fenêtre.
+
+---
+
 ## 0.2.11 — les identifiants enregistrés remplis tout seuls (01/11/2026)
 
 ### Fenêtre de connexion

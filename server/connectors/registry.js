@@ -622,6 +622,11 @@ function listForUser(user) {
         // Ce qu'on peut dire des secrets enregistrés sans les dévoiler : date
         // et échéance d'une session, éléments découverts, sélection en cours.
         configSummary: install ? configSummary(user.id, m.id) : null,
+        // 0.2.13 : où la fiche range l'identifiant et le mot de passe, et
+        // l'entrée du carnet qu'elle suit (nom et adresse — jamais le mot de
+        // passe), ou null.
+        champsIdentifiants: require('./login-detection').champsIdentifiants(m),
+        carnet: install?.carnet_id ? require('../carnet').entreeDe(user.id, m.id) : null,
         // Le défaut ACTUEL du service (lot 91) : la cause de sa dernière
         // exécution si elle a échoué et qu'aucune connexion n'a été
         // enregistrée depuis — calculé par connectors/cause-echec.js, la
@@ -1112,7 +1117,19 @@ function readConfig(userId, connectorId) {
     err.statusCode = 400;
     throw err;
   }
-  return crypto.decryptJson(install.config_encrypted);
+  const config = crypto.decryptJson(install.config_encrypted);
+  // 0.2.13 : une fiche reliée au carnet suit ses identifiants — pour les
+  // récupérations, la fenêtre, « Saisir mes identifiants ». La fiche brute,
+  // elle, n'est pas touchée (saveConfig relit config_encrypted, jamais ceci).
+  if (install.carnet_id) {
+    const champs = require('./login-detection').champsIdentifiants(get(connectorId).manifest);
+    const entree = champs && require('../carnet').identifiantsDe(userId, connectorId);
+    if (entree) {
+      config[champs.cleMotDePasse] = entree.motDePasse;
+      if (champs.cleIdentifiant && entree.identifiant) config[champs.cleIdentifiant] = entree.identifiant;
+    }
+  }
+  return config;
 }
 
 // ---------------------------------------------------------------------------

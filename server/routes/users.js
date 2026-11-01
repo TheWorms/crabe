@@ -162,7 +162,11 @@ router.get('/me/fichiers', requireAuth, (req, res) => {
  */
 router.post('/me/fichiers/harmonisation', requireAuth, (req, res) => {
   const harmonisation = require('../harmonisation');
-  const lance = harmonisation.demarrer({ userId: req.user.id, username: req.user.username });
+  const lance = harmonisation.demarrer({
+    userId: req.user.id,
+    username: req.user.username,
+    laisserDouteux: req.body?.laisserDouteux === true,
+  });
   applog.admin(req, 'Renommage des documents existants lancé depuis l\'écran Fichiers.');
   res.json(lance);
 });

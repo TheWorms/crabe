@@ -250,7 +250,7 @@
           <a class="settings-nav-item" href="/profil/interface" data-ppage="interface" onclick="return lienDeSection(event, this)">Interface</a>
           <a class="settings-nav-item" href="/profil/stockage" data-ppage="stockage" onclick="return lienDeSection(event, this)">Stockage</a>
           <a class="settings-nav-item" href="/profil/fichiers" data-ppage="fichiers" onclick="return lienDeSection(event, this)">Fichiers</a>
-          <a class="settings-nav-item" href="/profil/connecteurs" data-ppage="connecteurs" onclick="return lienDeSection(event, this)">Connecteurs installés</a>
+          <a class="settings-nav-item" href="/profil/connecteurs" data-ppage="connecteurs" onclick="return lienDeSection(event, this)">Connecteurs installés</a><a class="settings-nav-item" href="/profil/identifiants" data-ppage="identifiants" onclick="return lienDeSection(event, this)">Identifiants</a>
           <a class="settings-nav-item" href="/profil/permissions" data-ppage="permissions" onclick="return lienDeSection(event, this)">Permissions</a>
           <a class="settings-nav-item" href="/profil/compte" data-ppage="compte" onclick="return lienDeSection(event, this)">Compte</a>
           <a class="settings-nav-item" href="/profil/contact" data-ppage="contact" onclick="return lienDeSection(event, this)">Nous contacter</a>
@@ -402,6 +402,21 @@
                 <div class="view-switch" id="profil-connecteurs-view-switch"></div>
               </div>
               <div id="profil-conn-list"></div>
+            </section>
+          </div><div class="settings-page" id="ppage-identifiants">
+            <!-- 0.2.13 : le carnet d'identifiants (accolé à la page précédente :
+                 les essais d'écran le retirent sans laisser de blanc). -->
+            <section class="carte">
+              <div class="block-head">
+                <div>
+                  <h2 class="carte-titre">Identifiants</h2>
+                  <div class="block-sub">Un carnet d'adresses et de mots de passe. Reliez une entrée depuis la fiche d'un service ; une entrée reliée à plusieurs services se change ici, une fois.</div>
+                </div>
+                <button class="btn-mini" onclick="ouvrirEntreeCarnet(null)">+ Ajouter</button>
+              </div>
+              <div id="carnet-form"></div>
+              <div id="carnet-liste"></div>
+              <div class="inline-note" style="max-width:680px;">Chaque entrée est chiffrée (XChaCha20-Poly1305) et liée à votre compte ; un mot de passe n'est jamais réaffiché. Les fiches des services ne bougent pas tant que vous ne les reliez pas.</div>
             </section>
           </div>
 

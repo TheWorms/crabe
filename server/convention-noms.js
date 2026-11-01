@@ -90,8 +90,14 @@ const EXCLUS = new Set(['edocperso']);
 /** Connecteurs à relevés reconstitués : la paire de bornes est la période. */
 const RELEVES = new Set(['paypal', 'bitstamp']);
 
-/** Documents de voyage : la nature du document fait partie du nom. */
-const NATURES_VOYAGE = new Set(['billet', 'justificatif-voyage']);
+/**
+ * Natures portées par le nom : la nature du document en fait partie, seule la
+ * présence du service suit la convention. Les billets et justificatifs de
+ * voyage, et les reçus reconstitués (lot 74, `<service>_recu-reconstitue_<commande>`,
+ * sans période : un reçu par commande) — restés « douteux » jusqu'à la 0.2.13,
+ * ils bloquaient le renommage.
+ */
+const NATURES = new Set(['billet', 'justificatif-voyage', 'recu-reconstitue']);
 
 /** La paire de bornes d'un relevé reconstitué : `<du>_<au>` en dates ISO. */
 const BORNES = '\\d{4}-\\d{2}-\\d{2}_\\d{4}-\\d{2}-\\d{2}';
@@ -140,27 +146,27 @@ function deriverNomCible(connectorId, filename, convention = CONVENTION_PAR_DEFA
     return { action: 'douteux', motif: 'relevé attendu, forme inconnue' };
   }
 
-  // Documents de voyage : la nature (`billet_…`, `justificatif-voyage_…`) fait
-  // partie du nom ; seule la présence du service suit la convention.
-  const voyageAvec = new RegExp(`^${service}_([a-z-]+)_`).exec(nom);
-  if (voyageAvec && NATURES_VOYAGE.has(voyageAvec[1])) {
+  // Natures portées par le nom (`billet_…`, `justificatif-voyage_…`,
+  // `recu-reconstitue_…`) : seule la présence du service suit la convention.
+  const natureAvec = new RegExp(`^${service}_([a-z-]+)_`).exec(nom);
+  if (natureAvec && NATURES.has(natureAvec[1])) {
     if (!sansService) {
-      return { action: 'conforme', motif: `document de voyage : la nature « ${voyageAvec[1]} » fait partie du nom` };
+      return { action: 'conforme', motif: `la nature « ${natureAvec[1]} » fait partie du nom` };
     }
     return {
       action: 'renommer',
-      motif: `document de voyage : le service se retire, la nature « ${voyageAvec[1]} » reste`,
+      motif: `le service se retire, la nature « ${natureAvec[1]} » reste`,
       cible: nom.slice(service.length + 1),
     };
   }
-  const voyageSans = /^([a-z-]+)_/.exec(nom);
-  if (voyageSans && NATURES_VOYAGE.has(voyageSans[1])) {
+  const natureSans = /^([a-z-]+)_/.exec(nom);
+  if (natureSans && NATURES.has(natureSans[1])) {
     if (sansService) {
-      return { action: 'conforme', motif: `document de voyage : la nature « ${voyageSans[1]} » fait partie du nom` };
+      return { action: 'conforme', motif: `la nature « ${natureSans[1]} » fait partie du nom` };
     }
     return {
       action: 'renommer',
-      motif: `document de voyage : le service s'ajoute devant la nature « ${voyageSans[1]} »`,
+      motif: `le service s'ajoute devant la nature « ${natureSans[1]} »`,
       cible: `${service}_${nom}`,
     };
   }

@@ -207,6 +207,9 @@ router.post(
       // est confié au gestionnaire de navigateur, qui l'écrit dans le champ du
       // site et rien d'autre.
       identifiants: identifiantsConfigures(req.user.id, connectorId, manifest),
+      // 0.2.12 : où la fiche range l'identifiant et le mot de passe — ce qui
+      // est tapé dans la fenêtre pourra y être enregistré.
+      champsIdentifiants: detection.champsIdentifiants(manifest),
       // C'est ici, et nulle part ailleurs, que l'état capturé devient une
       // configuration : même chemin exactement qu'un fichier téléversé —
       // contrôle de forme, chiffrement, résumé. Le navigateur distant ne
@@ -382,6 +385,31 @@ router.post(
       .deposerTexte(req.user.id, req.params.id, req.body?.text);
     if (!result.ok) return res.status(409).json({ error: result.error });
     res.json({ ok: true });
+  })
+);
+
+/**
+ * La réponse à « Enregistrer ces identifiants pour la prochaine fois ? »
+ * (0.2.12). Le corps ne porte qu'un booléen : les identifiants sont ceux que
+ * la fenêtre a relevés, côté serveur ; ils vont dans la fiche, chiffrés, et ne
+ * reviennent jamais au client.
+ */
+router.post(
+  '/:id/remote-login/identifiants',
+  asyncHandler(async (req, res) => {
+    const enregistrer = req.body?.enregistrer === true;
+    const r = remoteBrowser.manager().repondreIdentifiants(req.user.id, req.params.id, enregistrer);
+    if (!r.ok) return res.status(409).json({ error: r.error });
+    if (!enregistrer) return res.json({ ok: true, enregistres: false });
+    const valeurs = { [r.champs.cleMotDePasse]: r.identifiants.motDePasse };
+    if (r.champs.cleIdentifiant && r.identifiants.identifiant) valeurs[r.champs.cleIdentifiant] = r.identifiants.identifiant;
+    registry.saveConfig(req.user.id, req.params.id, valeurs, { origine: 'formulaire' });
+    // 0.2.13 (décision du compte observé : « dans la fiche seulement », « tout séparé ») :
+    // un service relié au carnet n'en suit plus l'entrée — ses identifiants
+    // sont désormais ceux de sa fiche.
+    require('../carnet').relier(req.user.id, req.params.id, null);
+    applog.info(req.params.id, `Identifiants enregistrés depuis la fenêtre de connexion (identifiant ${valeurs[r.champs.cleIdentifiant] ? 'oui' : 'non'}, mot de passe oui).`);
+    res.json({ ok: true, enregistres: true });
   })
 );
 

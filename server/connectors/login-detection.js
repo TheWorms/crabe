@@ -455,6 +455,19 @@ function identifiantDeConfig(manifest, config) {
 }
 
 /**
+ * Les clés des champs d'une fiche qui rangent l'identifiant et le mot de passe
+ * (0.2.12, partagé au 0.2.13 avec le carnet), ou null sans mot de passe dans
+ * la fiche. Le mot de passe par son TYPE, l'identifiant par son nom usuel.
+ */
+function champsIdentifiants(manifest) {
+  const motDePasse = (manifest?.fields || []).find((f) => f.type === 'password');
+  if (!motDePasse) return null;
+  const identifiant = (manifest.fields || []).find((f) => f.type !== 'password' && f.type !== 'session'
+    && CLES_IDENTIFIANT.includes(String(f.key).toLowerCase()));
+  return { cleIdentifiant: identifiant ? identifiant.key : null, cleMotDePasse: motDePasse.key };
+}
+
+/**
  * Le champ d'identifiant d'un formulaire, par type PUIS par nom.
  *
  * L'ordre n'est pas indifférent : `type="email"` est le signal le plus sûr, un
@@ -566,6 +579,7 @@ module.exports = {
   DELAI_CONFIRMATION_MS,
   DELAI_COOKIES_TARDIFS_MS,
   CLES_IDENTIFIANT,
+  champsIdentifiants,
   SELECTEURS_IDENTIFIANT,
   identifiantDeConfig,
   preremplirIdentifiant,

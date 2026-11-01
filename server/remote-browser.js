@@ -1100,6 +1100,11 @@ function createManager(overrides = {}) {
     // demande explicite (§7.3a). Le mot de passe ne sort JAMAIS d'ici : ni
     // dans une réponse HTTP, ni dans un journal, ni dans un diagnostic.
     identifiants = null,
+    // 0.2.12 : le service range-t-il un identifiant et un mot de passe dans
+    // sa fiche ? `{ cleIdentifiant, cleMotDePasse }` (les clés de ses champs),
+    // ou null. Si oui, ce qui est tapé dans le formulaire du site est relevé,
+    // et proposé à l'enregistrement une fois la connexion confirmée.
+    champsIdentifiants = null,
     // Profil PERSISTANT plutôt que session capturée. Déclaré par le manifeste
     // (`remoteLogin.persistent`) pour les sites dont la protection juge le
     // NAVIGATEUR et pas seulement les cookies — Cloudflare en tête. Voir
@@ -1299,6 +1304,11 @@ function createManager(overrides = {}) {
       identifiants: identifiants && identifiants.motDePasse
         ? { identifiant: String(identifiants.identifiant || ''), motDePasse: String(identifiants.motDePasse) }
         : null,
+      // 0.2.12 : ce qui a été tapé dans le formulaire du site (en mémoire,
+      // jamais journalisé), puis la proposition d'enregistrement.
+      champsIdentifiants: champsIdentifiants?.cleMotDePasse ? champsIdentifiants : null,
+      saisieVue: null,
+      proposition: null,
       capture: capture !== false,
       langueNative: !!langueNative,
       stockageDeSession: (Array.isArray(stockageDeSession) ? stockageDeSession : [])
@@ -1671,6 +1681,74 @@ function createManager(overrides = {}) {
     }
   }
 
+  /**
+   * Ce qui est tapé dans le formulaire du site (0.2.12) : la dernière adresse
+   * et le dernier mot de passe non vides, relevés à chaque tour — une
+   * connexion en deux pages les montre l'un après l'autre. Gardé en mémoire
+   * dans la session, jamais journalisé, jamais dans une vue publique. Ne lève
+   * jamais.
+   */
+  async function releverIdentifiants(session) {
+    if (!session.champsIdentifiants) return;
+    const page = pageActive(session);
+    if (!page?.evaluate) return;
+    const lu = await page.evaluate((selecteurs) => {
+      const visible = (e) => e && e.getBoundingClientRect().height > 0;
+      const mdp = [...document.querySelectorAll('input[type="password"]')].find((e) => visible(e) && e.value);
+      let id = null;
+      for (const sel of selecteurs) {
+        id = [...document.querySelectorAll(sel)].find((e) => visible(e) && e.type !== 'password' && e.value.trim());
+        if (id) break;
+      }
+      return { identifiant: id ? id.value.trim() : '', motDePasse: mdp ? mdp.value : '' };
+    }, detection.SELECTEURS_IDENTIFIANT).catch(() => null);
+    if (!lu || (!lu.identifiant && !lu.motDePasse)) return;
+    const vue = session.saisieVue || { identifiant: '', motDePasse: '' };
+    if (lu.identifiant && !/[\r\n]/.test(lu.identifiant)) vue.identifiant = lu.identifiant.slice(0, 254);
+    if (lu.motDePasse) vue.motDePasse = lu.motDePasse.slice(0, 1024);
+    session.saisieVue = vue;
+  }
+
+  /**
+   * Une fois la connexion confirmée (0.2.12) : si ce qui a été tapé diffère de
+   * ce que la fiche garde, la proposition d'enregistrement est préparée, pour
+   * le temps où la session reste lisible ; sinon tout est oublié.
+   */
+  function preparerProposition(session) {
+    const vue = session.saisieVue;
+    session.saisieVue = null;
+    if (!session.champsIdentifiants || !vue?.motDePasse) return;
+    const garde = session.identifiants;
+    const identifiant = vue.identifiant || garde?.identifiant || '';
+    if (garde && garde.motDePasse === vue.motDePasse && garde.identifiant === identifiant) return;
+    session.proposition = { identifiant, motDePasse: vue.motDePasse };
+    const minuteur = setTimeout(() => { session.proposition = null; }, LINGER_MS);
+    minuteur.unref?.();
+    runtime.log(
+      'info',
+      `Session ${session.connectorName} : des identifiants différents de ceux de la fiche ont été tapés `
+        + `(identifiant ${identifiant ? 'vu' : 'absent'}, mot de passe vu) — leur enregistrement est proposé.`,
+      session.connectorId
+    );
+  }
+
+  /**
+   * La réponse à la proposition (0.2.12) : `enregistrer` rend les identifiants
+   * (pour la fiche, une seule fois) ; sinon ils sont oubliés. Dans les deux
+   * cas, la proposition disparaît.
+   */
+  function repondreIdentifiants(userId, connectorId, enregistrer) {
+    const session = sessionFor(userId, connectorId);
+    const proposition = session?.proposition || null;
+    if (session) session.proposition = null;
+    if (!proposition) return { ok: false, error: 'Aucune proposition en attente (la fenêtre est fermée depuis trop longtemps).' };
+    if (!enregistrer) {
+      runtime.log('info', `Session ${session.connectorName} : enregistrement des identifiants refusé, ils sont oubliés.`, session.connectorId);
+      return { ok: true };
+    }
+    return { ok: true, identifiants: proposition, champs: session.champsIdentifiants };
+  }
+
   async function watch(session) {
     session.watching = true;
     const { page } = session.browser;
@@ -1720,6 +1798,7 @@ function createManager(overrides = {}) {
           await detection.focusForm(page).catch(() => {});
           await remplirAuNouveauFormulaire(session);
         }
+        await releverIdentifiants(session);
         await runtime.sleep(pollMs);
       }
       return;
@@ -1820,6 +1899,7 @@ function createManager(overrides = {}) {
         await remplirAuNouveauFormulaire(session);
         if (session !== current || session.state !== 'running') return;
       }
+      await releverIdentifiants(session);
 
       await runtime.sleep(pollMs);
     }
@@ -2096,6 +2176,7 @@ function createManager(overrides = {}) {
       if (session.stopped) return;
 
       session.result = result || {};
+      preparerProposition(session);
       session.state = 'saved';
       // Le verdict de réussite est un FAIT dicible : combien de cookies sont
       // gardés. C'est ce que l'écran affiche avant de se fermer (lot 48).
@@ -3187,6 +3268,8 @@ function createManager(overrides = {}) {
       // 0.2.11 : ce que crabe a rempli de lui-même — deux booléens, jamais
       // une valeur.
       remplissageAuto: session.remplissageAuto || null,
+      // 0.2.12 : un booléen, jamais les identifiants eux-mêmes.
+      proposerIdentifiants: !!session.proposition,
       verdictCode: session.verdictCode || null,
       // Y a-t-il des identifiants enregistrés pour ce couple ? Un booléen, et
       // rien d'autre : ni l'identifiant, ni a fortiori le mot de passe.
@@ -3214,6 +3297,7 @@ function createManager(overrides = {}) {
     stopAll,
     typeText,
     deposerTexte,
+    repondreIdentifiants,
     saisirIdentifiants,
     saveNow,
     activite,

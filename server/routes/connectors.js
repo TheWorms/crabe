@@ -290,6 +290,31 @@ router.put(
 );
 
 /**
+ * Les identifiants de ce service : ceux de sa fiche (`carnetId` null), ou une
+ * entrée du carnet du compte (0.2.13). Refusé pour un service sans mot de
+ * passe dans sa fiche.
+ */
+router.put(
+  '/:id/carnet',
+  asyncHandler(async (req, res) => {
+    assertAllowed(req, req.params.id);
+    if (!registry.getInstall(req.user.id, req.params.id)) {
+      const err = new Error('Ce connecteur n\'est pas installé pour ce compte.');
+      err.statusCode = 404;
+      throw err;
+    }
+    if (!require('../connectors/login-detection').champsIdentifiants(registry.manifest(req.params.id))) {
+      const err = new Error('Ce service n\'a pas de mot de passe dans sa fiche : il ne se relie pas au carnet.');
+      err.statusCode = 400;
+      throw err;
+    }
+    const carnetId = req.body?.carnetId ?? null;
+    require('../carnet').relier(req.user.id, req.params.id, carnetId);
+    res.json({ ok: true, carnet: require('../carnet').entreeDe(req.user.id, req.params.id) });
+  })
+);
+
+/**
  * La visite d'entretien de ce service (0.2.8) : chaque jour, sa page de compte
  * ouverte avec la session, sans rien récupérer. Active par défaut.
  */

@@ -10,6 +10,14 @@
  *
  * Format d'un secret chiffré (chaîne stockée en base) :
  *     v1.<nonce base64>.<ciphertext base64>
+ *
+ * 0.2.13 — les secrets LIÉS (le carnet d'identifiants) :
+ *     x1.<nonce base64>.<ciphertext base64>
+ * XChaCha20-Poly1305 (IETF, AEAD), sous une sous-clé du carnet dérivée de la
+ * clé maîtresse (`crypto_kdf_derive_from_key`), avec des DONNÉES ASSOCIÉES :
+ * le contexte (le compte et l'entrée) entre dans la vérification. Une entrée
+ * recopiée sur la ligne d'un autre compte, ou d'une autre entrée, ne se
+ * déchiffre pas.
  */
 
 const fs = require('node:fs');
@@ -21,6 +29,9 @@ const PREFIX = 'v1';
 
 let masterKey = null;
 let ready = false;
+/** Les sous-clés dérivées, par usage (0.2.13). */
+const sousCles = new Map();
+const PREFIXE_LIE = 'x1';
 
 /**
  * Charge le sel maître, en le générant au premier démarrage.
@@ -75,6 +86,7 @@ async function init(opts = {}) {
     sodium.crypto_pwhash_ALG_ARGON2ID13
   );
   ready = true;
+  sousCles.clear();
   return { selCree: cree, cheminSel: chemin };
 }
 
@@ -146,6 +158,55 @@ function tryDecryptJson(blob, fallback = null) {
   }
 }
 
+/**
+ * La sous-clé d'un usage (8 caractères, libsodium) : une clé par usage, jamais
+ * la clé maîtresse elle-même. Déterministe : la même phrase et le même sel
+ * redonnent la même sous-clé.
+ */
+function sousCle(usage) {
+  if (!sousCles.has(usage)) {
+    sousCles.set(usage, sodium.crypto_kdf_derive_from_key(
+      sodium.crypto_aead_xchacha20poly1305_ietf_KEYBYTES, 1, usage, masterKey
+    ));
+  }
+  return sousCles.get(usage);
+}
+
+/**
+ * Chiffre une valeur LIÉE à son contexte (0.2.13) : `contexte` (« compte 3,
+ * entrée 12 ») n'est pas chiffré mais authentifié — sans lui, exactement, rien
+ * ne se déchiffre.
+ * @param {string|object} value
+ * @param {string} contexte
+ * @param {string} [usage] 8 caractères, la sous-clé (par défaut celle du carnet)
+ */
+function chiffrerLie(value, contexte, usage = 'carnet__') {
+  assertReady();
+  const plaintext = typeof value === 'string' ? value : JSON.stringify(value);
+  const nonce = sodium.randombytes_buf(sodium.crypto_aead_xchacha20poly1305_ietf_NPUBBYTES);
+  const cipher = sodium.crypto_aead_xchacha20poly1305_ietf_encrypt(
+    sodium.from_string(plaintext), sodium.from_string(String(contexte)), null, nonce, sousCle(usage)
+  );
+  return `${PREFIXE_LIE}.${Buffer.from(nonce).toString('base64')}.${Buffer.from(cipher).toString('base64')}`;
+}
+
+/** Déchiffre une valeur de `chiffrerLie` ; lève si le contexte ou la donnée diffèrent. */
+function dechiffrerLie(blob, contexte, usage = 'carnet__') {
+  assertReady();
+  const parts = String(blob || '').split('.');
+  if (parts.length !== 3 || parts[0] !== PREFIXE_LIE) throw new Error('Format de secret lié invalide.');
+  let plain;
+  try {
+    plain = sodium.crypto_aead_xchacha20poly1305_ietf_decrypt(
+      null, Buffer.from(parts[2], 'base64'), sodium.from_string(String(contexte)),
+      Buffer.from(parts[1], 'base64'), sousCle(usage)
+    );
+  } catch {
+    throw new Error('Déchiffrement impossible : donnée altérée, déplacée, ou passphrase maîtresse incorrecte.');
+  }
+  return sodium.to_string(plain);
+}
+
 /** Jeton aléatoire hexadécimal (identifiants d'export, reset, etc.). */
 function randomToken(bytes = 32) {
   assertReady();
@@ -165,6 +226,8 @@ module.exports = {
   encrypt,
   decrypt,
   decryptJson,
+  chiffrerLie,
+  dechiffrerLie,
   tryDecryptJson,
   randomToken,
   timingSafeEqual,

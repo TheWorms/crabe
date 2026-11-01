@@ -180,6 +180,8 @@ function createApp() {
   app.use('/api/home', require('./routes/home').router);
   app.use('/api/operations', require('./routes/operations').router);
   app.use('/api/documents', require('./routes/documents').router);
+  // 0.2.13 : le carnet d'identifiants du compte connecté.
+  app.use('/api/carnet', require('./routes/carnet').router);
   // Monté AVANT le routeur des connecteurs : ses chemins sont plus spécifiques
   // (« /:id/remote-login »), et ce qu'il ne reconnaît pas retombe naturellement
   // sur le routeur suivant.
