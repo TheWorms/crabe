@@ -1,0 +1,64 @@
+{
+  "id": "galaxus",
+  "name": "Galaxus",
+  "category": "shopping",
+  "color": "#0c2b45",
+  "letters": "GX",
+  "site": "www.galaxus.fr",
+  "implementation": "scraping",
+  "initialStatus": "pending",
+  "description": "Récupère automatiquement les documents de vos commandes Galaxus : factures et confirmations de commande.",
+  "caveat": "Vous ouvrez la connexion vous-même une fois, dans une fenêtre de navigateur : Galaxus refuse les navigateurs automatisés, crabe garde donc un profil de navigateur pour vous.",
+  "technicalNote": "0.2.16 (01/11/2026, lot l7, décision du compte observé). RECONNAISSANCE ANONYME (01/11/2026) : www.galaxus.fr refuse tout navigateur headless (net::ERR_HTTP2_PROTOCOL_ERROR, puis plus aucune réponse en HTTP/1.1) et rend 403 à un client simple — d'où le profil de navigateur PERSISTANT et visible (profil-marchand.js), comme Boulanger ou Darty.\n\nMESURÉ LE 01/11/2026 sur le compte du compte observé (relevés de page nettoyés, scripts/releve-page.js) : la connexion vit sur id.galaxus.eu (« Galaxus - Se connecter », e-mail et mot de passe sur la même page, bouton « Continuer », Google et Apple en option) ; la liste des commandes est www.galaxus.fr/fr/order (« Commandes - Galaxus »), chaque commande y est un bloc dont le lien « Afficher les détails de la commande » mène à /fr/order/<numéro> ; la page d'une commande a pour titre h1 « Commande <numéro> du JJ/MM/AAAA » et une section#documents (« Documents ») dont chaque lien est un PDF sous www.galaxus.fr/orderdocuments/<nature>/<numéro> — mesuré : pdforderconfirmation (« Confirmation de commande au format PDF »). La commande mesurée n'était pas encore expédiée : la nature de la FACTURE n'est pas encore vue ; le connecteur prend tout lien de la section Documents et nomme le fichier d'après la nature lue dans l'adresse.\n\nCE QUI N'EST PAS MESURÉ : la pagination d'une longue liste de commandes ; le chemin de la facture une fois la commande facturée. STATUT : jamais exercé de bout en bout — « pending ».\n\n0.2.16, CORRIGÉ LE 01/11/2026 (premier essai du compte observé) : la fenêtre vérifiait la session en la REJOUANT dans un navigateur headless — que Galaxus refuse (net::ERR_HTTP2_PROTOCOL_ERROR, trois fois) : la connexion ne s'enregistrait jamais. remoteLogin.preuveSurFenetre : la preuve se lit dans la fenêtre visible, sur les marqueurs MESURÉS de la liste des commandes (h1 « Commandes », le lien « Afficher les détails de la commande »), comme Boulanger et Darty.",
+  "remoteLogin": {
+    "url": "https://www.galaxus.fr/fr/order",
+    "marker": "",
+    "verifyUrl": "https://www.galaxus.fr/fr/order",
+    "verifyUrlTient": true,
+    "persistent": true,
+    "keepDomains": [
+      "galaxus.fr",
+      "galaxus.eu"
+    ],
+    "hint": "Connectez-vous à Galaxus comme d'habitude — adresse e-mail et mot de passe, ou Google, ou Apple. Fermez le bandeau de cookies s'il s'affiche. Quand la liste de vos commandes s'affiche, enregistrez la connexion.",
+    "preuveSurFenetre": true,
+    "marqueursFenetre": [
+      {
+        "selecteur": "h1",
+        "texte": "^\\s*Commandes\\s*$"
+      },
+      {
+        "texte": "Afficher les détails de la commande"
+      }
+    ]
+  },
+  "fields": [
+    {
+      "key": "session",
+      "label": "Connexion à Galaxus",
+      "type": "session",
+      "required": false,
+      "accept": "application/json,.json",
+      "help": "Le bouton « Se connecter à Galaxus » ouvre une fenêtre de navigateur dans crabe : connectez-vous comme sur le site. La connexion est conservée dans un profil de navigateur sur le serveur et n'est jamais réaffichée."
+    },
+    {
+      "key": "historique",
+      "label": "Historique à récupérer",
+      "type": "history",
+      "default": "depuis",
+      "help": "Combien d'années remonter dans vos commandes Galaxus. crabe reprend tout une première fois, puis ne va plus chercher que les nouveautés."
+    }
+  ],
+  "permissions": [
+    {
+      "key": "factures",
+      "scope": "read-write",
+      "description": "Ouvre la liste de vos commandes Galaxus et chacune d'elles pour y télécharger ses documents (facture, confirmation de commande), puis les dépose sur vos destinations de stockage."
+    },
+    {
+      "key": "identifiants",
+      "scope": "read",
+      "description": "Votre connexion Galaxus, conservée dans un profil de navigateur protégé sur le serveur, utilisée pour la seule lecture de vos commandes — jamais réaffichée, jamais journalisée."
+    }
+  ]
+}

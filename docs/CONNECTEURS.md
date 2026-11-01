@@ -18,7 +18,7 @@ où en est chacun, en cinq groupes :
 Un site peut changer ses pages du jour au lendemain : un connecteur
 fonctionnel peut cesser de l'être, et crabe le dit alors sur sa fiche.
 
-État au 18 octobre 2026, version 0.2.15. Il vous manque un service ? Ouvrez une
+État au 18 octobre 2026, version 0.2.18. Il vous manque un service ? Ouvrez une
 *issue* en indiquant le site et le type de document voulu (facture, reçu,
 attestation…).
 
@@ -77,12 +77,15 @@ attestation…).
 | <img src="icones/uber.png" width="24" height="24" alt=""> | Uber | Les reçus de vos trajets Uber (Uber Eats et Location à l'étude). |
 | <img src="icones/vistaprint.png" width="24" height="24" alt=""> | VistaPrint | Les factures de vos commandes d'impression VistaPrint. |
 
-## En cours (3)
+## En cours (6)
 
 | | Service | Ce qu'il récupérera |
 |---|---|---|
+| <img src="icones/blablacar.png" width="24" height="24" alt=""> | BlaBlaCar | Reconstitue un reçu pour chacun de vos trajets BlaBlaCar, à partir de vos paiements et remboursements. |
+| <img src="icones/galaxus.png" width="24" height="24" alt=""> | Galaxus | Les documents de vos commandes Galaxus : factures et confirmations de commande. |
 | <img src="icones/thesdelapagode.png" width="24" height="24" alt=""> | Les Thés de la Pagode | Les factures de vos commandes Les Thés de la Pagode. |
 | <img src="icones/paybyphone.png" width="24" height="24" alt=""> | PayByPhone | Vos relevés de stationnement payé depuis votre mobile. |
+| <img src="icones/recraft.png" width="24" height="24" alt=""> | Recraft | Vos factures d'abonnement Recraft. |
 | <img src="icones/totalenergies.png" width="24" height="24" alt=""> | TotalEnergies | Vos factures d'électricité et de gaz TotalEnergies. |
 
 ## En attente (2)
@@ -115,7 +118,7 @@ attestation…).
 | <img src="icones/sfr.png" width="24" height="24" alt=""> | SFR | Récupérerait vos factures SFR, mobile et box. | Pas exploitable aujourd'hui : aucun essai sur un vrai compte n'a abouti. Si cela change, le service reviendra. |
 | <img src="icones/vinted.png" width="24" height="24" alt=""> | Vinted | Récupérerait vos justificatifs de vente Vinted. | Pas exploitable aujourd'hui : aucun essai sur un vrai compte n'a abouti. Si cela change, le service reviendra. |
 
-## Proposés (16)
+## Proposés (15)
 
 | | Service | Ce qu'il récupérerait |
 |---|---|---|
@@ -130,7 +133,6 @@ attestation…).
 | <img src="icones/oney.png" width="24" height="24" alt=""> | Oney | Récupérerait vos échéanciers et relevés de paiement Oney. |
 | <img src="icones/planete-oui.png" width="24" height="24" alt=""> | Planète OUI | Récupérerait vos factures d'électricité Planète OUI. |
 | <img src="icones/pronote.png" width="24" height="24" alt=""> | Pronote | Récupérerait les documents de l'espace Pronote de votre établissement. |
-| <img src="icones/recraft.png" width="24" height="24" alt=""> | Recraft | Récupérerait vos factures d'abonnement Recraft. |
 | <img src="icones/saur.png" width="24" height="24" alt=""> | SAUR | Récupérerait vos factures d'eau SAUR. |
 | <img src="icones/scalapay.png" width="24" height="24" alt=""> | Scalapay | Récupérerait vos échéanciers et reçus de paiement Scalapay. |
 | <img src="icones/semailles.png" width="24" height="24" alt=""> | Semailles | Récupérerait les factures de vos achats de semences Semailles. |

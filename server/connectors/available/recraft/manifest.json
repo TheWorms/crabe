@@ -1,0 +1,51 @@
+{
+  "id": "recraft",
+  "name": "Recraft",
+  "category": "ia",
+  "color": "#6a3eff",
+  "letters": "RC",
+  "site": "www.recraft.ai",
+  "implementation": "scraping",
+  "initialStatus": "pending",
+  "description": "Récupère automatiquement vos factures d'abonnement Recraft.",
+  "caveat": "Vous ouvrez la connexion vous-même une fois, dans une fenêtre de navigateur : Recraft y demande une vérification anti-robot.",
+  "technicalNote": "0.2.16 (01/11/2026, lot l7, décision du compte observé) — ÉCRIT SANS COMPTE, D'APRÈS LA DOCUMENTATION DE RECRAFT. RECONNAISSANCE lot 36 (gardée) : www.recraft.ai/profile/billing redirige les anonymes (302) vers id.recraft.ai/realms/recraft/protocol/openid-connect/auth — un Keycloak dont le formulaire est gardé par un Turnstile (challenges.cloudflare.com). Le Turnstile garde la CONNEXION, pas les pages : la session est ouverte par l'utilisateur dans la fenêtre visible, puis rejouée.\n\nLE CHEMIN DES FACTURES (www.recraft.ai/docs/plans-and-billing/billing, lu le 01/11/2026) : profil → « Manage subscription » (la page profile/billing) → « Manage billing details » → le portail de facturation Stripe (billing.stripe.com), section « Invoice history » → chaque facture (invoice.stripe.com/i/acct_…/…) → « Download invoice ». Le connecteur suit exactement ce chemin : il ouvre profile/billing, clique le bouton dont le texte est « Manage billing details » (ou son équivalent français), suit le portail — dans le même onglet ou un nouveau —, déplie l'historique (« View more ») et lit les liens invoice.stripe.com, dont le PDF se déduit (pay.stripe.com/invoice/…/pdf, documents-de-page.urlDeTelechargement). Numéro et date se lisent dans le PDF (facture-stripe.js), jamais dans le jeton de l'adresse.\n\nMESURÉ LE 01/11/2026 sur le compte du compte observé (relevés de page nettoyés) : la page d'abonnement est www.recraft.ai/profile/subscription (« Abonnement - Recraft », en français) ; sous l'intertitre « Informations de facturation » (« Vous allez être redirigé vers Stripe »), le bouton « Gérer » ; le portail billing.stripe.com/p/session liste « Historique de facturation » en liens a[data-testid=hip-link] vers invoice.stripe.com/i/acct_…/live_…, une ligne par facture (date « 27 oct. 2026 », montants EUR et USD, « Payée »). CE QUI N'EST PAS MESURÉ : le rejeu headless d'une session Recraft (Cloudflare pourrait juger le navigateur des pages comme il juge celui de la connexion). STATUT : JAMAIS EXERCÉ CONTRE UN COMPTE RÉEL — « pending » ; la première récupération détaillée (crabe recuperer recraft --detail) montrera les vraies pages.",
+  "remoteLogin": {
+    "url": "https://www.recraft.ai/profile/subscription",
+    "verifyUrl": "https://www.recraft.ai/profile/subscription",
+    "keepDomains": [
+      "recraft.ai"
+    ],
+    "hint": "Connectez-vous à Recraft comme d'habitude — par adresse e-mail, Google, Discord ou Apple. Recraft affiche d'abord une vérification anti-robot : cochez-la si elle le demande. Laissez la page de votre abonnement finir de s'afficher avant d'enregistrer.",
+    "renvoiAnonyme": "connexion"
+  },
+  "fields": [
+    {
+      "key": "session",
+      "label": "Connexion à Recraft",
+      "type": "session",
+      "required": false,
+      "accept": "application/json,.json",
+      "help": "Le bouton « Se connecter à Recraft » ouvre une fenêtre de navigateur dans crabe : connectez-vous comme sur le site, et la connexion est enregistrée d'elle-même.\nSi vous passez par Google, Discord ou Apple : seule la connexion à Recraft est conservée.\nCette connexion vaut vos identifiants : elle est chiffrée ici et n'est jamais réaffichée. Elle finira par expirer, et crabe vous demandera alors de la rouvrir."
+    },
+    {
+      "key": "historique",
+      "label": "Historique à récupérer",
+      "type": "history",
+      "default": "depuis",
+      "help": "Combien d'années remonter dans vos factures Recraft. crabe reprend tout une première fois, puis ne va plus chercher que les nouveautés."
+    }
+  ],
+  "permissions": [
+    {
+      "key": "factures",
+      "scope": "read-write",
+      "description": "Ouvre votre page d'abonnement Recraft, puis son portail de facturation Stripe, pour y lister et télécharger vos factures, et les dépose sur vos destinations de stockage."
+    },
+    {
+      "key": "identifiants",
+      "scope": "read",
+      "description": "La connexion de navigateur que vous avez ouverte vous-même : les cookies de session de recraft.ai, chiffrés au repos, rejoués uniquement pour ouvrir votre page d'abonnement. Aucun mot de passe n'est stocké ici."
+    }
+  ]
+}

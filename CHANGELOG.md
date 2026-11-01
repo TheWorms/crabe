@@ -6,6 +6,33 @@ Pour mettre à jour votre crabe : [docs/MISE-A-JOUR.md](docs/MISE-A-JOUR.md) (En
 
 ---
 
+## 0.2.18 — les reçus BlaBlaCar (02/11/2026)
+
+### Corrigé (essai réel de la 0.2.17)
+- **BlaBlaCar : aucun reçu n'était créé.** Chaque ligne de la page « Paiements & remboursements » commence par une phrase d'accessibilité qui contient elle aussi « Payé le … » ; crabe s'y accrochait et ne reconnaissait aucune ligne. Il lit maintenant l'opération, la date du trajet, l'itinéraire et le montant, chacun sur sa ligne — un reçu reconstitué par trajet, comme prévu.
+- **BlaBlaCar : « Aucune nouvelle facture » alors que rien n'avait été lu.** Des opérations affichées et aucune reconnue font désormais échouer la récupération, en le disant.
+
+---
+
+## 0.2.17 — Galaxus et BlaBlaCar se connectent, Recraft lit son portail (02/11/2026)
+
+### Corrigé (premier essai réel de la 0.2.16)
+- **Galaxus et BlaBlaCar : la connexion ne s'enregistrait jamais.** La fenêtre vérifiait la session en la rejouant dans un navigateur automatisé, que ces deux sites refusent (Galaxus coupe la connexion, BlaBlaCar sert une page vide). La preuve se lit désormais dans la fenêtre elle-même, sur des repères de leurs pages : la liste des commandes Galaxus, les lignes de paiement BlaBlaCar.
+- **Recraft : « Aucune nouvelle facture » alors que rien n'avait été lu.** Le portail de facturation était relevé avant de s'être affiché. crabe attend maintenant que l'historique des factures s'affiche, et, s'il ne s'affiche pas, échoue en le disant.
+
+---
+
+## 0.2.16 — Recraft, Galaxus, BlaBlaCar (02/11/2026)
+
+### Nouveaux services (en cours d'essai)
+- **Recraft** : vos factures d'abonnement. Vous ouvrez la connexion une fois dans la fenêtre (Recraft y demande une vérification anti-robot) ; crabe ouvre ensuite votre page d'abonnement, puis le portail de facturation Stripe, et télécharge chaque facture en PDF.
+- **Galaxus** : les documents de vos commandes — factures et confirmations de commande. Galaxus refuse les navigateurs automatisés : la connexion est gardée dans un profil de navigateur, comme pour Boulanger.
+- **BlaBlaCar** : BlaBlaCar ne fournit pas de reçu ; crabe en reconstitue un **par trajet**, à partir de vos paiements et remboursements, une fois le trajet passé de 7 jours. Connexion gardée dans un profil de navigateur (BlaBlaCar demande une vérification anti-robot).
+
+Les trois ont été écrits sur des pages relevées sur un vrai compte ; leur première récupération réelle reste à faire.
+
+---
+
 ## 0.2.15 — un autre compte sur le même site (01/11/2026)
 
 ### Services
