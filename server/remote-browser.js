@@ -1389,12 +1389,19 @@ function createManager(overrides = {}) {
     const reste = session.plafondAt == null ? timeoutMs : session.plafondAt - runtime.now();
     const delai = Math.max(0, Math.min(timeoutMs, reste));
     session.expiresAt = runtime.now() + delai;
+    // Ramenée au plafond, cette minuterie part à la même heure que celle du
+    // plafond — parfois avant elle (0.2.14, mesuré sous charge) : c'est alors
+    // le plafond qui ferme, et son message qui se lit.
+    const auPlafond = delai < timeoutMs;
     session.timer = setTimeout(() => {
       terminate(
         session,
         'timeout',
-        'Fenêtre fermée après dix minutes sans activité — le navigateur a été arrêté et rien '
-          + 'n\'a été enregistré.'
+        auPlafond
+          ? 'Fenêtre fermée au bout de trente minutes — le navigateur a été arrêté et rien n\'a été '
+            + 'enregistré. Rouvrez-la pour recommencer.'
+          : 'Fenêtre fermée après dix minutes sans activité — le navigateur a été arrêté et rien '
+            + 'n\'a été enregistré.'
       );
     }, delai);
     session.timer.unref?.();

@@ -91,7 +91,7 @@ const EXCLUS = {
 /** Les points remplaçables par les essais. */
 const ouverture = {
   requirePlaywright: () => require('playwright'),
-  socleProfil: (connectorId) => (PROFIL_SNCF.has(connectorId)
+  socleProfil: (connectorId) => (PROFIL_SNCF.has(require('./connectors/instances').baseDe(connectorId))
     ? require('./connectors/auth-sncf')
     : require('./connectors/profil-marchand')),
 };
@@ -104,7 +104,9 @@ const ouverture = {
  * Ce service peut-il être visité ? Pure : lit le manifeste et le module.
  * @returns {{ok: true, mode: 'etat'|'profil', champ: string}|{ok: false, raison: string}}
  */
-function eligibilite(connectorId, manifest, connecteur = null) {
+function eligibilite(idInstalle, manifest, connecteur = null) {
+  // 0.2.15 : un autre compte suit les règles de son service.
+  const connectorId = require('./connectors/instances').baseDe(idInstalle);
   const champ = (manifest?.fields || []).find((f) => f.type === 'session');
   const rl = manifest?.remoteLogin;
   if (!champ || !rl) return { ok: false, raison: 'pas de connexion enregistrée par la fenêtre' };
@@ -316,6 +318,17 @@ async function visiter(c) {
     r = c.mode === 'profil' ? await visiterProfil(c, log, connecteur) : await visiterEtat(c, log);
   } catch (err) {
     r = { verdict: 'erreur', code: 'erreur', raison: String(err?.message || err).slice(0, 300) };
+  }
+  // 0.2.14 : une session trouvée morte se rouvre seule quand le service s'y
+  // prête (reconnexion-auto.js) — la visite le dit dans sa raison.
+  if (r.verdict === 'refusee' && c.mode === 'etat') {
+    const essai = await require('./reconnexion-auto').tenter(c.userId, c.connectorId, {
+      origine: 'entretien',
+      log: (ligne) => applog.info('entretien', ligne),
+    }).catch(() => null);
+    if (essai && essai.issue !== 'non-tentee') {
+      r = { ...r, raison: `${r.raison ? `${r.raison} ; ` : ''}reconnexion automatique : ${essai.issue === 'reussie' ? 'session rouverte' : essai.raison}` };
+    }
   }
   const ligne = {
     verdict: r.verdict,

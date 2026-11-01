@@ -4123,6 +4123,9 @@ function storeVisibles() {
     // Lot 108 : un non faisable n'est plus dans le Store, même installé (le
     // serveur ne l'envoie qu'à son compte, pour « Mes connecteurs »).
     if (estNonFaisable(c)) return false;
+    // 0.2.15 : un autre compte n'est pas un service de plus — il vit dans
+    // « Mes connecteurs », la tuile du Store reste celle du service.
+    if (c.instanceDe) return false;
     if (state.storeAvailableOnly && c.planned) return false;
     if (!recherche) return true;
     // Le nom d'abord, mais aussi la description et le site : quelqu'un qui
@@ -6080,6 +6083,8 @@ function essentialFields(connector) {
  * montre dans la fiche même. Les autres listes à cocher restent où elles sont.
  */
 function estChampAvance(field) {
+  // 0.2.14 : `avance` — les identifiants facultatifs d'un service par la fenêtre.
+  if (field.avance) return true;
   return CHAMPS_AVANCES.includes(field.type) && !(field.type === 'multiselect' && field.toutCocher);
 }
 
@@ -6164,15 +6169,53 @@ function sheetAdvanced(connector) {
          id="modal-uninstall">Désinstaller ${esc(connector.name)}</button>`
     : '';
 
+  // 0.2.15 : un autre compte sur le même site — le nom de celui-ci s'il en
+  // est un, et le geste d'en ajouter un, pour tout service installé.
+  const nomService = connector.nomService || connector.name;
+  const autreCompte = connector.installed && !connector.planned
+    ? `<div class="field" id="autre-compte">
+        ${connector.instanceDe ? `<label for="libelle-compte">Nom de ce compte</label>
+          <input id="libelle-compte" maxlength="40" value="${esc(connector.libelleInstance || '')}"
+                 placeholder="Pro, Maison…" onchange="nommerCeCompte('${esc(connector.id)}', this.value)">` : ''}
+        <button type="button" class="btn-ghost" onclick="ajouterAutreCompte('${esc(connector.instanceDe || connector.id)}')">
+          Ajouter un autre compte ${esc(nomService)}</button>
+        <div class="field-help">Un second identifiant sur le même site : il a sa propre connexion et ses propres
+          récupérations, et ses documents vont dans le dossier ${esc(nomService)}, sous leur propre compte.</div>
+      </div>`
+    : '';
+
   return `<div class="adv">
     <button type="button" class="adv-toggle" id="adv-toggle" onclick="toggleAdvanced()"
             aria-expanded="false" aria-controls="adv-body">
       Options avancées <span class="adv-chevron">▾</span>
     </button>
     <div class="adv-body" id="adv-body" style="display:none;">
-      ${blocs}${desinstaller}
+      ${blocs}${autreCompte}${desinstaller}
     </div>
   </div>`;
+}
+
+/** 0.2.15 : un autre compte du même service, puis sa fiche. */
+async function ajouterAutreCompte(serviceId) {
+  try {
+    const r = await api(`/connectors/${encodeURIComponent(serviceId)}/autre-compte`, { method: 'POST', body: {} });
+    await loadConnectors();
+    openModal(r.id, { edit: true });
+    showToast('Autre compte ajouté : connectez-le depuis sa fiche.');
+  } catch (err) {
+    showToast(err.message);
+  }
+}
+
+/** 0.2.15 : le nom d'un autre compte (« Pro »), vide pour l'effacer. */
+async function nommerCeCompte(connectorId, libelle) {
+  try {
+    await api(`/connectors/${encodeURIComponent(connectorId)}/libelle`, { method: 'PUT', body: { libelle } });
+    await loadConnectors();
+    showToast(libelle.trim() ? 'Compte renommé.' : 'Nom du compte effacé.');
+  } catch (err) {
+    showToast(err.message);
+  }
 }
 
 /** Déplie ou replie les options avancées. */

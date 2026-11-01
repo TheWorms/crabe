@@ -84,6 +84,11 @@ async function rejouer(session, state, { runtime = runtimeParDefaut, garderEtat 
   let contexte = null;
   // 0.2.8 : la visite d'entretien emporte l'état du navigateur prolongé par
   // le site — seulement sur une session confirmée.
+  //
+  // ⚠ `return await`, jamais `return` seul (0.2.14) : sans `await`, le
+  // `finally` ci-dessous fermait le navigateur AVANT que l'état soit lu, et
+  // chaque visite confirmée finissait en « Protocol error » — la session
+  // prolongée n'était jamais enregistrée.
   const confirmee = async (verdict) => (garderEtat && contexte
     ? { ...verdict, etat: await contexte.storageState() }
     : verdict);
@@ -166,7 +171,7 @@ async function rejouer(session, state, { runtime = runtimeParDefaut, garderEtat 
           corpsVide = false; // illisible n'est pas vide : on ne conclut pas ici
         }
         if (!corpsVide) {
-          return confirmee({
+          return await confirmee({
             verdict: 'confirmee',
             preuve: `${session.connectorName} : connexion confirmée — la page de contrôle a `
               + `renvoyé vers l'espace client hébergé sur ${session.domaineEspaceClient} `
@@ -211,7 +216,7 @@ async function rejouer(session, state, { runtime = runtimeParDefaut, garderEtat 
         }
         const tenue = await preuve.verifier(page, { cookies: (state.cookies || []).length });
         if (!corpsVide && !tenue.surFormulaire) {
-          return confirmee({
+          return await confirmee({
             verdict: 'confirmee',
             preuve: `${session.connectorName} : connexion confirmée — l'adresse de contrôle `
               + `${releve.adresseMasquee(session.verifyUrl)} a tenu, or le site en redirige les anonymes `
@@ -223,7 +228,7 @@ async function rejouer(session, state, { runtime = runtimeParDefaut, garderEtat 
 
     const resultat = await preuve.verifier(page, { cookies: (state.cookies || []).length });
     if (resultat.confirme) {
-      return confirmee({
+      return await confirmee({
         verdict: 'confirmee',
         preuve: preuve.ligneConfirmee(session.connectorName, resultat),
       });
@@ -295,7 +300,7 @@ async function rejouer(session, state, { runtime = runtimeParDefaut, garderEtat 
     if (session.renvoiAnonyme === 'connexion'
       && (statut === null || statut < 400)
       && preuve.memeSite(page.url(), session.verifyUrl)) {
-      return confirmee({
+      return await confirmee({
         verdict: 'confirmee',
         preuve: `${session.connectorName} : connexion confirmée — la page est restée sur le `
           + `site (URL finale ${releve.adresseMasquee(resultat.url)}) sans renvoi vers la connexion, or c'est ainsi `

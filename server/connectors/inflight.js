@@ -198,7 +198,8 @@ const PROFIL_PERIME_MS = 15 * 60 * 1000;
 const profil = createLock({ timeoutMs: PROFIL_PERIME_MS });
 
 /** Clé d'un profil : un compte, un connecteur — comme le dossier sur disque. */
-const profilKey = (userId, connectorId) => `${userId}:${connectorId}`;
+// 0.2.15 : le second compte en cours garde son propre verrou (voir instances.js).
+const profilKey = (userId, connectorId) => `${userId}:${require('./instances').pourLeProfil(connectorId)}`;
 
 /** Les étiquettes des porteurs du verrou de profil, relues par `holder()`. */
 const PORTEUR_FENETRE = 'fenêtre de connexion';

@@ -138,7 +138,6 @@ const config = {
   allowedCidrsParDefaut: reseauxEcrits(process.env.CRABE_ALLOWED_CIDRS).length === 0,
 
   rcloneBin: process.env.CRABE_RCLONE_BIN || 'rclone',
-  rcloneConf: process.env.CRABE_RCLONE_CONF || path.join(dataDir, 'rclone.conf'),
 
   bootstrapAdmin: {
     username: process.env.CRABE_ADMIN_USERNAME || 'admin',

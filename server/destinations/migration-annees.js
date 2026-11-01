@@ -242,7 +242,9 @@ function passeBase(root, vus) {
 /** Nom lisible d'un connecteur, ou son identifiant s'il a quitté le disque. */
 function nomConnecteur(connectorId) {
   try {
-    return require('../connectors/registry').manifest(connectorId).name;
+    // 0.2.15 : le nom du SERVICE — un second compte range dans son dossier.
+    const m = require('../connectors/registry').manifest(connectorId);
+    return m.nomService || m.name;
   } catch {
     return connectorId;
   }

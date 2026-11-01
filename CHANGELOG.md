@@ -6,6 +6,30 @@ Pour mettre à jour votre crabe : [docs/MISE-A-JOUR.md](docs/MISE-A-JOUR.md) (En
 
 ---
 
+## 0.2.15 — un autre compte sur le même site (01/11/2026)
+
+### Services
+- **Plusieurs comptes sur le même site.** « Ajouter un autre compte » (Options avancées de la fiche d'un service installé) crée un second compte du service — par exemple un Amazon personnel et un Amazon professionnel —, avec sa propre connexion, ses propres identifiants, ses propres récupérations et sa propre planification. Il s'affiche « Amazon (2) », ou sous le nom que vous lui donnez (« Amazon — Pro »). Ses documents vont dans le dossier du service, « Amazon », sous leur propre dossier de compte. Jusqu'à neuf comptes par service.
+
+### Interne
+- Migration 74 (additive) : le nom d'un autre compte.
+
+---
+
+## 0.2.14 — la reconnexion automatique (01/11/2026)
+
+### Connexions
+- **Une session expirée se rouvre seule.** Quand une récupération (ou la visite d'entretien) trouve la session d'un service expirée, crabe ouvre la page de connexion du site, y écrit l'identifiant et le mot de passe du service — ceux de sa fiche, ou de l'entrée du carnet qu'elle suit —, vérifie la session comme la fenêtre « Se connecter », puis reprend la récupération. Un essai par service et par 24 h. Devant un captcha, une vérification anti-robot ou un code reçu, il s'arrête et n'essaie plus avant une connexion faite à la main ; le message de la session expirée dit alors pourquoi. Active par défaut, désactivable en tout et service par service (Administration › Automatisation › Reconnexion automatique).
+- **Tous les services connectés par la fenêtre ont maintenant un identifiant et un mot de passe facultatifs** (Options avancées de leur fiche). Jusqu'ici, un seul en avait : pour les autres, le remplissage automatique de la fenêtre (0.2.11), « Enregistrer ces identifiants » (0.2.12) et le carnet (0.2.13) n'avaient rien à utiliser.
+
+### Corrigé
+- **La visite d'entretien n'enregistrait jamais la session prolongée** (0.2.8) : le navigateur se fermait avant que la session soit lue, et chaque visite d'une session vivante finissait en « visite interrompue ».
+
+### Interne
+- Migration 73 (additive) : la table des essais de reconnexion et ses deux interrupteurs.
+
+---
+
 ## 0.2.13 — le carnet d'identifiants (01/11/2026)
 
 ### Identifiants

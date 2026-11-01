@@ -230,7 +230,7 @@ router.get('/runs', (req, res) => {
           )
           .all(...journalParams);
 
-  const catalog = new Map(registry.listAll().map((c) => [c.id, c]));
+  const catalog = registry.catalogueParId();
   const decor = (id) => ({
     connectorName: catalog.get(id)?.name || id,
     color: catalog.get(id)?.color || '#63666e',

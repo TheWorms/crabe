@@ -256,7 +256,7 @@ function lire(user, query = {}) {
     s.annees.push({ annee: g.annee, nombre: g.nombre });
   }
 
-  const catalogue = new Map(registry.listAll().map((c) => [c.id, c]));
+  const catalogue = registry.catalogueParId();
   const services = tri.parNom(
     [...parService].map(([id, s]) => {
       const style = styleDuService(catalogue, id);
@@ -267,7 +267,7 @@ function lire(user, query = {}) {
         annees: s.annees.sort((a, b) => String(b.annee).localeCompare(String(a.annee))),
         // Le dossier DU SERVICE (lot 106) : le niveau suivant du chemin réel
         // est l'identifiant du compte, que le lot 96 a retiré de l'écran.
-        dossier: dossier.dossierDe(demande.espace, { user, connectorName: style.nom }),
+        dossier: dossier.dossierDe(demande.espace, { user, connectorName: catalogue.get(id)?.nomService || style.nom }),
       };
     }),
     (s) => s.nom

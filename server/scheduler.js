@@ -841,13 +841,16 @@ async function runLocked(user, connectorId, trigger, options = {}) {
     const catalog = db
       .get()
       .prepare('SELECT maintenance FROM connector_catalog WHERE connector_id = ?')
-      .get(connectorId);
+      // 0.2.15 : un second compte suit la maintenance de son service.
+      .get(require('./connectors/instances').baseDe(connectorId));
     if (catalog?.maintenance) {
       return finish(false, 0, 'Connecteur en maintenance — récupération ignorée.');
     }
 
     connectorConfig = registry.readConfig(userId, connectorId);
-    const connectorName = registry.manifest(connectorId).name;
+    // Le NOM DU SERVICE nomme le dossier : un second compte (0.2.15, « Amazon
+    // (2) ») range dans « Amazon », sous son propre dossier de compte.
+    const connectorName = registry.manifest(connectorId).nomService || registry.manifest(connectorId).name;
 
     // ─── « Récupérer tout l'historique » (lot 32) ─────────────────────────
     //
@@ -876,8 +879,8 @@ async function runLocked(user, connectorId, trigger, options = {}) {
     const knownSizes = {};
     for (const r of dejaEnBase) knownSizes[r.remote_id] = r.size_bytes;
 
-    const fetched = await avecLimiteDeDuree(
-      registry.fetchInvoicesDetailed(connectorId, connectorConfig, {
+    const recuperer = (configuration) => avecLimiteDeDuree(
+      registry.fetchInvoicesDetailed(connectorId, configuration, {
         // Les connecteurs à profil persistant (addons-prestashop) rouvrent le
         // profil du couple (utilisateur, connecteur) : il leur faut l'utilisateur.
         userId,
@@ -905,6 +908,34 @@ async function runLocked(user, connectorId, trigger, options = {}) {
         ),
       })
     );
+
+    // ─── La reconnexion automatique (0.2.14, lot l21) ─────────────────────
+    //
+    // Une session trouvée expirée : si le service a ses identifiants et que
+    // son site s'y prête, crabe se reconnecte seul (reconnexion-auto.js), puis
+    // reprend la récupération UNE fois. Sinon — ou si la reprise échoue
+    // encore — l'échec suit son chemin d'avant, avec la raison de l'essai.
+    let fetched;
+    try {
+      fetched = await recuperer(connectorConfig);
+    } catch (err) {
+      if (!err?.sessionExpired || options.sansReconnexion) throw err;
+      const essai = await require('./reconnexion-auto').tenter(userId, connectorId, {
+        origine: 'recuperation',
+        log: (ligne) => applog.connector(connectorId, ligne, qui),
+      });
+      if (essai.issue !== 'reussie') {
+        if (essai.issue !== 'non-tentee') err.reconnexion = essai;
+        throw err;
+      }
+      applog.connector(connectorId, 'Session rouverte automatiquement : la récupération reprend.', qui);
+      connectorConfig = registry.readConfig(userId, connectorId);
+      if (options.toutLHistorique) {
+        const { CHAMP_HISTORIQUE } = require('./connectors/scraping');
+        connectorConfig = { ...connectorConfig, [CHAMP_HISTORIQUE]: 'tout' };
+      }
+      fetched = await recuperer(connectorConfig);
+    }
 
     // ─── L'état de session renouvelé après le passage (lot 87) ─────────────
     //
@@ -1262,6 +1293,7 @@ async function runLocked(user, connectorId, trigger, options = {}) {
     const brut = String(err.message || '').trim();
     let message = !brut ? '' : err.sessionExpired ? brut : `Échec — ${brut}`;
 
+
     // ─── Le site n'a jamais répondu (lot 110) ───────────────────────────────
     //
     // Verdict posé par le registre (`err.horsLigne`, connectors/site-hors-ligne.js) :
@@ -1344,6 +1376,14 @@ async function runLocked(user, connectorId, trigger, options = {}) {
         if (expiration) message = expiration;
         else if (err.renvoiAuthentification) message = messagesEchec.messageSessionExpiree();
       }
+    }
+
+    // 0.2.14 : la reconnexion automatique a été essayée — sa raison suit la
+    // phrase de la session expirée, quelle qu'elle soit.
+    if (message && err.reconnexion) {
+      message += ` Reconnexion automatique essayée : ${err.reconnexion.issue === 'impossible'
+        ? `le site a demandé ${err.reconnexion.raison} — connectez-vous vous-même.`
+        : `${err.reconnexion.raison}.`}`;
     }
 
     // ─── L'abandon n'est complet que si le navigateur s'éteint (lot 67) ─────
@@ -1515,7 +1555,7 @@ function normalizeRun(row) {
  * dernier résultat. C'est ce que consomme l'écran « Automatisation ».
  */
 function listSchedules() {
-  const catalog = new Map(registry.listAll().map((c) => [c.id, c]));
+  const catalog = registry.catalogueParId();
 
   return schedules
     .listInstallations()

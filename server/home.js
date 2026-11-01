@@ -528,7 +528,7 @@ function stats(user) {
  * et les faire disparaître ferait mentir le total affiché juste au-dessus.
  */
 function stockageParConnecteur(user) {
-  const catalog = new Map(registry.listAll().map((c) => [c.id, c]));
+  const catalog = registry.catalogueParId();
 
   return db
     .get()
@@ -672,7 +672,7 @@ function facturesParMois(user, mois = GRAPHIQUE_MOIS) {
  * compte toujours.
  */
 function facturesParConnecteur(user) {
-  const catalog = new Map(registry.listAll().map((c) => [c.id, c]));
+  const catalog = registry.catalogueParId();
 
   return db
     .get()
@@ -988,7 +988,7 @@ function copyFailures(user, enabledIds) {
  * destination par destination.
  */
 function recentDocuments(user, enabledIds, limit = DOCUMENTS_LIMIT) {
-  const catalog = new Map(registry.listAll().map((c) => [c.id, c]));
+  const catalog = registry.catalogueParId();
 
   const rows = db
     .get()

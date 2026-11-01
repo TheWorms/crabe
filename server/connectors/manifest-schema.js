@@ -1071,11 +1071,60 @@ function normalize(manifest, { planned = false } = {}) {
     // Le nom du service traverse jusqu'au champ : c'est lui qui écrit l'aide du
     // champ d'identification — « Celle avec laquelle vous vous connectez sur
     // Kubii. » — au lieu de la voir recopiée dans chaque manifeste.
-    fields: (reste.fields || []).map((f) => normalizeField(f, reste.name)),
+    fields: avecIdentifiantsFenetre((reste.fields || []).map((f) => normalizeField(f, reste.name)), reste),
     // Vue prête à afficher : icône et libellé viennent du vocabulaire commun,
     // la description du manifeste.
     permissionDetails: vocabulary.describeAll(reste.permissions),
   };
+}
+
+/**
+ * Les identifiants facultatifs d'un service connecté par la fenêtre (0.2.14).
+ *
+ * Mesuré le 01/11/2026 : sur 40 services connectés par la fenêtre, un seul
+ * (addons-prestashop) déclarait un mot de passe. Les 39 autres n'avaient nulle
+ * part où ranger leurs identifiants : le remplissage de la fenêtre (0.2.11),
+ * « Enregistrer ces identifiants » (0.2.12) et le carnet (0.2.13) ne leur
+ * servaient à rien, et la reconnexion automatique n'aurait rien eu à taper.
+ *
+ * Posés ici, sur le chemin de tous les manifestes : jamais obligatoires,
+ * rangés sous « Options avancées » (`avance`) — la fiche d'un service par la
+ * fenêtre reste « un bouton », ses identifiants arrivent d'ordinaire par la
+ * fenêtre elle-même ou par le carnet. Un manifeste qui déclare déjà un mot de
+ * passe, ou l'une de ces deux clés, est laissé tel quel.
+ */
+const CLE_IDENTIFIANT_FENETRE = 'identifiant';
+const CLE_MOT_DE_PASSE_FENETRE = 'motDePasse';
+
+function avecIdentifiantsFenetre(fields, manifest) {
+  if (!manifest.remoteLogin || manifest.unfeasible) return fields;
+  if (!fields.some((f) => f.type === 'session')) return fields;
+  if (fields.some((f) => f.type === 'password'
+    || f.key === CLE_IDENTIFIANT_FENETRE || f.key === CLE_MOT_DE_PASSE_FENETRE)) return fields;
+  return [
+    ...fields,
+    {
+      key: CLE_IDENTIFIANT_FENETRE,
+      label: `Identifiant sur ${manifest.name || 'le site'}`,
+      type: 'text',
+      inputType: 'text',
+      required: false,
+      avance: true,
+      help: 'Facultatif. Avec le mot de passe, crabe remplit le formulaire de la fenêtre de connexion, '
+        + 'et se reconnecte seul quand la session expire — sur les sites qui ne demandent ni captcha '
+        + 'ni code reçu. La fenêtre propose aussi de les enregistrer après une connexion tapée.',
+    },
+    {
+      key: CLE_MOT_DE_PASSE_FENETRE,
+      label: `Mot de passe sur ${manifest.name || 'le site'}`,
+      type: 'password',
+      inputType: 'password',
+      required: false,
+      avance: true,
+      help: `Facultatif. Celui avec lequel vous vous connectez sur ${manifest.name || 'le site'} ; `
+        + 'enregistré chiffré, il n\'est jamais réaffiché.',
+    },
+  ];
 }
 
 /**
@@ -1375,10 +1424,13 @@ function publicView(manifest) {
     discovery: (fields || []).some(isDiscoveredField),
     fields: fields.map(
       ({ key, label, type, required, help, options, placeholder, source, notice, accept, unit,
-         unitFeminine, identification: nature, inputType, default: valeurParDefaut, toutCocher }) => ({
+         unitFeminine, identification: nature, inputType, default: valeurParDefaut, toutCocher, avance }) => ({
         key,
         label,
         type,
+        // 0.2.14 : un champ rangé sous « Options avancées » (les identifiants
+        // facultatifs d'un service par la fenêtre).
+        avance: avance || undefined,
         // Ce que le site demande pour vous reconnaître, et le type de champ HTML
         // qui en découle. Le formulaire n'en décide plus rien lui-même : il
         // écrit `inputType` tel quel (voir connectors/identification.js).
@@ -1438,6 +1490,7 @@ module.exports = {
   MOTIFS_INTERDITS,
   normalize,
   normalizeField,
+  avecIdentifiantsFenetre,
   isDiscoveredField,
   discoveredFields,
   publicView,

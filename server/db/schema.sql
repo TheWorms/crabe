@@ -131,6 +131,10 @@ CREATE TABLE IF NOT EXISTS connector_installs (
   -- Migration 72 : l'entrée du carnet dont la fiche suit les identifiants
   -- (NULL : ceux de la fiche).
   carnet_id        INTEGER,
+  -- Migration 73 : 1 = pas de reconnexion automatique pour ce service.
+  reconnexion_off  INTEGER NOT NULL DEFAULT 0,
+  -- Migration 74 : le nom d'un autre compte du même service (`amazon--2`).
+  libelle          TEXT,
   UNIQUE (user_id, connector_id)
 );
 
@@ -306,6 +310,22 @@ CREATE TABLE IF NOT EXISTS carnet_identifiants (
 
 CREATE INDEX IF NOT EXISTS idx_carnet_user ON carnet_identifiants(user_id);
 
+-- La reconnexion automatique (0.2.14, migration 73) : un essai par ligne, hors
+-- de run_logs. Jamais un identifiant ni un mot de passe : l'issue et sa raison.
+CREATE TABLE IF NOT EXISTS reconnexions_auto (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  connector_id TEXT    NOT NULL,
+  at           TEXT    NOT NULL DEFAULT (datetime('now')),
+  origine      TEXT    NOT NULL,
+  issue        TEXT    NOT NULL,
+  code         TEXT,
+  raison       TEXT,
+  duree_ms     INTEGER
+);
+
+CREATE INDEX IF NOT EXISTS idx_reconnexions_couple ON reconnexions_auto(user_id, connector_id, at);
+
 -- La file d'attente des récupérations (lot 90) : une seule tourne à la fois,
 -- les autres attendent ici leur tour. Une ligne naît à la mise en file et
 -- disparaît AU DÉPART de l'exécution — ce qui reste dans la table à un arrêt
@@ -473,6 +493,8 @@ CREATE TABLE IF NOT EXISTS app_settings (
   detail_precedentes INTEGER NOT NULL DEFAULT 0,
   -- Migration 71 : la visite d'entretien des sessions, active par défaut.
   entretien_sessions INTEGER NOT NULL DEFAULT 1,
+  -- Migration 73 : la reconnexion automatique, active par défaut.
+  reconnexion_auto INTEGER NOT NULL DEFAULT 1,
   updated_at       TEXT NOT NULL DEFAULT (datetime('now'))
 );
 

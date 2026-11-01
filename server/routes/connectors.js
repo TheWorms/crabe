@@ -140,6 +140,15 @@ function assertAllowed(req, connectorId, { agir = false } = {}) {
     err.statusCode = 404;
     throw err;
   }
+  // 0.2.15 : un autre compte (`amazon--2`) n'existe que s'il est installé pour
+  // CE compte crabe — il naît par « Ajouter un autre compte », jamais par une
+  // route qui écrirait sa configuration à un numéro choisi.
+  if (require('../connectors/instances').estInstance(connectorId)
+    && !registry.getInstall(req.user.id, connectorId)) {
+    const err = new Error('Ce compte n\'existe pas.');
+    err.statusCode = 404;
+    throw err;
+  }
   if (!registry.isAllowedForUser(connectorId, req.user)) {
     const err = new Error('Ce connecteur n\'est pas disponible pour votre compte.');
     err.statusCode = 403;
@@ -230,6 +239,32 @@ router.post(
     // compte immédiatement, sans attendre un redémarrage du service.
     scheduler.reload();
     res.json({ ok: true, status: install.status });
+  })
+);
+
+/**
+ * Un autre compte sur le même site (0.2.15, lot l9) : une installation neuve
+ * du service, `<service>--<n>`, avec son nom facultatif (« Pro »).
+ */
+router.post(
+  '/:id/autre-compte',
+  asyncHandler(async (req, res) => {
+    const base = require('../connectors/instances').baseDe(req.params.id);
+    assertAllowed(req, base, { agir: 'installé' });
+    const install = registry.ajouterCompte(req.user.id, base, req.body?.libelle);
+    scheduler.reload();
+    applog.admin(req, `Autre compte ajouté pour ${base} : ${install.connector_id}.`);
+    res.status(201).json({ ok: true, id: install.connector_id, status: install.status });
+  })
+);
+
+/** Le nom d'un autre compte (0.2.15) — vide pour l'effacer. */
+router.put(
+  '/:id/libelle',
+  asyncHandler(async (req, res) => {
+    assertAllowed(req, req.params.id);
+    const install = registry.nommerCompte(req.user.id, req.params.id, req.body?.libelle);
+    res.json({ ok: true, libelle: install.libelle || '' });
   })
 );
 
@@ -603,7 +638,7 @@ router.get('/me/recuperations/:id/rapport', (req, res) => {
  * tests (test/isolation.test.js).
  */
 router.get('/me/invoices', (req, res) => {
-  const catalog = new Map(registry.listAll().map((c) => [c.id, c]));
+  const catalog = registry.catalogueParId();
 
   const invoices = db
     .get()
@@ -1429,6 +1464,39 @@ scheduleRouter.put('/entretien/:userId/:connectorId', (req, res) => {
   registry.setEntretien(userId, req.params.connectorId, actif);
   applog.admin(req, `Visite d'entretien de ${req.params.connectorId} (compte n° ${userId}) ${actif ? 'activée' : 'désactivée'}.`);
   res.json(require('../entretien-sessions').etat());
+});
+
+// ─── La reconnexion automatique (0.2.14) ─────────────────────────────────────
+//
+// Sur l'écran Automatisation, sous l'entretien : chaque service par la
+// fenêtre, s'il peut se reconnecter seul, son dernier essai, et pourquoi il ne
+// le ferait pas maintenant ; l'interrupteur général et celui de chaque service.
+scheduleRouter.get('/reconnexion', (req, res) => {
+  res.json(require('../reconnexion-auto').etat());
+});
+
+scheduleRouter.put('/reconnexion', (req, res) => {
+  const actif = req.body?.actif;
+  if (actif !== true && actif !== false) {
+    return res.status(400).json({ error: 'Précisez si la reconnexion automatique doit être active ou non.' });
+  }
+  require('../settings').updateAppSettings({ reconnexionAuto: actif });
+  applog.admin(req, `Reconnexion automatique ${actif ? 'activée' : 'arrêtée'} pour tous les services.`);
+  res.json(require('../reconnexion-auto').etat());
+});
+
+scheduleRouter.put('/reconnexion/:userId/:connectorId', (req, res) => {
+  const actif = req.body?.actif;
+  const userId = Number(req.params.userId);
+  if (actif !== true && actif !== false) {
+    return res.status(400).json({ error: 'Précisez si la reconnexion automatique doit être active ou non.' });
+  }
+  if (!Number.isInteger(userId) || !registry.getInstall(userId, req.params.connectorId)) {
+    return res.status(404).json({ error: 'Ce service n\'est pas installé pour ce compte.' });
+  }
+  registry.setReconnexion(userId, req.params.connectorId, actif);
+  applog.admin(req, `Reconnexion automatique de ${req.params.connectorId} (compte n° ${userId}) ${actif ? 'activée' : 'désactivée'}.`);
+  res.json(require('../reconnexion-auto').etat());
 });
 
 scheduleRouter.get('/', (req, res) => {

@@ -144,6 +144,14 @@ function entretienSessions(row = appSettings() || {}) {
   return row.entretien_sessions !== 0;
 }
 
+/**
+ * La reconnexion automatique (0.2.14, migration 73) : active par défaut. Une
+ * colonne absente (base d'avant la migration) vaut « active ».
+ */
+function reconnexionAuto(row = appSettings() || {}) {
+  return row.reconnexion_auto !== 0;
+}
+
 /** Vue consommée par le front pour formater toutes les dates et heures. */
 function publicSettings() {
   const row = appSettings() || {};
@@ -154,6 +162,7 @@ function publicSettings() {
     gravatarEnabled: !!row.gravatar_enabled,
     detailRecuperation: detailRecuperation(row),
     entretienSessions: entretienSessions(row),
+    reconnexionAuto: reconnexionAuto(row),
   };
 }
 
@@ -218,6 +227,16 @@ function updateAppSettings(patch = {}) {
     }
     fields.push('entretien_sessions = ?');
     values.push(patch.entretienSessions ? 1 : 0);
+  }
+
+  if (patch.reconnexionAuto !== undefined) {
+    if (typeof patch.reconnexionAuto !== 'boolean') {
+      const err = new Error('La reconnexion automatique vaut true ou false.');
+      err.statusCode = 400;
+      throw err;
+    }
+    fields.push('reconnexion_auto = ?');
+    values.push(patch.reconnexionAuto ? 1 : 0);
   }
 
   if (!fields.length) {
@@ -293,6 +312,7 @@ module.exports = {
   VOLETS_DETAIL,
   detailRecuperation,
   entretienSessions,
+  reconnexionAuto,
   publicSettings,
   updateAppSettings,
   timezone,

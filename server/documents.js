@@ -150,7 +150,7 @@ function resolveDestination(wanted) {
  * @returns {Array<object>}
  */
 function documentsOn(user, destId) {
-  const catalog = new Map(registry.listAll().map((c) => [c.id, c]));
+  const catalog = registry.catalogueParId();
   const racine = destId === 'local' ? destinations.readConfig('local')?.path : null;
 
   return db

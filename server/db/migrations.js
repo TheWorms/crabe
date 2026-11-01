@@ -1467,6 +1467,53 @@ const MIGRATIONS = [
       database.exec('CREATE INDEX IF NOT EXISTS idx_carnet_user ON carnet_identifiants(user_id)');
     },
   },
+  {
+    id: 73,
+    name: 'la reconnexion automatique',
+    // 0.2.14 (choix du compte observé du 01/11/2026, lot l21) : une session trouvée
+    // expirée se rouvre seule avec les identifiants du service, sur les sites
+    // qui ne demandent ni captcha ni code. Active par défaut, désactivable en
+    // tout (app_settings) et service par service (connector_installs). Une
+    // table des essais, hors de `run_logs`.
+    //
+    // Additive : revenir au code d'avant laisse deux colonnes et une table
+    // que personne ne lit.
+    up(database) {
+      if (hasTable(database, 'app_settings')) {
+        addColumn(database, 'app_settings', 'reconnexion_auto', 'INTEGER NOT NULL DEFAULT 1');
+      }
+      addColumn(database, 'connector_installs', 'reconnexion_off', 'INTEGER NOT NULL DEFAULT 0');
+      database.exec(`CREATE TABLE IF NOT EXISTS reconnexions_auto (
+          id           INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          connector_id TEXT    NOT NULL,
+          at           TEXT    NOT NULL DEFAULT (datetime('now')),
+          -- recuperation | entretien : ce qui a trouvé la session expirée.
+          origine      TEXT    NOT NULL,
+          -- reussie | echouee | impossible (captcha, code, mur : plus d'essai
+          -- avant une connexion faite à la main).
+          issue        TEXT    NOT NULL,
+          code         TEXT,
+          raison       TEXT,
+          duree_ms     INTEGER
+        );`);
+      database.exec('CREATE INDEX IF NOT EXISTS idx_reconnexions_couple ON reconnexions_auto(user_id, connector_id, at)');
+    },
+  },
+  {
+    id: 74,
+    name: 'le nom d\'un autre compte',
+    // 0.2.15 (lot l9, choix du compte observé du 01/11/2026) : un autre compte sur le
+    // même site est une installation `<service>--<n>` ; son nom (« Pro »,
+    // « Maison ») vit ici. Rien d'autre ne change : toutes les tables sont
+    // déjà rangées par identifiant de service.
+    //
+    // Additive : revenir au code d'avant laisse une colonne que personne ne lit
+    // (et des installations `amazon--2` qu'il ignore : connecteur inconnu).
+    up(database) {
+      addColumn(database, 'connector_installs', 'libelle', 'TEXT');
+    },
+  },
 ];
 
 /**

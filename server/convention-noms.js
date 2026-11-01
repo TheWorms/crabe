@@ -114,7 +114,9 @@ const BORNES = '\\d{4}-\\d{2}-\\d{2}_\\d{4}-\\d{2}-\\d{2}';
  *   qui ne se laisse pas dériver se liste, et l'utilisateur tranche — jamais
  *   une supposition.
  */
-function deriverNomCible(connectorId, filename, convention = CONVENTION_PAR_DEFAUT) {
+function deriverNomCible(idInstalle, filename, convention = CONVENTION_PAR_DEFAUT) {
+  // 0.2.15 : un autre compte (`amazon--2`) nomme ses fichiers comme son service.
+  const connectorId = require('./connectors/instances').baseDe(idInstalle);
   const service = propre(connectorId);
   const nom = String(filename ?? '');
   const sansService = convention === 'sans-service';

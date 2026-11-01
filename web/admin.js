@@ -2395,6 +2395,7 @@ async function loadCron() {
   renderCron();
   renderBulkDay();
   chargerEntretien();
+  chargerReconnexion();
 }
 
 // ─── La visite d'entretien des sessions (0.2.8) ──────────────────────────────
@@ -2474,6 +2475,78 @@ async function basculerEntretienService(userId, connectorId, actif) {
     renderEntretien(await api(`/admin/schedules/entretien/${userId}/${encodeURIComponent(connectorId)}`,
       { method: 'PUT', body: { actif } }));
     showToast(`Visite d'entretien ${actif ? 'activée' : 'désactivée'}`);
+  } catch (err) {
+    showToast(err.message);
+  }
+}
+
+// ─── La reconnexion automatique (0.2.14) ─────────────────────────────────────
+
+async function chargerReconnexion() {
+  try {
+    renderReconnexion(await api('/admin/schedules/reconnexion'));
+  } catch (err) {
+    $('reconnexion-liste').innerHTML = `<div class="empty-state">${esc(err.message)}</div>`;
+  }
+}
+
+function renderReconnexion(data) {
+  $('reconnexion-bascule').innerHTML = `
+    <div class="toggle ${data.actif ? 'on' : ''}" role="switch" aria-checked="${!!data.actif}"
+         aria-label="Reconnexion automatique" tabindex="0"
+         onclick="basculerReconnexion(${!data.actif})"><div class="knob"></div></div>`;
+  const services = data.services || [];
+  if (!services.length) {
+    $('reconnexion-liste').innerHTML = `<div class="empty-state">
+      Aucun service n'a de connexion enregistrée par la fenêtre « Se connecter ».</div>`;
+    return;
+  }
+  $('reconnexion-liste').innerHTML = `
+    <div class="inline-note" style="max-width:680px;">
+      Quand une récupération ou la visite d'entretien trouve la session expirée, crabe ouvre la page
+      de connexion du site, y écrit l'identifiant et le mot de passe du service (sa fiche, ou l'entrée
+      du carnet qu'elle suit), vérifie la session comme la fenêtre, puis reprend la récupération.
+      Un essai par service et par 24 h. Devant un captcha, une vérification anti-robot ou un code
+      reçu, il s'arrête, et n'essaie plus avant une connexion faite à la main.
+    </div>
+    <table class="data-table wide">
+      <thead><tr><th>Service</th><th>Compte</th><th>Identifiants</th><th>Dernier essai</th>
+        <th>Maintenant</th><th>Reconnexion</th></tr></thead>
+      <tbody>
+      ${services.map((s) => {
+        const d = s.dernier;
+        const essai = d ? `${esc(fmt.dateTime(d.at))} — ${esc(d.libelle)}` : 'jamais';
+        return `<tr>
+          <td data-label="Service" style="color:var(--text);">${esc(s.nom)}</td>
+          <td data-label="Compte">${esc(s.compte)}</td>
+          <td data-label="Identifiants">${s.possible ? (s.identifiants ? 'enregistrés' : 'à enregistrer') : '—'}</td>
+          <td data-label="Dernier essai" title="${esc(d?.raison || '')}">${essai}</td>
+          <td data-label="Maintenant">${esc(s.pourquoi || 'possible')}</td>
+          <td data-label="Reconnexion">${s.possible ? `
+            <div class="toggle ${s.active ? 'on' : ''}" role="switch" aria-checked="${!!s.active}"
+                 aria-label="Reconnexion automatique de ${esc(s.nom)}" tabindex="0"
+                 onclick="basculerReconnexionService(${Number(s.userId)}, '${esc(s.connectorId)}', ${!s.active})"><div class="knob"></div></div>` : ''}
+          </td>
+        </tr>`;
+      }).join('')}
+      </tbody>
+    </table>`;
+}
+
+async function basculerReconnexion(actif) {
+  try {
+    renderReconnexion(await api('/admin/schedules/reconnexion', { method: 'PUT', body: { actif } }));
+    showToast(`Reconnexion automatique ${actif ? 'activée' : 'arrêtée'}`);
+  } catch (err) {
+    showToast(err.message);
+  }
+}
+
+async function basculerReconnexionService(userId, connectorId, actif) {
+  try {
+    renderReconnexion(await api(`/admin/schedules/reconnexion/${userId}/${encodeURIComponent(connectorId)}`,
+      { method: 'PUT', body: { actif } }));
+    showToast(`Reconnexion automatique ${actif ? 'activée' : 'désactivée'}`);
   } catch (err) {
     showToast(err.message);
   }

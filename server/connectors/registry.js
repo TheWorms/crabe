@@ -47,6 +47,7 @@ const causeEchec = require('./cause-echec');
 // Lot 110 — « site hors ligne » : chaque passage d'un connecteur (essai,
 // récupération) est suivi sur le réseau, et classé ici, une fois pour tous.
 const siteHorsLigne = require('./site-hors-ligne');
+const instances = require('./instances');
 const schedules = require('../schedules');
 
 const AVAILABLE_DIR = path.join(__dirname, 'available');
@@ -369,7 +370,37 @@ function* entrees() {
 }
 
 function has(id) {
-  return registry.has(id) || planned.has(id);
+  return registry.has(id) || planned.has(id) || !!entreeInstance(id);
+}
+
+/**
+ * L'entrée d'un second compte (0.2.15, `amazon--2`) : celle de son service,
+ * sous son propre identifiant et son nom (« Amazon (2) »). `nomService` garde
+ * le nom du service — c'est lui qui nomme le dossier de rangement — et
+ * `instanceDe` l'identifiant du service. Null pour tout autre identifiant,
+ * pour un service inconnu ou seulement annoncé.
+ */
+const cacheInstances = new Map();
+function entreeInstance(id) {
+  const a = instances.analyser(id);
+  if (!a) return null;
+  const base = registry.get(a.base);
+  if (!base) return null;
+  const deja = cacheInstances.get(id);
+  if (deja && deja.base === base) return deja.entree;
+  const entree = {
+    ...base,
+    manifest: {
+      ...base.manifest,
+      id,
+      name: `${base.manifest.name} (${a.numero})`,
+      nomService: base.manifest.name,
+      instanceDe: a.base,
+      numeroInstance: a.numero,
+    },
+  };
+  cacheInstances.set(id, { base, entree });
+  return entree;
 }
 
 /** Ce service est-il seulement ANNONCÉ ? Faux pour un identifiant inconnu. */
@@ -378,7 +409,7 @@ function isPlanned(id) {
 }
 
 function get(id) {
-  const entry = registry.get(id) || planned.get(id);
+  const entry = registry.get(id) || planned.get(id) || entreeInstance(id);
   if (!entry) throw new Error(`Connecteur inconnu : ${id}`);
   return entry;
 }
@@ -418,7 +449,7 @@ function assertInstallable(connectorId, geste = 'installé') {
  * pas concernée : `assertInstallable` la refuse déjà, pour tout geste.
  */
 function nonFaisable(connectorId) {
-  const entry = registry.get(connectorId);
+  const entry = registry.get(connectorId) || entreeInstance(connectorId);
   return entry ? String(entry.manifest.unfeasible || '').trim() : '';
 }
 
@@ -465,14 +496,23 @@ function listAll() {
   //
   // Ce qui NE dépend pas de cet ordre : `syncCatalog()`, qui passe par
   // `entrees()` directement, et `listPlanned()`/`listAvailable()`, qui filtrent.
-  return tri.parNom([...entrees()].map(([, entry]) => {
-    const row = catalog.get(entry.manifest.id) || {};
+  return tri.parNom([...entrees()].map(([, entry]) => versCatalogue(entry, catalog, logoUrls)));
+}
+
+/**
+ * Une entrée du catalogue, fusionnée avec sa ligne d'administration. Un
+ * second compte (0.2.15) prend la ligne et le logo de son service.
+ */
+function versCatalogue(entry, catalog, logoUrls) {
+  {
+    const cle = entry.manifest.instanceDe || entry.manifest.id;
+    const row = catalog.get(cle) || {};
     return {
       ...entry.manifest,
       // L'adresse du logo réel, servie par crabe — jamais rechargée depuis
       // l'extérieur à l'affichage. `null` = la pastille à initiales reprend sa
       // place (voir connectors/logos.js).
-      logo: logoUrls.get(entry.manifest.id) || null,
+      logo: logoUrls.get(cle) || null,
       category: row.category || entry.manifest.category,
       categoryLabel:
         schema.CATEGORIES[row.category || entry.manifest.category] || entry.manifest.categoryLabel,
@@ -483,7 +523,27 @@ function listAll() {
       // administrateur). null = livré disponible par défaut, sans décision.
       publishedAt: row.published_at || null,
     };
-  }));
+  }
+}
+
+/**
+ * Le catalogue PAR IDENTIFIANT, seconds comptes installés compris (0.2.15) :
+ * pour nommer un service à partir d'une ligne de base (documents, journaux,
+ * accueil), où `listAll()` — le Store — ne les porte pas.
+ */
+function catalogueParId() {
+  const parId = new Map(listAll().map((c) => [c.id, c]));
+  const catalog = new Map(
+    db.get().prepare('SELECT * FROM connector_catalog').all().map((r) => [r.connector_id, r])
+  );
+  const logoUrls = logos.tousLesUrls();
+  for (const { connector_id: id } of db.get().prepare(
+    "SELECT DISTINCT connector_id FROM connector_installs WHERE connector_id LIKE '%--%'"
+  ).all()) {
+    const entree = entreeInstance(id);
+    if (entree && !parId.has(id)) parId.set(id, versCatalogue(entree, catalog, logoUrls));
+  }
+  return parId;
 }
 
 /** Les seuls connecteurs réellement exécutables : ceux qui portent du code. */
@@ -513,7 +573,8 @@ function isAllowedForUser(connectorId, user) {
   const row = db
     .get()
     .prepare('SELECT allowed_users, status FROM connector_catalog WHERE connector_id = ?')
-    .get(connectorId);
+    // 0.2.15 : un second compte suit les droits de son service.
+    .get(instances.baseDe(connectorId));
   if (!row) return false;
   if (row.status === 'pending') return false;
   const allowed = parseAllowed(row.allowed_users);
@@ -578,7 +639,29 @@ function listForUser(user) {
   // la dernière réussite et le prochain essai d'un site hors ligne.
   const zone = require('../settings').timezone();
 
-  return listAll()
+  // 0.2.15 : les seconds comptes de CE compte crabe, à côté de leur service,
+  // sous leur nom (« Amazon — Pro » quand il est nommé, « Amazon (2) » sinon).
+  let catalogue = listAll();
+  const seconds = [...installs.keys()].filter((id) => instances.estInstance(id) && entreeInstance(id));
+  if (seconds.length) {
+    const lignes = new Map(
+      db.get().prepare('SELECT * FROM connector_catalog').all().map((r) => [r.connector_id, r])
+    );
+    const logoUrls = logos.tousLesUrls();
+    // Chacun juste après son service, par numéro — jamais trié sur son nom :
+    // « Amazon — Pro » ne doit pas passer devant « Amazon (2) ».
+    const parService = new Map();
+    for (const id of seconds.sort((x, y) => instances.analyser(x).numero - instances.analyser(y).numero)) {
+      const vue = versCatalogue(entreeInstance(id), lignes, logoUrls);
+      const libelle = String(installs.get(id).libelle || '').trim();
+      const ligne = libelle ? { ...vue, name: `${vue.nomService} — ${libelle}`, libelleInstance: libelle } : vue;
+      if (!parService.has(vue.instanceDe)) parService.set(vue.instanceDe, []);
+      parService.get(vue.instanceDe).push(ligne);
+    }
+    catalogue = catalogue.flatMap((c) => [c, ...(parService.get(c.id) || [])]);
+  }
+
+  return catalogue
     .filter((m) => isAllowedForUser(m.id, user) && voitLesEnAttente(m, user))
     .map((m) => {
       // Un service annoncé n'a pas d'installation, et n'en aura pas : une
@@ -781,6 +864,58 @@ function install(userId, connectorId) {
   return getInstall(userId, connectorId);
 }
 
+/** Au plus neuf comptes par service (le service et huit autres) : une borne, pas une politique. */
+const COMPTES_MAX = 9;
+
+/**
+ * Ajoute un autre compte d'un service (0.2.15) : une installation neuve,
+ * `<service>--<n>`, au premier numéro libre à partir de 2. Le service lui-même
+ * n'a pas besoin d'être installé. Rend l'installation créée.
+ */
+function ajouterCompte(userId, connectorId, libelle = '') {
+  const base = instances.baseDe(connectorId);
+  get(base); // lève si inconnu
+  assertInstallable(base, 'installé');
+  assertFaisable(base, 'installé');
+  const pris = new Set(db.get().prepare(
+    'SELECT connector_id FROM connector_installs WHERE user_id = ? AND (connector_id = ? OR connector_id LIKE ?)'
+  ).all(userId, base, `${base}--%`).map((r) => r.connector_id));
+  let numero = 2;
+  while (pris.has(instances.idInstance(base, numero))) numero++;
+  if (numero > COMPTES_MAX) {
+    const err = new Error(`${manifest(base).name} a déjà ${COMPTES_MAX - 1} autres comptes : retirez-en un avant d'en ajouter.`);
+    err.statusCode = 409;
+    throw err;
+  }
+  const id = instances.idInstance(base, numero);
+  install(userId, id);
+  if (String(libelle || '').trim()) nommerCompte(userId, id, libelle);
+  return getInstall(userId, id);
+}
+
+/** Le nom d'un second compte (« Pro », « Maison ») : 40 caractères au plus, vide pour l'effacer. */
+function nommerCompte(userId, connectorId, libelle) {
+  if (!instances.estInstance(connectorId)) {
+    const err = new Error('Seul un autre compte d\'un service se nomme.');
+    err.statusCode = 400;
+    throw err;
+  }
+  const texte = String(libelle ?? '').replace(/\s+/g, ' ').trim();
+  if (texte.length > 40) {
+    const err = new Error('Le nom d\'un compte tient en 40 caractères.');
+    err.statusCode = 400;
+    throw err;
+  }
+  const r = db.get().prepare('UPDATE connector_installs SET libelle = ? WHERE user_id = ? AND connector_id = ?')
+    .run(texte || null, userId, connectorId);
+  if (!r.changes) {
+    const err = new Error('Ce compte n\'est pas installé.');
+    err.statusCode = 404;
+    throw err;
+  }
+  return getInstall(userId, connectorId);
+}
+
 /**
  * Désinstalle, efface la configuration chiffrée et retire la planification.
  * Les éléments découverts partent aussi : ce sont des données personnelles
@@ -840,6 +975,14 @@ function setActivation(userId, connectorId, actif) {
 function setEntretien(userId, connectorId, actif) {
   db.get()
     .prepare('UPDATE connector_installs SET entretien_off = ? WHERE user_id = ? AND connector_id = ?')
+    .run(actif ? 0 : 1, userId, connectorId);
+  return getInstall(userId, connectorId);
+}
+
+/** 0.2.14 : la reconnexion automatique de ce service, active ou non. */
+function setReconnexion(userId, connectorId, actif) {
+  db.get()
+    .prepare('UPDATE connector_installs SET reconnexion_off = ? WHERE user_id = ? AND connector_id = ?')
     .run(actif ? 0 : 1, userId, connectorId);
   return getInstall(userId, connectorId);
 }
@@ -1171,7 +1314,12 @@ function discoveryField(connectorId) {
  *
  * @returns {Promise<{field: object, items: Array<object>, selection: string[]}>}
  */
+/** 0.2.15 : exécuté « dans » son compte — un second compte ouvre son propre profil (instances.js). */
 async function discoverForUser(userId, connectorId, ctx = {}) {
+  return instances.dans(connectorId, () => discoverForUserDans(userId, connectorId, ctx));
+}
+
+async function discoverForUserDans(userId, connectorId, ctx = {}) {
   assertInstallable(connectorId, 'exploré');
   const { module: mod } = get(connectorId);
   const field = discoveryField(connectorId);
@@ -1407,7 +1555,12 @@ function makeContext(extra = {}, connectorId = null) {
       );
     },
     fetch: globalThis.fetch,
-    connectorId,
+    // 0.2.15 : le SERVICE — les connecteurs partagés (OVH, PrestaShop) en
+    // tirent leur marque et le préfixe de leurs fichiers ; un autre compte
+    // (`ovh--2`) est la même marque. L'installation exécutée, elle, est
+    // `installationId` (le journal ci-dessus lui est rattaché).
+    connectorId: connectorId ? instances.baseDe(connectorId) : connectorId,
+    installationId: connectorId,
     manifest: connectorId && has(connectorId) ? manifest(connectorId) : null,
     // Le PLAFOND de ce que les connecteurs iront chercher, en mois (0 = aucun).
     // Sans lui, crabe télécharge des documents que l'entretien de la nuit
@@ -1471,7 +1624,12 @@ function assertScrapingAllowed(connectorId) {
  * @param {object} config identifiants en clair
  * @returns {Promise<{ok: boolean, message: string, invoiceCount?: number}>}
  */
+/** 0.2.15 : exécuté « dans » son compte — un second compte ouvre son propre profil (instances.js). */
 async function test(connectorId, config, ctx = {}) {
+  return instances.dans(connectorId, () => testDans(connectorId, config, ctx));
+}
+
+async function testDans(connectorId, config, ctx = {}) {
   const { module: mod } = get(connectorId);
   // Lot 110 — le passage est suivi sur le réseau : un site qui n'a jamais
   // répondu se dit « hors ligne » au lieu d'un faux échec.
@@ -1604,7 +1762,12 @@ async function testForUser(userId, connectorId) {
  *
  * @returns {Promise<{invoices: Array<object>, accountId: string|null}>}
  */
+/** 0.2.15 : exécuté « dans » son compte — un second compte ouvre son propre profil (instances.js). */
 async function fetchInvoicesDetailed(connectorId, config, ctx = {}) {
+  return instances.dans(connectorId, () => fetchInvoicesDetailedDans(connectorId, config, ctx));
+}
+
+async function fetchInvoicesDetailedDans(connectorId, config, ctx = {}) {
   const { module: mod } = get(connectorId);
   assertInstallable(connectorId, 'exécuté');
   assertScrapingAllowed(connectorId);
@@ -1838,6 +2001,11 @@ async function fetchInvoices(connectorId, config, ctx = {}) {
 module.exports = {
   // Lot 97 : le titre des éléments découverts, aussi pour les données d'essai.
   titrerElements,
+  // 0.2.15 : les autres comptes d'un même service.
+  ajouterCompte,
+  nommerCompte,
+  catalogueParId,
+  COMPTES_MAX,
   AVAILABLE_DIR,
   PLANNED_DIR,
   SHARED_IMPLEMENTATIONS,
@@ -1863,6 +2031,7 @@ module.exports = {
   uninstall,
   setActivation,
   setEntretien,
+  setReconnexion,
   getInstall,
   listInstalls,
   configIllisible,

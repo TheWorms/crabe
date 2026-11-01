@@ -71,7 +71,9 @@ function racine() {
  * @returns {string} chemin absolu
  */
 function chemin(userId, connectorId) {
-  return nodePath.join(racine(), segment(userId), segment(connectorId));
+  // 0.2.15 : pendant la récupération d'un second compte (`amazon--2`), le code
+  // du service demande le profil de `amazon` — c'est celui du second compte.
+  return nodePath.join(racine(), segment(userId), segment(require('./instances').pourLeProfil(connectorId)));
 }
 
 /**
