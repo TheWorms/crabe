@@ -61,7 +61,33 @@ function garde(req, res, next) {
 
 router.use(garde);
 
-/** Lance une récupération ; rend son numéro dès qu'elle existe. */
+/**
+ * Les récupérations lancées par la ligne de commande qui attendent leur tour
+ * dans la file (0.2.9) : la commande revient les demander (`/attentes/:id`).
+ * Le 01/11/2026, Private Sport Shop lancé pendant les récupérations des
+ * reconnexions disait « n'a pas démarré en 30 s » alors qu'il était en file.
+ */
+const enAttente = new Map();
+
+/**
+ * Où en est une récupération lancée : son numéro dès qu'elle existe, son
+ * refus si elle a fini sans en avoir, sa place si elle attend dans la file ;
+ * null tant qu'on ne sait rien.
+ */
+function etatDuLancement(l) {
+  const d = db.get();
+  const ligne = d.prepare('SELECT id FROM run_logs WHERE id > ? AND user_id = ? AND connector_id = ? ORDER BY id LIMIT 1')
+    .get(l.avant, l.userId, l.service);
+  if (ligne) return { runId: ligne.id, compte: l.compte };
+  if (l.fini) {
+    return { refus: l.fini.err ? l.fini.err.message : l.fini.r?.message || 'La récupération n\'a pas démarré.' };
+  }
+  const attente = require('../scheduler').attentePour(l.userId, l.service);
+  if (attente) return { enFile: true, devant: attente.devant, compte: l.compte };
+  return null;
+}
+
+/** Lance une récupération ; rend son numéro dès qu'elle existe, ou sa place dans la file. */
 router.post('/recuperer', async (req, res) => {
   const registry = require('../connectors/registry');
   const scheduler = require('../scheduler');
@@ -86,24 +112,37 @@ router.post('/recuperer', async (req, res) => {
 
   // La récupération continue sans cette requête : la ligne de commande suit
   // son journal par la route suivante.
-  let fini = null;
+  const lancement = { userId: user.id, service, compte: user.username, avant, fini: null };
   scheduler.runForUser(user.id, service, 'manual', { detail: !!req.body?.detail })
-    .then((r) => { fini = { r }; }, (err) => { fini = { err }; });
+    .then((r) => { lancement.fini = { r }; }, (err) => { lancement.fini = { err }; });
 
   // Le numéro existe dès que la récupération commence ; un refus (verrou,
-  // pause) finit avant d'en avoir un.
+  // pause) finit avant d'en avoir un ; une récupération en file le dit tout
+  // de suite, avec sa place, et la commande revient la demander.
   const limite = Date.now() + 30_000;
   for (;;) {
-    const ligne = d.prepare('SELECT id FROM run_logs WHERE id > ? AND user_id = ? AND connector_id = ? ORDER BY id LIMIT 1')
-      .get(avant, user.id, service);
-    if (ligne) return res.json({ runId: ligne.id, compte: user.username });
-    if (fini) {
-      const message = fini.err ? fini.err.message : fini.r?.message || 'La récupération n\'a pas démarré.';
-      return res.status(409).json({ error: message });
+    const etat = etatDuLancement(lancement);
+    if (etat?.runId) return res.json(etat);
+    if (etat?.refus) return res.status(409).json({ error: etat.refus });
+    if (etat?.enFile) {
+      const id = crypto.randomBytes(8).toString('hex');
+      enAttente.set(id, lancement);
+      return res.status(202).json({ attente: id, devant: etat.devant, compte: etat.compte });
     }
     if (Date.now() > limite) return res.status(504).json({ error: 'La récupération n\'a pas démarré en 30 s.' });
     await new Promise((r) => setTimeout(r, 200));
   }
+});
+
+/** Une récupération en file : sa place, puis son numéro quand son tour vient. */
+router.get('/attentes/:id', async (req, res) => {
+  const lancement = enAttente.get(String(req.params.id));
+  if (!lancement) return res.status(404).json({ error: 'Attente inconnue.' });
+  const etat = etatDuLancement(lancement);
+  if (etat?.runId || etat?.refus) enAttente.delete(String(req.params.id));
+  if (etat?.refus) return res.status(409).json({ error: etat.refus });
+  // Entre la file et le départ (le numéro naît au départ) : encore en file.
+  return res.json(etat || { enFile: true, devant: 0, compte: lancement.compte });
 });
 
 /** Où en est une récupération, et ses lignes de journal depuis `apres`. */

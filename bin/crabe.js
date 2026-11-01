@@ -49,7 +49,7 @@ function lireArguments(argv) {
 
 const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
 
-async function main(argv, { dataDir = null, ecrire = console.log, erreur = console.error } = {}) {
+async function main(argv, { dataDir = null, ecrire = console.log, erreur = console.error, intervalle = 3000 } = {}) {
   const args = lireArguments(argv);
   if (args.commande === 'aide') {
     ecrire(AIDE);
@@ -83,11 +83,37 @@ async function main(argv, { dataDir = null, ecrire = console.log, erreur = conso
     erreur(`crabe : le service ne répond pas sur le port ${conf.port} (${err.cause?.code || err.message}).`);
     return 1;
   }
-  const lancee = await reponse.json().catch(() => ({}));
+  let lancee = await reponse.json().catch(() => ({}));
   if (!reponse.ok) {
     erreur(`crabe : ${lancee.error || `refus (HTTP ${reponse.status})`}`);
     if (lancee.comptes) erreur(`comptes : ${lancee.comptes.join(', ')}`);
     return 1;
+  }
+
+  // 0.2.9 : une récupération à la fois — la nôtre peut attendre son tour.
+  // On le dit, avec la place, et on attend : elle partira d'elle-même.
+  if (lancee.attente) {
+    let devant = null;
+    for (;;) {
+      if (lancee.devant !== devant) {
+        devant = lancee.devant;
+        ecrire(devant > 0
+          ? `En file d'attente : ${devant} récupération(s) avant celle-ci ; crabe attend son tour.`
+          : 'En file d\'attente : la récupération part.');
+      }
+      await attendre(intervalle);
+      const r = await appeler('GET', `/attentes/${lancee.attente}`);
+      const etat = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        erreur(`crabe : ${etat.error || `refus (HTTP ${r.status})`}`);
+        return 1;
+      }
+      if (etat.runId) {
+        lancee = etat;
+        break;
+      }
+      lancee = { ...lancee, devant: etat.devant };
+    }
   }
   const { runId } = lancee;
   ecrire(`Récupération n° ${runId} lancée : ${args.service}, compte ${lancee.compte}${args.detail ? ', détaillée' : ''}.`);

@@ -81,6 +81,7 @@ const cookieBanner = require('./connectors/obstructions');
 // réponses différentes à « est-on connecté ? » seraient deux occasions de se
 // tromper (voir connectors/preuve-connexion.js).
 const preuve = require('./connectors/preuve-connexion');
+const controleSession = require('./connectors/controle-session');
 const messagesEchec = require('./connectors/messages-echec');
 const sessionState = require('./connectors/session-state');
 // Lot 105 (R6) — toute adresse écrite au journal de la fenêtre : l'hôte et le
@@ -148,14 +149,7 @@ const XVFB_READY_TIMEOUT_MS = 15_000;
 /** Combien de temps une session terminée reste lisible par le client. */
 const LINGER_MS = 90_000;
 
-/**
- * Patience du contrôle de session (§6 du lot 14), joué dans un Chromium à part.
- *
- * Court : ce n'est pas un parcours, c'est une page à charger et deux
- * sélecteurs à compter. Un portail qui n'a pas répondu en quinze secondes n'en
- * dira pas plus à la trentième, et l'utilisateur attend devant sa fenêtre.
- */
-const CONTROLE_SESSION_TIMEOUT_MS = 15_000;
+// La patience du contrôle de session : `connectors/controle-session.js` (0.2.8).
 
 /**
  * Sursis accordé à une session dont le flux vient de tomber.
@@ -1655,6 +1649,28 @@ function createManager(overrides = {}) {
     }
   }
 
+  /**
+   * Le remplissage automatique (0.2.11), à chaque NOUVEAU formulaire.
+   *
+   * Demande de l'utilisateur du 01/11/2026 : que le formulaire du service remplisse
+   * seul celui du site. Une connexion en deux pages montre deux formulaires :
+   * l'adresse va sur le premier, le mot de passe sur le second. Seuls les
+   * champs VIDES sont remplis — jamais par-dessus ce que l'utilisateur a
+   * tapé — et rien n'est envoyé : la case du site, un code reçu et la
+   * validation restent à l'utilisateur. Ne lève jamais.
+   */
+  async function remplirAuNouveauFormulaire(session) {
+    const rempli = await remplirFormulaire(session, { seulementVides: true, auto: true })
+      .catch(() => ({ ok: false }));
+    if (rempli.ok) {
+      const avant = session.remplissageAuto || {};
+      session.remplissageAuto = {
+        identifiant: !!(rempli.identifiant || avant.identifiant),
+        motDePasse: !!(rempli.motDePasse || avant.motDePasse),
+      };
+    }
+  }
+
   async function watch(session) {
     session.watching = true;
     const { page } = session.browser;
@@ -1702,6 +1718,7 @@ function createManager(overrides = {}) {
           if (derniereSignature) noterActivite(session);
           derniereSignature = signature;
           await detection.focusForm(page).catch(() => {});
+          await remplirAuNouveauFormulaire(session);
         }
         await runtime.sleep(pollMs);
       }
@@ -1800,6 +1817,8 @@ function createManager(overrides = {}) {
         if (derniereSignature) noterActivite(session);
         derniereSignature = signature;
         await detection.focusForm(page);
+        await remplirAuNouveauFormulaire(session);
+        if (session !== current || session.state !== 'running') return;
       }
 
       await runtime.sleep(pollMs);
@@ -2219,295 +2238,9 @@ function createManager(overrides = {}) {
       return essayerSurLaFenetre(session, { naviguer });
     }
 
-    if (!session.verifyUrl) {
-      return {
-        verdict: 'sans-controle',
-        code: 'sans-controle',
-        raison: 'aucune page de contrôle déclarée par le connecteur',
-        preuve: 'aucune page de contrôle déclarée par le connecteur',
-      };
-    }
-
-    // ⚠ `findPlaywright()` rend un BOOLÉEN — test de présence écrit pour
-    // `checkPrerequisites`, pas un chargeur de module. `true?.chromium` vaut
-    // `undefined`, la condition passait, et le contrôle se sautait. À chaque
-    // fois : `runtime.requirePlaywright` n'est défini nulle part, la branche de
-    // gauche n'était jamais prise. Conséquence : aucune session capturée n'a
-    // jamais été essayée avant d'être enregistrée — exactement la panne que ce
-    // contrôle devait empêcher (huit cookies à 03:07:16, session morte à
-    // 03:07:19, lot 12).
-    let playwright = null;
-    try {
-      playwright = runtime.requirePlaywright ? runtime.requirePlaywright() : require('playwright');
-    } catch {
-      // Playwright réellement absent : le navigateur distant n'aurait pas pu
-      // s'ouvrir, on n'en serait pas là. On laisse passer plutôt que de perdre
-      // une connexion que l'utilisateur vient d'établir à la main.
-      playwright = null;
-    }
-    if (!playwright?.chromium) {
-      return {
-        verdict: 'sans-controle',
-        code: 'sans-controle',
-        raison: 'l\'outil de contrôle est indisponible, rien ne peut être prouvé',
-        preuve: 'outil de contrôle indisponible, contrôle sauté',
-      };
-    }
-
-    let navigateur = null;
-    try {
-      navigateur = await playwright.chromium.launch({ headless: true });
-      const contexte = await navigateur.newContext(
-        identity.optionsContexte({ storageState: state })
-      );
-      const page = await contexte.newPage();
-      page.setDefaultTimeout(CONTROLE_SESSION_TIMEOUT_MS);
-
-      // La garde du lot 77 : une adresse de contrôle réduite à un `null` ne se
-      // visite pas — on le dit comme un défaut de configuration, jamais comme
-      // un verdict de session (elle atteint ici après le filtre `!verifyUrl`,
-      // donc elle est non vide : reste à écarter un `/null` littéral).
-      exigerAdresseVisitable(session.verifyUrl, session.connectorName);
-      const reponse = await page.goto(session.verifyUrl, { waitUntil: 'domcontentloaded' });
-      await page.waitForLoadState('networkidle').catch(() => {});
-
-      // ─── Le code de réponse est lu (lot 37) ──────────────────────────────
-      //
-      // L'erreur du 18/08/2026, à la lettre : la page de contrôle SoundCloud
-      // répondait 404, et le contrôle — qui ne regardait que le contenu —
-      // concluait « la page répond et n'est pas un formulaire de connexion ».
-      // Une adresse morte ou un site en panne ne disent RIEN de la session :
-      // verdict non concluant, jamais acceptation.
-      const statut = typeof reponse?.status === 'function' ? reponse.status() : null;
-      if (statut === 404 || (typeof statut === 'number' && statut >= 500)) {
-        return {
-          verdict: 'non-concluante',
-          code: statut === 404 ? 'adresse-morte' : 'erreur-site',
-          raison: statut === 404
-            ? 'la page de contrôle n\'existe pas à cette adresse (réponse 404) — '
-              + 'rien ne peut être conclu sur la session'
-            : `le site a répondu par une erreur (réponse ${statut}) — `
-              + 'rien ne peut être conclu sur la session',
-        };
-      }
-
-      // ─── L'URL a tenu (lot 40) ───────────────────────────────────────────
-      //
-      // Certains sites n'affichent aucun marqueur générique de compte mais
-      // REDIRIGENT les anonymes hors de la page de contrôle : y rester est
-      // alors LE signe de session. Mesuré le 14/08/2026 sur OUIGO — hors
-      // session, la page des réservations passées renvoie à l'accueil. Le
-      // connecteur le déclare (`verifyUrlTient`), et le jugement reste
-      // prudent : une page vide ou un formulaire de connexion resté sur
-      // place ne prouvent rien — ces cas retombent sur le contrôle générique
-      // ci-dessous, qui les refuse ou ne conclut pas.
-      // Un 403 qui GARDE l'adresse n'est pas une page qui « tient » : c'est la
-      // signature des murs anti-robot qui habillent leur refus en page
-      // d'excuse sans rediriger (Darty, « FNAC DARTY - Maintenance », mesuré
-      // au lot 47). Le raccourci « l'URL a tenu » exige une vraie réponse.
-      // ─── L'espace client vit sur un AUTRE domaine (lot 73) ───────────────
-      //
-      // Mesuré sur Atma le 08/09/2026 : un connecté qui demande
-      // `atmakitchenware.fr/account` est renvoyé vers
-      // `shopify.com/<boutique>/account/orders` — les comptes clients Shopify
-      // sont hébergés sur shopify.com, pas sur la boutique. Le lot 68 jugerait
-      // ce renvoi « vers un autre site » et refuserait (garde `memeSite`).
-      // Quand le connecteur DÉCLARE ce domaine (`domaineEspaceClient`), un
-      // renvoi VERS lui est la preuve — à condition que ce ne soit pas un
-      // écran de connexion (l'anonyme, lui, finit sur
-      // `shopify.com/authentication/…/login`, capté par estUrlAuthentification)
-      // et que la page ne soit pas vide. Le statut ≥ 400 est déjà écarté par la
-      // garde de cette branche : une session morte reçoit un 401/403, jamais
-      // une page d'espace client.
-      if (session.domaineEspaceClient && (statut === null || statut < 400)) {
-        const urlFinale = String(page.url() || '');
-        if (preuve.surDomaine(urlFinale, session.domaineEspaceClient)
-          && !preuve.estUrlAuthentification(urlFinale)) {
-          let corpsVide = false;
-          try {
-            corpsVide = Boolean(await page.evaluate(
-              () => !document.body || !document.body.innerText.trim()
-            ));
-          } catch {
-            corpsVide = false; // illisible n'est pas vide : on ne conclut pas ici
-          }
-          if (!corpsVide) {
-            return {
-              verdict: 'confirmee',
-              preuve: `${session.connectorName} : connexion confirmée — la page de contrôle a `
-                + `renvoyé vers l'espace client hébergé sur ${session.domaineEspaceClient} `
-                + `(URL finale ${releve.adresseMasquee(urlFinale)}), hors écran de connexion, or ce domaine ne sert `
-                + `une page de compte qu'à une session établie `
-                + `(${(state.cookies || []).length} cookie(s)).`,
-            };
-          }
-        }
-        // Hors du domaine déclaré, sur un écran de connexion, ou page vide : on
-        // ne conclut pas ici — les gardes ci-dessous (tenue, renvoi, mur,
-        // contrôle générique) tranchent, et refusent un renvoi vers la
-        // connexion Shopify.
-      }
-
-      if (session.verifyUrlTient && (statut === null || statut < 400)) {
-        const urlFinale = String(page.url() || '');
-        // La tenue se juge SANS le fragment de l'adresse finale (lot 68) : un
-        // fragment n'est pas un chemin. Voir `preuve.adresseTenue`.
-        if (!preuve.adresseTenue(urlFinale, session.verifyUrl)) {
-          // Être ramené AILLEURS SUR LE SITE n'est pas être éconduit quand le
-          // manifeste atteste que le site éconduit vers sa page de connexion :
-          // le renvoi mesuré tranche plus bas, pas la tenue (lot 68).
-          if (session.renvoiAnonyme !== 'connexion') {
-            return {
-              verdict: 'refusee',
-              code: 'refus',
-              raison: `la page de contrôle a renvoyé vers ${releve.adresseMasquee(urlFinale)} — c'est ainsi que `
-                + 'le site éconduit les visiteurs sans session : session non établie',
-              // Lot 110 : l'adresse masquée, pour dire la raison à l'écran.
-              adresse: releve.adresseMasquee(urlFinale),
-            };
-          }
-        } else {
-          let corpsVide = false;
-          try {
-            corpsVide = Boolean(await page.evaluate(
-              () => !document.body || !document.body.innerText.trim()
-            ));
-          } catch {
-            corpsVide = false; // illisible n'est pas vide : on ne conclut pas ici
-          }
-          const tenue = await preuve.verifier(page, { cookies: (state.cookies || []).length });
-          if (!corpsVide && !tenue.surFormulaire) {
-            return {
-              verdict: 'confirmee',
-              preuve: `${session.connectorName} : connexion confirmée — l'adresse de contrôle `
-                + `${releve.adresseMasquee(session.verifyUrl)} a tenu, or le site en redirige les anonymes `
-                + `(${(state.cookies || []).length} cookie(s)).`,
-            };
-          }
-        }
-      }
-
-      const resultat = await preuve.verifier(page, { cookies: (state.cookies || []).length });
-      if (resultat.confirme) {
-        return {
-          verdict: 'confirmee',
-          preuve: preuve.ligneConfirmee(session.connectorName, resultat),
-        };
-      }
-
-      // ─── Le refus certain : la page renvoie au formulaire ────────────────
-      //
-      // C'est EXACTEMENT ce qui s'est passé le 11/08/2026 — le connecteur a
-      // signalé « redirection vers la page de connexion » trois secondes après
-      // la capture. Aucun doute possible : la session ne vaut rien.
-      if (resultat.surFormulaire) {
-        return {
-          verdict: 'refusee',
-          code: 'refus',
-          raison: preuve.ligneNonConfirmee(session.connectorName, resultat),
-        };
-      }
-
-      // ─── La page vide : rien à juger ─────────────────────────────────────
-      //
-      // Une page sans le moindre texte n'est ni un espace connecté ni un
-      // formulaire : le site n'a rien montré, on ne conclut rien. Une page
-      // illisible (navigation en cours) n'est pas déclarée vide pour autant.
-      let pageVide = false;
-      try {
-        pageVide = Boolean(await page.evaluate(
-          () => !document.body || !document.body.innerText.trim()
-        ));
-      } catch {
-        pageVide = false;
-      }
-      if (pageVide) {
-        return {
-          verdict: 'non-concluante',
-          code: 'page-vide',
-          raison: 'la page de contrôle s\'est affichée vide — rien ne permet de trancher',
-        };
-      }
-
-      // ─── Le 403 sans preuve ni formulaire : un mur, pas un verdict ─────────
-      //
-      // Le site a répondu, mais en refusant : c'est presque toujours une garde
-      // anti-robot qui juge le contrôleur headless, pas la session. Conclure
-      // « refusée » accuserait l'utilisateur ; conclure « confirmée » (le cas
-      // verifyUrlTient, écarté plus haut) enregistrerait n'importe quoi. On ne
-      // sait pas, et on le dit.
-      if (statut === 403) {
-        return {
-          verdict: 'non-concluante',
-          code: 'mur',
-          raison: 'le site a refusé de montrer la page de contrôle (réponse 403, '
-            + 'probablement une vérification de sécurité) — rien ne peut être conclu',
-        };
-      }
-
-      // ─── Le renvoi des anonymes est la preuve (lot 68) ───────────────────
-      //
-      // Arrivé ici, la page a répondu (< 400), n'est ni vide, ni un formulaire,
-      // ni un mur — et ne porte aucun marqueur générique. Quand le manifeste
-      // ATTESTE que le site renvoie tout anonyme vers sa page de connexion
-      // (`renvoiAnonyme: "connexion"`, mesuré — claude.ai : hors session,
-      // `/settings/billing` renvoie vers `/login?from=logout`, relevé le
-      // 13/08/2026 et revu dans les journaux du 28/08/2026), rester sur le
-      // site sans y être renvoyé EST la preuve — même quand l'application a
-      // réécrit le chemin en gardant la cible en fragment. Le principe du
-      // lot 67 (Free Mobile), déclaré au manifeste au lieu d'être recodé
-      // connecteur par connecteur. Un départ vers un AUTRE site, lui, ne
-      // prouve rien : `memeSite` ferme cette porte.
-      if (session.renvoiAnonyme === 'connexion'
-        && (statut === null || statut < 400)
-        && preuve.memeSite(page.url(), session.verifyUrl)) {
-        return {
-          verdict: 'confirmee',
-          preuve: `${session.connectorName} : connexion confirmée — la page est restée sur le `
-            + `site (URL finale ${releve.adresseMasquee(resultat.url)}) sans renvoi vers la connexion, or c'est ainsi `
-            + `que ce site éconduit les visiteurs sans session — comportement mesuré `
-            + `(${(state.cookies || []).length} cookie(s)).`,
-        };
-      }
-
-      // ─── Page valide, aucun marqueur : la preuve MANQUE ──────────────────
-      //
-      // Jusqu'au lot 37, ce cas n'était un refus que si le manifeste déclarait
-      // `verifyStrict` ; sinon la session était « acceptée » avec un simple
-      // avertissement au journal. C'est ce chemin qui a enregistré la session
-      // SoundCloud morte du 18/08/2026. Il n'existe plus : une page qui répond
-      // sans montrer de compte connecté ne prouve pas la session.
-      //
-      // Mais depuis le lot 68, ce cas porte son propre code : `sans-preuve`.
-      // La session n'est PAS forcément mauvaise — Anthropic, 28/08/2026 :
-      // trois refus d'une session valide, et un message qui invitait à
-      // « finir de se connecter » alors qu'il n'y avait rien à finir. Dire
-      // « session non établie » ici serait une supposition, pas une mesure :
-      // on dit que la preuve manque, et le message de `save()` dit quoi faire.
-      return {
-        verdict: 'refusee',
-        code: 'sans-preuve',
-        raison: preuve.ligneNonConfirmee(session.connectorName, resultat),
-      };
-    } catch (err) {
-      // Un contrôle qui ne peut pas s'exécuter ne conclut RIEN : ni
-      // acceptation (l'erreur du 18/08/2026), ni refus net (la session est
-      // peut-être bonne). La fenêtre reste ouverte, et le détail technique va
-      // au journal — jamais à l'écran.
-      runtime.log(
-        'warn',
-        `Contrôle de session ${session.connectorName} : détail technique — ${err.message}`,
-        session.connectorId
-      );
-      return {
-        verdict: 'non-concluante',
-        code: 'interrompu',
-        raison: 'le contrôle n\'a pas pu s\'exécuter jusqu\'au bout '
-          + '(le site n\'a pas répondu, ou la vérification s\'est interrompue)',
-      };
-    } finally {
-      await navigateur?.close?.().catch(() => {});
-    }
+    // Le rejeu et son jugement : `connectors/controle-session.js` (0.2.8),
+    // partagé avec la visite d'entretien des sessions.
+    return controleSession.rejouer(session, state, { runtime });
   }
 
   /**
@@ -3058,6 +2791,63 @@ function createManager(overrides = {}) {
     // changement d'adresse est la navigation initiale du site, pas une
     // connexion — la sonde n'a rien à y vérifier.
     session.saisies = (session.saisies || 0) + 1;
+    // 0.2.10 : le même texte, dans le presse-papiers de la fenêtre — pour le
+    // coller ailleurs par le clic droit ou Ctrl+V (demande du compte observé du 01/11).
+    return { ok: true, pressePapiers: await deposerPressePapiers(session, page, contenu) };
+  }
+
+  /**
+   * Dépose un texte dans le presse-papiers du Chromium distant (0.2.10).
+   *
+   * Demande de l'utilisateur du 01/11/2026 : le « Coller » du clic droit de la fenêtre
+   * ne collait rien. Mesuré le jour même, sur Xvfb + x11vnc + un vrai
+   * Chromium : le texte poussé dans la fenêtre visible (`clipboardPasteFrom`, un
+   * ClientCutText) est reçu par x11vnc (« xcut_receive … recv-ing it ») mais
+   * n'arrive JAMAIS à Chromium — Ctrl+V et Maj+Inser collaient un champ vide.
+   * Écrit par la page elle-même (`navigator.clipboard.writeText`, autorisation
+   * donnée à l'origine du site), il colle dans tous les champs, au clic droit
+   * comme au clavier.
+   *
+   * Ne lève jamais, ne journalise jamais le texte : rend vrai si le dépôt a
+   * réussi. Une page sans origine web (about:blank) n'a pas de presse-papiers.
+   */
+  async function deposerPressePapiers(session, page, contenu) {
+    try {
+      const origine = new URL(urlDe(page)).origin;
+      if (!/^https?:\/\//.test(origine)) return false;
+      const contexte = page.context?.() || session.browser?.context;
+      await contexte?.grantPermissions?.(['clipboard-read', 'clipboard-write'], { origin: origine });
+      const depose = await page.evaluate(
+        (t) => navigator.clipboard.writeText(t).then(() => true, () => false),
+        contenu
+      );
+      return depose === true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Un texte collé dans la page de crabe HORS du champ « Coller un texte »
+   * (0.2.10) : déposé dans le presse-papiers de la fenêtre, sans être frappé.
+   */
+  async function deposerTexte(userId, connectorId, texte) {
+    const contenu = String(texte ?? '');
+    if (!contenu) return { ok: false, error: 'Aucun texte à déposer.' };
+    if (contenu.length > SAISIE_MAX_CARACTERES) {
+      return { ok: false, error: `Texte trop long (${SAISIE_MAX_CARACTERES} caractères au plus).` };
+    }
+    const session = sessionFor(userId, connectorId);
+    if (!session || session !== current || session.stopped || session.state !== 'running') {
+      return { ok: false, error: 'La fenêtre de connexion n\'est plus ouverte.' };
+    }
+    noterActivite(session);
+    const page = pageActive(session);
+    if (!page) return { ok: false, error: 'Le navigateur ne répond pas. Fermez la fenêtre et recommencez.' };
+    if (!(await deposerPressePapiers(session, page, contenu))) {
+      return { ok: false, error: 'Le presse-papiers de la fenêtre a refusé le texte : collez-le dans le champ « Coller un texte ».' };
+    }
+    runtime.log('info', `Texte déposé dans le presse-papiers de la fenêtre de ${session.connectorName} — ${contenu.length} caractère(s).`, session.connectorId);
     return { ok: true };
   }
 
@@ -3174,6 +2964,17 @@ function createManager(overrides = {}) {
     }
     // Lot 110 : demander la saisie des identifiants est un geste.
     noterActivite(session);
+    return remplirFormulaire(session);
+  }
+
+  /**
+   * Le formulaire du site, rempli avec les identifiants enregistrés. Pour le
+   * bouton, comme pour le remplissage automatique (0.2.11).
+   *
+   * `seulementVides` : un champ que l'utilisateur a déjà rempli n'est jamais
+   * réécrit — c'est la règle du remplissage automatique, qui part sans geste.
+   */
+  async function remplirFormulaire(session, { seulementVides = false, auto = false } = {}) {
     if (!session.identifiants) {
       return { ok: false, error: 'Aucun identifiant enregistré pour ce service.' };
     }
@@ -3182,6 +2983,7 @@ function createManager(overrides = {}) {
     if (!page?.locator) {
       return { ok: false, error: 'Le navigateur ne répond pas. Fermez la fenêtre et recommencez.' };
     }
+    const vide = async (champ) => !seulementVides || !(await champ.inputValue().catch(() => ''));
 
     // Un voile promotionnel recouvre aussi bien un champ qu'un bouton : le
     // même module que partout ailleurs, avant toute interaction.
@@ -3201,15 +3003,17 @@ function createManager(overrides = {}) {
         const champ = page.locator(selecteur).first();
         if (!(await champ.count())) continue;
         if (typeof champ.isVisible === 'function' && !(await champ.isVisible())) continue;
+        // Un identifiant vide n'efface jamais ce qui est dans le champ.
+        if (!session.identifiants.identifiant || !(await vide(champ))) break;
         // `fill` et non `type` : c'est le geste demandé au §7.3a, et il ne
         // risque pas de valider le formulaire au milieu de la saisie.
-        await champ.fill(session.identifiants.identifiant || '');
+        await champ.fill(session.identifiants.identifiant);
         identifiantPose = true;
         break;
       }
 
       const motDePasse = page.locator('input[type="password"]').first();
-      if (await motDePasse.count()) {
+      if (await motDePasse.count() && await vide(motDePasse)) {
         await motDePasse.fill(session.identifiants.motDePasse);
         motDePassePose = true;
       }
@@ -3235,7 +3039,7 @@ function createManager(overrides = {}) {
     // Ce qui a été POSÉ, jamais ce qui a été écrit.
     runtime.log(
       'info',
-      `Identifiants saisis dans la fenêtre de ${session.connectorName} — `
+      `Identifiants saisis${auto ? ' automatiquement' : ''} dans la fenêtre de ${session.connectorName} — `
         + `identifiant ${identifiantPose ? 'posé' : 'non trouvé'}, `
         + `mot de passe ${motDePassePose ? 'posé' : 'non trouvé'}.`,
       session.connectorId
@@ -3380,6 +3184,9 @@ function createManager(overrides = {}) {
       // nature du dernier verdict. Au troisième échec, l'écran propose
       // explicitement de renoncer plutôt que de laisser recliquer sans fin.
       echecsVerification: session.echecsVerification || 0,
+      // 0.2.11 : ce que crabe a rempli de lui-même — deux booléens, jamais
+      // une valeur.
+      remplissageAuto: session.remplissageAuto || null,
       verdictCode: session.verdictCode || null,
       // Y a-t-il des identifiants enregistrés pour ce couple ? Un booléen, et
       // rien d'autre : ni l'identifiant, ni a fortiori le mot de passe.
@@ -3406,6 +3213,7 @@ function createManager(overrides = {}) {
     conclure,
     stopAll,
     typeText,
+    deposerTexte,
     saisirIdentifiants,
     saveNow,
     activite,

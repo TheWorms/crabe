@@ -1402,6 +1402,45 @@ const MIGRATIONS = [
       }
     },
   },
+  {
+    id: 71,
+    name: 'la visite d\'entretien des sessions',
+    // 0.2.8 (demande du compte observé du 01/11/2026 : « que les sessions n'expirent
+    // pas, ou peu ») : chaque jour, la page de compte de chaque service
+    // connecté est ouverte avec sa session, sans rien récupérer ; une session
+    // vivante est enregistrée telle que le site l'a prolongée. Active par
+    // défaut (décision du compte observé), désactivable en tout (app_settings) et
+    // service par service (connector_installs). Une table de visites, hors
+    // de `run_logs`.
+    //
+    // Additive : revenir au code d'avant laisse deux colonnes et une table
+    // que personne ne lit.
+    up(database) {
+      if (hasTable(database, 'app_settings')) {
+        addColumn(database, 'app_settings', 'entretien_sessions', 'INTEGER NOT NULL DEFAULT 1');
+      }
+      addColumn(database, 'connector_installs', 'entretien_off', 'INTEGER NOT NULL DEFAULT 0');
+      database.exec(`CREATE TABLE IF NOT EXISTS entretiens_session (
+          id                INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id           INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          connector_id      TEXT    NOT NULL,
+          at                TEXT    NOT NULL DEFAULT (datetime('now')),
+          -- confirmee | refusee | non-concluante | sans-controle | erreur
+          verdict           TEXT    NOT NULL,
+          code              TEXT,
+          raison            TEXT,
+          -- 1 : l'état prolongé par le site a été enregistré (ou le profil gardé).
+          prolongee         INTEGER NOT NULL DEFAULT 0,
+          duree_ms          INTEGER,
+          -- Ce que le site annonce, lu sur l'état rendu (jamais une valeur) : les
+          -- cookies, ceux sans date (de session), et la plus lointaine expiration.
+          cookies           INTEGER,
+          cookies_sans_date INTEGER,
+          expire_au_plus_tard TEXT
+        );`);
+      database.exec('CREATE INDEX IF NOT EXISTS idx_entretiens_couple ON entretiens_session(user_id, connector_id, at)');
+    },
+  },
 ];
 
 /**

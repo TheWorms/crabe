@@ -6,6 +6,45 @@ Pour mettre à jour votre crabe : [docs/MISE-A-JOUR.md](docs/MISE-A-JOUR.md) (En
 
 ---
 
+## 0.2.11 — les identifiants enregistrés remplis tout seuls (01/11/2026)
+
+### Fenêtre de connexion
+- **Le formulaire du site se remplit tout seul.** Quand un identifiant et un mot de passe sont enregistrés dans la fiche du service, la fenêtre « Se connecter » les écrit d'elle-même dans le formulaire du site, sans clic sur « Saisir mes identifiants ». Une connexion en deux pages est remplie aux deux : l'adresse sur la première, le mot de passe sur la seconde. Un champ déjà rempli n'est jamais réécrit, et rien n'est envoyé : la case de vérification du site, un code reçu et la validation restent à vous. La fenêtre dit ce qu'elle a rempli.
+- « Saisir mes identifiants » n'efface plus le champ de l'identifiant quand aucun identifiant n'est enregistré.
+
+### Interface
+- **Nouveau logo** : le crabe, dans l'en-tête, sur la page de connexion et dans l'onglet du navigateur.
+
+---
+
+## 0.2.10 — coller par le clic droit dans la fenêtre de connexion (01/11/2026)
+
+### Fenêtre de connexion
+- **Clic droit › Coller et Ctrl+V marchent dans la fenêtre.** Un texte collé dans le champ « Coller un texte » est saisi dans le site comme avant, et il est désormais aussi dans le presse-papiers de la fenêtre : on peut le recoller dans un autre champ par le clic droit ou le clavier. crabe essayait de le faire passer par l'affichage à distance (la fenêtre visible) ; mesuré, le texte n'arrivait jamais au navigateur. C'est maintenant le navigateur de la fenêtre qui l'écrit dans son propre presse-papiers.
+- Quand crabe est ouvert en HTTPS, ce que vous avez copié sur votre poste passe dans la fenêtre dès que la souris y entre (le navigateur demande l'autorisation une fois) : clic droit › Coller et Ctrl+V y collent directement, sans passer par le champ.
+
+---
+
+## 0.2.9 — la ligne de commande attend son tour (01/11/2026)
+
+### Ligne de commande
+- **`crabe recuperer` attend son tour.** crabe ne fait tourner qu'une récupération à la fois ; quand d'autres passaient avant, la commande répondait « La récupération n'a pas démarré en 30 s » alors que la récupération attendait dans la file, et partait plus tard sans être suivie. La commande dit maintenant sa place (« 2 récupération(s) avant celle-ci »), attend, puis suit la récupération comme avant.
+
+---
+
+## 0.2.8 — des connexions entretenues chaque jour (01/11/2026)
+
+### Connexions
+- **Une visite d'entretien chaque jour.** Pour chaque service connecté par la fenêtre « Se connecter », crabe ouvre une fois par jour sa page de compte avec la connexion enregistrée, sans rien télécharger. Si le site prolonge la connexion à l'usage, crabe garde la connexion prolongée : elle ne meurt plus faute d'avoir servi entre deux récupérations mensuelles. Chaque service a son heure, tirée entre 9 h et 21 h ; les visites passent une à une, jamais pendant une récupération ni quand la fenêtre de connexion du service est ouverte.
+- Une connexion que la visite trouve expirée n'est plus visitée avant une nouvelle connexion ; aucune notification n'est envoyée, l'avertissement vient de la récupération, comme avant. Après deux vérifications de sécurité de suite, un service n'est plus visité pendant une semaine.
+- Ne sont pas visités : impots.gouv.fr (un rejeu y a déjà coûté la connexion), Alma (sa connexion vit aussi dans l'onglet), TotalEnergies (sa garde réseau), et les services sans page de compte connue. Un site qui coupe sa connexion au bout de quelques heures (Darty, Bricomarché, Coyote) n'est pas sauvé par une visite par jour.
+- **Administration › Automatisation › Entretien des sessions** : l'heure de chaque service, sa dernière visite, ce que le site annonce de sa connexion (le nombre de cookies, ceux de session, la plus lointaine expiration — jamais une valeur), pourquoi un service n'est pas visité ; un interrupteur général et un par service. Active par défaut.
+
+### Interne
+- Migration 71 (additive) : la table des visites, l'interrupteur général et celui de chaque service.
+
+---
+
 ## 0.2.7 — échéanciers TotalEnergies, Private Sport Shop plus patient (01/11/2026)
 
 ### Connecteurs

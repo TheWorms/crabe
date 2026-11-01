@@ -7596,44 +7596,44 @@ function relayerPave(event, appui) {
 }
 
 /**
- * Pousse un texte dans le presse-papiers du navigateur distant.
+ * Dépose un texte dans le presse-papiers de la fenêtre distante (0.2.10).
  *
- * **En complément seulement.** Le nom de la méthode a changé selon les versions
- * de noVNC (`clipboardPasteFrom` en 1.x, `clipboardPaste` sur les branches plus
- * récentes) et le paquet installé sur le LXC n'est pas celui du dépôt : on
- * essaie les deux, et l'absence des deux n'est pas un incident. Ce qui saisit
- * réellement le texte, c'est la frappe (voir `typeIntoRemote`).
+ * C'est le SERVEUR qui le fait écrire par le Chromium distant
+ * (`deposerPressePapiers`) : poussé par noVNC (`clipboardPasteFrom`), le texte
+ * arrivait à x11vnc et jamais à Chromium — mesuré le 01/11/2026, Ctrl+V et
+ * Maj+Inser collaient un champ vide. Le texte part dans le corps de la
+ * requête, jamais dans l'adresse.
  *
- * @returns {boolean} vrai si une des méthodes a répondu
+ * @returns {Promise<boolean>} vrai si le texte est dans le presse-papiers
  */
-function pousserPressePapiersDistant(texte) {
-  const rfb = rb().rfb;
-  if (!rfb || !texte) return false;
-  for (const nom of ['clipboardPasteFrom', 'clipboardPaste']) {
-    try {
-      if (typeof rfb[nom] === 'function') {
-        rfb[nom](texte);
-        return true;
-      }
-    } catch {
-      /* version qui refuse : on essaie la suivante */
-    }
+async function deposerPressePapiersDistant(texte) {
+  const base = rbBase();
+  if (!base || !texte) return false;
+  try {
+    await api(`${base}/presse-papiers`, { method: 'POST', body: { text: String(texte) } });
+    return true;
+  } catch {
+    return false;
   }
-  return false;
 }
 
 /**
  * Presse-papiers du poste → navigateur distant, quand le navigateur le permet.
  *
  * Un Ctrl+V dans la fenêtre distante colle le presse-papiers DU SERVEUR, pas
- * celui du poste. On écoute donc le collage local pour pousser le texte de
+ * celui du poste. On écoute donc le collage local pour déposer le texte de
  * l'autre côté — mais **ce chemin n'est pas fiable** : noVNC annule la frappe
  * sur sa toile, et l'événement `paste` n'arrive alors jamais. C'est pour cela
  * que le champ « Coller un texte » est visible en permanence : lui fonctionne
  * partout, parce qu'il vit dans une page de crabe.
  *
- * L'écouteur est posé une seule fois pour la vie de la page ; il ne fait rien
- * tant qu'aucune session n'est ouverte.
+ * 0.2.10 : quand crabe est servi en HTTPS (contexte sécurisé), le navigateur
+ * le laisse lire le presse-papiers du poste. Dès que la souris entre dans la
+ * fenêtre, ce qui a été copié sur le poste est déposé dans celle du site :
+ * clic droit › Coller et Ctrl+V y collent directement.
+ *
+ * Les écouteurs sont posés une seule fois pour la vie de la page ; ils ne font
+ * rien tant qu'aucune session n'est ouverte.
  */
 function bindRemoteClipboard() {
   if (bindRemoteClipboard.done) return;
@@ -7648,8 +7648,31 @@ function bindRemoteClipboard() {
 
     const texte = event.clipboardData?.getData?.('text');
     if (!texte) return;
-    pousserPressePapiersDistant(texte);
+    deposerPressePapiersDistant(texte);
   });
+
+  const ecran = $('rb-screen');
+  if (ecran && window.isSecureContext && navigator.clipboard?.readText) {
+    ecran.addEventListener('mouseenter', synchroniserPressePapiers);
+    ecran.addEventListener('focusin', synchroniserPressePapiers);
+  }
+}
+
+/**
+ * HTTPS seulement : le presse-papiers du poste, déposé dans la fenêtre s'il a
+ * changé depuis le dernier dépôt. Le navigateur demande l'autorisation une
+ * fois ; un refus laisse le champ « Coller un texte », qui marche partout.
+ */
+async function synchroniserPressePapiers() {
+  if (!rb().rfb) return;
+  let texte = '';
+  try {
+    texte = await navigator.clipboard.readText();
+  } catch {
+    return;
+  }
+  if (!texte || texte === synchroniserPressePapiers.dernier) return;
+  if (await deposerPressePapiersDistant(texte)) synchroniserPressePapiers.dernier = texte;
 }
 
 /** Entrée valide la saisie : personne ne cherche le bouton après avoir collé. */
@@ -7710,11 +7733,10 @@ async function pasteIntoRemote() {
   bouton.disabled = true;
   champ.disabled = true;
 
+  // 0.2.10 : le serveur dépose aussi le texte dans le presse-papiers de la
+  // fenêtre (`frappe.pressePapiers`) — clic droit › Coller ou Ctrl+V pour le
+  // remettre dans un autre champ du site.
   const frappe = await typeIntoRemote(texte);
-
-  // Complément : si le presse-papiers distant répond, un Ctrl+V dans la fenêtre
-  // marchera aussi. S'il ne répond pas, la frappe a déjà fait le travail.
-  pousserPressePapiersDistant(texte);
 
   champ.disabled = false;
   bouton.disabled = false;
@@ -7728,12 +7750,14 @@ async function pasteIntoRemote() {
   }
 
   // Le texte a fini son voyage : ni dans le champ, ni dans une variable.
-  note.textContent = 'Texte saisi.';
+  note.textContent = frappe.pressePapiers
+    ? 'Texte saisi. Il est aussi dans le presse-papiers de la fenêtre : clic droit › Coller ou Ctrl+V pour le coller dans un autre champ.'
+    : 'Texte saisi.';
   clearTimeout(pasteIntoRemote.minuteur);
   pasteIntoRemote.minuteur = setTimeout(() => {
     champ.value = '';
     resetRemotePaste();
-  }, 2000);
+  }, frappe.pressePapiers ? 6000 : 2000);
 }
 
 /**
@@ -7778,11 +7802,11 @@ async function typeIntoRemote(texte) {
   try {
     // Le texte part dans le corps de la requête, jamais dans l'URL : une URL
     // se retrouve dans les journaux d'accès, un corps de POST non.
-    await api(`${base}/type`, {
+    const reponse = await api(`${base}/type`, {
       method: 'POST',
       body: { text: String(texte) },
     });
-    return { ok: true };
+    return { ok: true, pressePapiers: !!reponse?.pressePapiers };
   } catch (err) {
     // 404 : la route n'existe pas — serveur d'une version antérieure. C'est le
     // seul cas où le chemin historique a encore un sens.
@@ -7921,9 +7945,13 @@ function applyRemoteView(view) {
   const bouton = $('rb-fill');
   if (bouton && view.identifiantsDisponibles !== undefined) {
     bouton.disabled = !view.identifiantsDisponibles;
-    $('rb-fill-note').textContent = view.identifiantsDisponibles
-      ? 'crabe remplit l\'identifiant et le mot de passe dans le formulaire du site.'
-      : 'Aucun identifiant enregistré pour ce service.';
+    const auto = view.remplissageAuto;
+    $('rb-fill-note').textContent = !view.identifiantsDisponibles
+      ? 'Aucun identifiant enregistré pour ce service.'
+      : auto && (auto.identifiant || auto.motDePasse)
+        ? `crabe a rempli ${[auto.identifiant && 'l\'identifiant', auto.motDePasse && 'le mot de passe'].filter(Boolean).join(' et ')} : `
+          + 'vérifiez, cochez la case du site si elle est demandée, puis validez.'
+        : 'crabe remplit l\'identifiant et le mot de passe dans le formulaire du site.';
   }
 }
 

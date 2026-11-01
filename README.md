@@ -1,4 +1,6 @@
-# 🦀 crabe
+<p align="center"><img src="docs/logo.png" alt="Le logo de crabe : un crabe qui tient une facture, au-dessus d'un nuage" width="240"></p>
+
+# crabe
 
 **Vos factures et vos documents, récupérés tout seuls, rangés chez vous.**
 

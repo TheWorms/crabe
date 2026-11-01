@@ -366,6 +366,21 @@ router.post(
       .typeText(req.user.id, req.params.id, req.body?.text);
 
     if (!result.ok) return res.status(409).json({ error: result.error });
+    res.json({ ok: true, pressePapiers: !!result.pressePapiers });
+  })
+);
+
+/**
+ * Un texte déposé dans le presse-papiers de la fenêtre, sans être frappé
+ * (0.2.10). Mêmes règles que la saisie : rien au journal que sa longueur.
+ */
+router.post(
+  '/:id/remote-login/presse-papiers',
+  asyncHandler(async (req, res) => {
+    const result = await remoteBrowser
+      .manager()
+      .deposerTexte(req.user.id, req.params.id, req.body?.text);
+    if (!result.ok) return res.status(409).json({ error: result.error });
     res.json({ ok: true });
   })
 );

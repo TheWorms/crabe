@@ -788,6 +788,8 @@ function uninstall(userId, connectorId) {
     .run(userId, connectorId);
   schedules.removeForInstall(userId, connectorId);
   discovery.forget(userId, connectorId);
+  // Les visites d'entretien de ce service (0.2.8) : rien à garder.
+  db.get().prepare('DELETE FROM entretiens_session WHERE user_id = ? AND connector_id = ?').run(userId, connectorId);
   return res.changes > 0;
 }
 
@@ -826,6 +828,14 @@ function setActivation(userId, connectorId, actif) {
         WHERE user_id = ? AND connector_id = ?`
     )
     .run(userId, connectorId);
+  return getInstall(userId, connectorId);
+}
+
+/** La visite d'entretien de ce service (0.2.8) : active ou non. */
+function setEntretien(userId, connectorId, actif) {
+  db.get()
+    .prepare('UPDATE connector_installs SET entretien_off = ? WHERE user_id = ? AND connector_id = ?')
+    .run(actif ? 0 : 1, userId, connectorId);
   return getInstall(userId, connectorId);
 }
 
@@ -1026,7 +1036,11 @@ function saveConfig(userId, connectorId, values, { origine = 'formulaire' } = {}
   // ici. Une première configuration reste une mise en service, comme avant.
   const connexionNeuve = connexionEnregistree(mf.fields, values, previous);
   const premiereConfiguration = !existing?.config_encrypted || existing.status === 'needs-config';
-  const remettreEnService = connexionNeuve || premiereConfiguration;
+  // La visite d'entretien (0.2.8) prolonge une session sans rien récupérer :
+  // ce n'est ni une connexion, ni une réussite. Elle ne touche ni à l'état du
+  // service, ni à son erreur — un défaut de lecture reste dit tant qu'une
+  // récupération ne l'a pas levé.
+  const remettreEnService = origine !== 'entretien' && (connexionNeuve || premiereConfiguration);
 
   db.get()
     .prepare(
@@ -1044,7 +1058,7 @@ function saveConfig(userId, connectorId, values, { origine = 'formulaire' } = {}
   // une session expirée d'une connexion refusée. Le renouvellement d'une
   // session par le planificateur (impots, lot 87) n'en est pas une : il suit
   // une récupération réussie, personne ne s'est connecté.
-  if (connexionNeuve && origine !== 'renouvellement') {
+  if (connexionNeuve && origine !== 'renouvellement' && origine !== 'entretien') {
     causeEchec.noterConnexion(userId, connectorId, origine === 'fenetre' ? 'fenetre' : 'formulaire');
   }
 
@@ -1831,6 +1845,7 @@ module.exports = {
   install,
   uninstall,
   setActivation,
+  setEntretien,
   getInstall,
   listInstalls,
   configIllisible,

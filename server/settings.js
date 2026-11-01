@@ -136,6 +136,14 @@ function detailRecuperation(row = appSettings() || {}) {
   return Object.fromEntries(VOLETS_DETAIL.map((v) => [v, row[`detail_${v}`] === 1]));
 }
 
+/**
+ * La visite d'entretien des sessions (0.2.8, migration 71) : active par
+ * défaut. Une colonne absente (base d'avant la migration) vaut « active ».
+ */
+function entretienSessions(row = appSettings() || {}) {
+  return row.entretien_sessions !== 0;
+}
+
 /** Vue consommée par le front pour formater toutes les dates et heures. */
 function publicSettings() {
   const row = appSettings() || {};
@@ -145,6 +153,7 @@ function publicSettings() {
     dateFormat: row.date_format || 'DD/MM/YYYY',
     gravatarEnabled: !!row.gravatar_enabled,
     detailRecuperation: detailRecuperation(row),
+    entretienSessions: entretienSessions(row),
   };
 }
 
@@ -199,6 +208,16 @@ function updateAppSettings(patch = {}) {
       fields.push(`detail_${v} = ?`);
       values.push(volets[v] ? 1 : 0);
     }
+  }
+
+  if (patch.entretienSessions !== undefined) {
+    if (typeof patch.entretienSessions !== 'boolean') {
+      const err = new Error('La visite d\'entretien des sessions vaut true ou false.');
+      err.statusCode = 400;
+      throw err;
+    }
+    fields.push('entretien_sessions = ?');
+    values.push(patch.entretienSessions ? 1 : 0);
   }
 
   if (!fields.length) {
@@ -273,6 +292,7 @@ module.exports = {
   appSettings,
   VOLETS_DETAIL,
   detailRecuperation,
+  entretienSessions,
   publicSettings,
   updateAppSettings,
   timezone,

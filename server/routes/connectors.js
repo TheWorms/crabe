@@ -289,6 +289,30 @@ router.put(
   })
 );
 
+/**
+ * La visite d'entretien de ce service (0.2.8) : chaque jour, sa page de compte
+ * ouverte avec la session, sans rien récupérer. Active par défaut.
+ */
+router.put(
+  '/:id/entretien',
+  asyncHandler(async (req, res) => {
+    assertAllowed(req, req.params.id);
+    const actif = req.body?.actif;
+    if (actif !== true && actif !== false) {
+      const err = new Error('Précisez si la visite d\'entretien doit être active ou non.');
+      err.statusCode = 400;
+      throw err;
+    }
+    if (!registry.getInstall(req.user.id, req.params.id)) {
+      const err = new Error('Ce connecteur n\'est pas installé pour ce compte.');
+      err.statusCode = 404;
+      throw err;
+    }
+    const install = registry.setEntretien(req.user.id, req.params.id, actif);
+    res.json({ ok: true, entretien: !install.entretien_off });
+  })
+);
+
 /** Enregistre la configuration (chiffrée) et active le connecteur. */
 router.put(
   '/:id/config',
@@ -1348,6 +1372,39 @@ function readTargets(body) {
   }
   return targets;
 }
+
+// ─── La visite d'entretien des sessions (0.2.8) ──────────────────────────────
+//
+// Sur l'écran Automatisation : chaque service à connexion enregistrée, son
+// heure de visite, sa dernière visite, et pourquoi il n'est pas visité quand
+// il ne l'est pas ; l'interrupteur général et celui de chaque service.
+scheduleRouter.get('/entretien', (req, res) => {
+  res.json(require('../entretien-sessions').etat());
+});
+
+scheduleRouter.put('/entretien', (req, res) => {
+  const actif = req.body?.actif;
+  if (actif !== true && actif !== false) {
+    return res.status(400).json({ error: 'Précisez si la visite d\'entretien doit être active ou non.' });
+  }
+  require('../settings').updateAppSettings({ entretienSessions: actif });
+  applog.admin(req, `Visite d'entretien des sessions ${actif ? 'activée' : 'arrêtée'} pour tous les services.`);
+  res.json(require('../entretien-sessions').etat());
+});
+
+scheduleRouter.put('/entretien/:userId/:connectorId', (req, res) => {
+  const actif = req.body?.actif;
+  const userId = Number(req.params.userId);
+  if (actif !== true && actif !== false) {
+    return res.status(400).json({ error: 'Précisez si la visite d\'entretien doit être active ou non.' });
+  }
+  if (!Number.isInteger(userId) || !registry.getInstall(userId, req.params.connectorId)) {
+    return res.status(404).json({ error: 'Ce service n\'est pas installé pour ce compte.' });
+  }
+  registry.setEntretien(userId, req.params.connectorId, actif);
+  applog.admin(req, `Visite d'entretien de ${req.params.connectorId} (compte n° ${userId}) ${actif ? 'activée' : 'désactivée'}.`);
+  res.json(require('../entretien-sessions').etat());
+});
 
 scheduleRouter.get('/', (req, res) => {
   res.json({

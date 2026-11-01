@@ -540,6 +540,21 @@ router.post(
       .manager()
       .typeText(req.user.id, autorisation.idFenetre(req.params.id), req.body?.text);
     if (!resultat.ok) return res.status(409).json({ error: resultat.error });
+    res.json({ ok: true, pressePapiers: !!resultat.pressePapiers });
+  })
+);
+
+/**
+ * Un texte déposé dans le presse-papiers de la fenêtre, sans être frappé
+ * (0.2.10) — comme pour les connecteurs ; rien au journal que sa longueur.
+ */
+router.post(
+  '/:id/autorisation/presse-papiers',
+  asyncHandler(async (req, res) => {
+    const resultat = await remoteBrowser
+      .manager()
+      .deposerTexte(req.user.id, autorisation.idFenetre(req.params.id), req.body?.text);
+    if (!resultat.ok) return res.status(409).json({ error: resultat.error });
     res.json({ ok: true });
   })
 );

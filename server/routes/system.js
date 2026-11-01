@@ -222,6 +222,10 @@ router.put(
           ? `, détail d'une récupération : ${Object.entries(updated.detailRecuperation)
             .map(([v, ouvert]) => `${v} ${ouvert ? 'ouvert' : 'fermé'}`).join(', ')}`
           : '') +
+        // 0.2.8 : la visite d'entretien des sessions, quand elle change.
+        (req.body?.entretienSessions !== undefined
+          ? `, visite d'entretien des sessions ${updated.entretienSessions ? 'active' : 'arrêtée'}`
+          : '') +
         '.'
     );
     res.json({ ok: true, settings: updated });

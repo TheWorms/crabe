@@ -104,13 +104,13 @@ function confirmEmailPage(result) {
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Crabe — ${escapeHtml(title)}</title>
 <link rel="stylesheet" href="/style.css">
-<link rel="icon" href="/crabe.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.png" type="image/png">
 </head>
 <body>
 <div class="auth-wrap">
   <div class="auth-card">
     <div class="auth-logo">
-      <svg class="crab-mark" viewBox="0 0 40 40" fill="none"><circle cx="20" cy="22" r="12" fill="#e0693a"/><path d="M8 18 L2 12 M8 14 L1 20" stroke="#e0693a" stroke-width="2.5" stroke-linecap="round"/><path d="M32 18 L38 12 M32 14 L39 20" stroke="#e0693a" stroke-width="2.5" stroke-linecap="round"/><circle cx="15" cy="19" r="1.6" fill="#14161a"/><circle cx="25" cy="19" r="1.6" fill="#14161a"/></svg>
+      <img class="crab-mark" src="/crabe.png" alt="">
       <span>Crabe</span>
     </div>
     <div class="auth-title">${escapeHtml(title)}</div>

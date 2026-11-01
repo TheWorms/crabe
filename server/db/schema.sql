@@ -126,6 +126,8 @@ CREATE TABLE IF NOT EXISTS connector_installs (
   -- Volontairement séparé de `status`, qui dit l'état de SANTÉ : on met en
   -- pause un connecteur en erreur sans effacer son erreur (migration 57).
   disabled_at      TEXT,
+  -- Migration 71 : 1 = pas de visite d'entretien pour ce service.
+  entretien_off    INTEGER NOT NULL DEFAULT 0,
   UNIQUE (user_id, connector_id)
 );
 
@@ -260,6 +262,30 @@ CREATE TABLE IF NOT EXISTS connexions_enregistrees (
 );
 
 CREATE INDEX IF NOT EXISTS idx_connexions_couple ON connexions_enregistrees(user_id, connector_id, at);
+
+-- La visite d'entretien des sessions (0.2.8, migration 71) : une ligne par
+-- visite. Hors de `run_logs` : une visite ne récupère rien, elle ne compte ni
+-- comme une réussite ni comme un échec d'un service.
+CREATE TABLE IF NOT EXISTS entretiens_session (
+  id                INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id           INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  connector_id      TEXT    NOT NULL,
+  at                TEXT    NOT NULL DEFAULT (datetime('now')),
+  -- confirmee | refusee | non-concluante | sans-controle | erreur
+  verdict           TEXT    NOT NULL,
+  code              TEXT,
+  raison            TEXT,
+  -- 1 : l'état prolongé par le site a été enregistré (ou le profil gardé).
+  prolongee         INTEGER NOT NULL DEFAULT 0,
+  duree_ms          INTEGER,
+  -- Ce que le site annonce, lu sur l'état rendu (jamais une valeur) : les
+  -- cookies, ceux sans date (de session), et la plus lointaine expiration.
+  cookies           INTEGER,
+  cookies_sans_date INTEGER,
+  expire_au_plus_tard TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_entretiens_couple ON entretiens_session(user_id, connector_id, at);
 
 -- La file d'attente des récupérations (lot 90) : une seule tourne à la fois,
 -- les autres attendent ici leur tour. Une ligne naît à la mise en file et
@@ -426,6 +452,8 @@ CREATE TABLE IF NOT EXISTS app_settings (
   detail_rapport     INTEGER NOT NULL DEFAULT 0,
   detail_fiche       INTEGER NOT NULL DEFAULT 0,
   detail_precedentes INTEGER NOT NULL DEFAULT 0,
+  -- Migration 71 : la visite d'entretien des sessions, active par défaut.
+  entretien_sessions INTEGER NOT NULL DEFAULT 1,
   updated_at       TEXT NOT NULL DEFAULT (datetime('now'))
 );
 

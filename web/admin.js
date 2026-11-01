@@ -2394,6 +2394,89 @@ async function loadCron() {
   marquerBascule('cron');
   renderCron();
   renderBulkDay();
+  chargerEntretien();
+}
+
+// ─── La visite d'entretien des sessions (0.2.8) ──────────────────────────────
+
+async function chargerEntretien() {
+  try {
+    renderEntretien(await api('/admin/schedules/entretien'));
+  } catch (err) {
+    $('entretien-liste').innerHTML = `<div class="empty-state">${esc(err.message)}</div>`;
+  }
+}
+
+/** « 38 cookies, dont 12 de session ; le plus durable jusqu'au 01/05/2027 ». */
+function entretienCookies(d) {
+  if (d.cookies === null || d.cookies === undefined) return '';
+  const fin = d.expireAuPlusTard ? ` ; le plus durable jusqu'au ${fmt.date(d.expireAuPlusTard)}` : '';
+  return `${d.cookies} cookie(s), dont ${d.cookiesSansDate} de session${fin}`;
+}
+
+function renderEntretien(data) {
+  $('entretien-bascule').innerHTML = `
+    <div class="toggle ${data.actif ? 'on' : ''}" role="switch" aria-checked="${!!data.actif}"
+         aria-label="Visite d'entretien des sessions" tabindex="0"
+         onclick="basculerEntretien(${!data.actif})"><div class="knob"></div></div>`;
+  const services = data.services || [];
+  if (!services.length) {
+    $('entretien-liste').innerHTML = `<div class="empty-state">
+      Aucun service n'a de connexion enregistrée par la fenêtre « Se connecter ».</div>`;
+    return;
+  }
+  $('entretien-liste').innerHTML = `
+    <div class="inline-note" style="max-width:680px;">
+      Une heure par service, tirée entre 9 h et 21 h. Une session vue expirée n'est plus visitée
+      avant une nouvelle connexion ; après deux vérifications de sécurité de suite, un service
+      n'est plus visité pendant une semaine. Aucune notification : l'avertissement vient de la
+      récupération, comme avant. Un site qui tue sa session en quelques heures n'est pas sauvé
+      par une visite par jour.
+    </div>
+    <table class="data-table wide">
+      <thead><tr><th>Service</th><th>Compte</th><th>Heure</th><th>Dernière visite</th>
+        <th>Ce que le site annonce</th><th>Aujourd'hui</th><th>Visite</th></tr></thead>
+      <tbody>
+      ${services.map((s) => {
+        const d = s.derniere;
+        const visite = d
+          ? `${esc(fmt.dateTime(d.at))} — ${esc(d.libelle)}${d.prolongee ? ', prolongée' : ''}`
+          : 'jamais';
+        return `<tr>
+          <td data-label="Service" style="color:var(--text);">${esc(s.nom)}</td>
+          <td data-label="Compte">${esc(s.compte)}</td>
+          <td data-label="Heure">${s.visitable ? esc(s.heure) : '—'}</td>
+          <td data-label="Dernière visite" title="${esc(d?.raison || '')}">${visite}</td>
+          <td data-label="Ce que le site annonce">${d ? esc(entretienCookies(d)) : ''}</td>
+          <td data-label="Aujourd'hui">${esc(s.pourquoi || 'à visiter')}</td>
+          <td data-label="Visite">${s.visitable ? `
+            <div class="toggle ${s.active ? 'on' : ''}" role="switch" aria-checked="${!!s.active}"
+                 aria-label="Visite d'entretien de ${esc(s.nom)}" tabindex="0"
+                 onclick="basculerEntretienService(${Number(s.userId)}, '${esc(s.connectorId)}', ${!s.active})"><div class="knob"></div></div>` : ''}
+          </td>
+        </tr>`;
+      }).join('')}
+      </tbody>
+    </table>`;
+}
+
+async function basculerEntretien(actif) {
+  try {
+    renderEntretien(await api('/admin/schedules/entretien', { method: 'PUT', body: { actif } }));
+    showToast(`Visite d'entretien des sessions ${actif ? 'activée' : 'arrêtée'}`);
+  } catch (err) {
+    showToast(err.message);
+  }
+}
+
+async function basculerEntretienService(userId, connectorId, actif) {
+  try {
+    renderEntretien(await api(`/admin/schedules/entretien/${userId}/${encodeURIComponent(connectorId)}`,
+      { method: 'PUT', body: { actif } }));
+    showToast(`Visite d'entretien ${actif ? 'activée' : 'désactivée'}`);
+  } catch (err) {
+    showToast(err.message);
+  }
 }
 
 function setCronView(view) {

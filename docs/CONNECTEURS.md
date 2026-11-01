@@ -18,7 +18,7 @@ où en est chacun, en cinq groupes :
 Un site peut changer ses pages du jour au lendemain : un connecteur
 fonctionnel peut cesser de l'être, et crabe le dit alors sur sa fiche.
 
-État au 18 octobre 2026, version 0.2.7. Il vous manque un service ? Ouvrez une
+État au 18 octobre 2026, version 0.2.11. Il vous manque un service ? Ouvrez une
 *issue* en indiquant le site et le type de document voulu (facture, reçu,
 attestation…).
 

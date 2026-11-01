@@ -133,13 +133,13 @@ function pageRefusReseau(ip) {
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Crabe — accès refusé depuis cette adresse</title>
 <link rel="stylesheet" href="/style.css">
-<link rel="icon" href="/crabe.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.png" type="image/png">
 </head>
 <body>
 <div class="auth-wrap">
   <div class="auth-card">
     <div class="auth-logo">
-      <svg class="crab-mark" viewBox="0 0 40 40" fill="none"><circle cx="20" cy="22" r="12" fill="#e0693a"/><path d="M8 18 L2 12 M8 14 L1 20" stroke="#e0693a" stroke-width="2.5" stroke-linecap="round"/><path d="M32 18 L38 12 M32 14 L39 20" stroke="#e0693a" stroke-width="2.5" stroke-linecap="round"/><circle cx="15" cy="19" r="1.6" fill="#14161a"/><circle cx="25" cy="19" r="1.6" fill="#14161a"/></svg>
+      <img class="crab-mark" src="/crabe.png" alt="">
       <span>Crabe</span>
     </div>
     <div class="auth-title">Accès refusé depuis cette adresse</div>
@@ -152,11 +152,12 @@ function pageRefusReseau(ip) {
 }
 
 /**
- * Lot 112 — les deux seuls fichiers servis à une adresse refusée : la feuille
- * de style et l'icône de la page de refus. Publics, identiques au dépôt, ils ne
- * portent aucune donnée ; sans eux, la page s'afficherait sans la charte.
+ * Lot 112 — les seuls fichiers servis à une adresse refusée : la feuille de
+ * style, l'icône et le logo de la page de refus (en PNG depuis la 0.2.11).
+ * Publics, identiques au dépôt, ils ne portent aucune donnée ; sans eux, la
+ * page s'afficherait sans la charte.
  */
-const FICHIERS_DE_LA_PAGE_DE_REFUS = new Set(['/style.css', '/crabe.svg']);
+const FICHIERS_DE_LA_PAGE_DE_REFUS = new Set(['/style.css', '/favicon.png', '/crabe.png']);
 
 /** Bloque tout ce qui n'est pas sur le réseau autorisé. */
 function networkGuard(req, res, next) {

@@ -1945,6 +1945,9 @@ function start() {
   const result = reload();
   startMaintenance();
   reprendreLaFile();
+  // 0.2.8 : la visite d'entretien des sessions, un tour toutes les cinq
+  // minutes — jamais quand le planificateur est arrêté.
+  if (!config.schedulerDisabled) require('./entretien-sessions').demarrer();
   // Après la file : une demande qui attendait déjà n'est pas doublée (elle
   // refuserait d'ailleurs le doublon, « déjà en file »).
   rattraperLesEcheancesManquees();
@@ -1953,6 +1956,7 @@ function start() {
 
 function stop() {
   stopAll();
+  require('./entretien-sessions').arreter();
   if (maintenanceTask) {
     maintenanceTask.stop();
     maintenanceTask = null;
