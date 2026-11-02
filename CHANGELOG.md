@@ -6,6 +6,21 @@ Pour mettre à jour votre crabe : [docs/MISE-A-JOUR.md](docs/MISE-A-JOUR.md) (En
 
 ---
 
+## 0.2.19 — les connexions par la fenêtre dans les journaux (02/11/2026)
+
+### Journaux
+- **Chaque connexion par la fenêtre « Se connecter » a sa ligne dans Administration › Logs › Connecteurs** : « Connexion enregistrée » ou « Connexion non enregistrée » (fermée sans enregistrer, après le délai, en erreur), sa raison, le nombre de vérifications restées sans preuve. Les filtres « Succès » et « Échecs » s'y appliquent.
+- **Un « Rapport » pour une connexion qui n'a pas abouti**, comme pour une récupération : la tentative, ses tentatives précédentes et tout ce que la fenêtre a écrit, anonymisé — jamais ce que vous avez tapé.
+- **La fiche d'un service dit sa dernière connexion par la fenêtre quand elle n'a pas abouti**, avec son rapport à télécharger.
+
+### Corrigé
+- **La fenêtre de connexion pouvait rester ouverte** alors que la connexion était terminée : « Enregistrer » répondait « La fenêtre de connexion n'est plus ouverte » et seul « Annuler » la fermait. Elle relit désormais l'état et se ferme. La fin d'une connexion ne se joue plus qu'une fois (la question sur les identifiants pouvait revenir deux fois).
+
+### Interne
+- Migration 75 (additive) : la table des connexions par la fenêtre.
+
+---
+
 ## 0.2.18 — les reçus BlaBlaCar (02/11/2026)
 
 ### Corrigé (essai réel de la 0.2.17)

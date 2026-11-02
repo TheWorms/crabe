@@ -584,6 +584,23 @@ function recuperationDuCompte(req, res, id) {
   return reglages;
 }
 
+/**
+ * Le rapport d'une connexion par la fenêtre de CE compte (0.2.19, lot l26),
+ * depuis la fiche du service. Celle d'un autre compte n'existe pas.
+ */
+router.get('/me/connexions/:id/rapport', (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: 'Numéro de connexion invalide.' });
+  const sortie = require('../connexions-fenetre').rapport(id, {
+    userId: req.user.id,
+    fuseau: require('../settings').timezone(),
+  });
+  if (!sortie) return res.status(404).json({ error: 'Cette connexion n\'existe pas, ou plus.' });
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${sortie.nomFichier}"`);
+  res.send(sortie.texte);
+});
+
 /** La dernière récupération terminée d'un service, pour le lien de sa fiche. */
 router.get('/me/recuperations/derniere/:connectorId', (req, res) => {
   const reglages = require('../settings').detailRecuperation();

@@ -5866,7 +5866,7 @@ function connectorSheet(connector) {
     ? `<div class="sheet-lead">${esc(connector.description)}</div>`
     : '';
 
-  return `${phrase}${sheetEnAttente(connector)}${sheetDefaut(connector)}`
+  return `${phrase}${sheetEnAttente(connector)}${sheetDefaut(connector)}${sheetConnexionFenetre(connector)}`
     + `${saisie ? sheetConnect(connector) : sheetConnected(connector)}${sheetAdvanced(connector)}`;
 }
 
@@ -5887,6 +5887,20 @@ function sheetDefaut(connector) {
     ? ` <button type="button" class="dr-lien" onclick="ouvrirDetailRecuperation({ connectorId: '${esc(connector.id)}' })">Voir ce qui s'est passé</button>`
     : '';
   return `<div class="sheet-alert${ton}" role="status">${esc(etat.detail)}${voir}</div>`;
+}
+
+/**
+ * La dernière connexion par la fenêtre, quand elle n'a PAS abouti (0.2.19,
+ * lot l26) : quand, comment elle s'est fermée, la raison affichée, et son
+ * rapport à envoyer. Rien quand elle a abouti, ni pour un service sans fenêtre.
+ */
+function sheetConnexionFenetre(connector) {
+  const d = connector.derniereConnexionFenetre;
+  if (!d || d.issue === 'enregistree') return '';
+  return `<div class="sheet-alert amber" role="status" id="sheet-connexion-fenetre">
+    Dernière connexion par la fenêtre, ${esc(fmt.dateTime(d.at))} : ${esc(d.libelle)}${d.message ? ` — ${esc(d.message)}` : ''}
+    <a class="dr-lien" href="/api/connectors/me/connexions/${Number(d.id)}/rapport" download>Télécharger le rapport</a>
+  </div>`;
 }
 
 // ---------------------------------------------------------------------------
@@ -7985,6 +7999,11 @@ function startRemotePolling() {
       applyRemoteView(view);
       if (view.done) await finishRemoteLogin(view);
     } catch (err) {
+      // 0.2.19 : une session qui disparaît juste après son enregistrement (ou
+      // sa vérification) n'est pas une panne : la fenêtre se ferme.
+      if (err?.status === 404 && ['saving', 'saved'].includes(rb().view?.state)) {
+        return void terminerSansSession();
+      }
       // 404 : la session a disparu côté serveur (redémarrage du service).
       failRemoteLogin(err.message);
     }
@@ -8129,6 +8148,24 @@ async function fillRemoteCredentials() {
   }
 }
 
+/**
+ * 0.2.19 : la session n'existe plus côté serveur alors que la fenêtre est
+ * affichée (enregistrée puis close, ou délai écoulé) — on ferme, on le dit,
+ * et la liste des services se relit. Mesuré le 01/11/2026 : la fenêtre restait
+ * ouverte, « Enregistrer » répondait « n'est plus ouverte », seul « Annuler »
+ * la fermait.
+ */
+async function terminerSansSession() {
+  stopRemoteTimers();
+  stopRemoteStages();
+  detachRemoteScreen();
+  const connectorId = rb().connectorId;
+  closeRemoteLogin();
+  showToast('La fenêtre de connexion est terminée.');
+  await loadConnectors().catch(() => {});
+  if (connectorId) openModal(connectorId, { edit: true });
+}
+
 /** « Enregistrer » après un essai de session resté sans preuve (§6.3). */
 async function saveRemoteSession() {
   // « Enregistrer la session » n'existe que pour un CONNECTEUR : une
@@ -8149,6 +8186,15 @@ async function saveRemoteSession() {
     applyRemoteView(view);
     if (view.done) await finishRemoteLogin(view);
   } catch (err) {
+    // 0.2.19 : la session est peut-être déjà terminée côté serveur (« La
+    // fenêtre de connexion n'est plus ouverte ») — l'état fait foi.
+    const base = rbBase();
+    const etat = base ? await api(base).catch((e) => e) : null;
+    if (etat?.done) {
+      rb().view = etat;
+      return void (await finishRemoteLogin(etat));
+    }
+    if (etat?.status === 404) return void (await terminerSansSession());
     // 409 : le contrôle a de nouveau échoué. Ce n'est pas une panne, c'est un
     // parcours de connexion qui n'est pas terminé — on le dit tel quel. Et si
     // le serveur n'a rien dit (coupure, réponse sans corps), on dit QUAND MÊME
@@ -8161,7 +8207,6 @@ async function saveRemoteSession() {
         + 'Réessayez, ou fermez la fenêtre : rien ne sera enregistré.';
     // L'état du serveur a pu changer (compteur d'échecs, consigne) : on le
     // relit tout de suite plutôt que d'attendre la prochaine seconde.
-    const base = rbBase();
     if (base) {
       api(base).then((etat) => {
         rb().view = etat;
@@ -8228,6 +8273,10 @@ function brancherActiviteFenetre() {
  */
 async function finishRemoteLogin(view) {
   stopRemoteTimers();
+  // 0.2.19 : UNE fin par session. Deux réponses du serveur dans la même
+  // seconde la jouaient deux fois — la question sur les identifiants revenait.
+  if (view.sessionId && rb().finiPour === view.sessionId) return;
+  rb().finiPour = view.sessionId || null;
   detachRemoteScreen();
 
   if (view.state !== 'saved') {

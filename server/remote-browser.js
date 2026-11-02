@@ -286,6 +286,14 @@ const BINAIRES = [
  */
 function defaultRuntime() {
   return {
+    // 0.2.19 (lot l26) : la ligne de chaque fenêtre (connexions-fenetre.js).
+    journalFenetre: {
+      // Un SERVICE seulement : l'autorisation d'un stockage n'a pas de ligne.
+      ouvrir: (userId, connectorId) => (require('./connectors/registry').has(connectorId)
+        ? require('./connexions-fenetre').ouvrir(userId, connectorId)
+        : null),
+      fermer: (id, fin) => require('./connexions-fenetre').fermer(id, fin),
+    },
     fs: nodeFs,
     os: nodeOs,
     spawn: nodeSpawn,
@@ -1342,6 +1350,13 @@ function createManager(overrides = {}) {
     };
     current = session;
     finished = null;
+    // 0.2.19 (lot l26) : chaque fenêtre d'un SERVICE a sa ligne — Logs ›
+    // Connecteurs, son rapport, la fiche. Jamais bloquant.
+    try {
+      session.journalId = runtime.journalFenetre.ouvrir(userId, connectorId);
+    } catch {
+      session.journalId = null;
+    }
 
     try {
       await bringUp(session);
@@ -2701,6 +2716,19 @@ function createManager(overrides = {}) {
       current = null;
       finished = session;
       session.finishedAt = runtime.now();
+    }
+
+    // 0.2.19 (lot l26) : l'issue de la fenêtre, sa raison, ses vérifications.
+    if (session.journalId) {
+      try {
+        runtime.journalFenetre.fermer(session.journalId, {
+          etat: session.state,
+          message: [session.message, session.detail].filter(Boolean).join(' '),
+          verifications: session.echecsVerification || 0,
+        });
+      } catch {
+        /* le journal ne doit jamais empêcher une extinction */
+      }
     }
 
     runtime.log(

@@ -571,5 +571,6 @@ module.exports = {
   envoyer,
   anonymiser,
   environnement,
+  colonnes,
   rapport,
 };

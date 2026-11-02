@@ -710,6 +710,9 @@ function listForUser(user) {
         // passe), ou null.
         champsIdentifiants: require('./login-detection').champsIdentifiants(m),
         carnet: install?.carnet_id ? require('../carnet').entreeDe(user.id, m.id) : null,
+        // 0.2.19 (lot l26) : la dernière connexion par la fenêtre — la fiche
+        // la dit quand elle n'a pas abouti, avec son rapport.
+        derniereConnexionFenetre: install && m.remoteLogin ? require('../connexions-fenetre').derniere(user.id, m.id) : null,
         // Le défaut ACTUEL du service (lot 91) : la cause de sa dernière
         // exécution si elle a échoué et qu'aucune connexion n'a été
         // enregistrée depuis — calculé par connectors/cause-echec.js, la

@@ -238,8 +238,17 @@ router.get('/runs', (req, res) => {
     logo: catalog.get(id)?.logo || null,
   });
 
+  // 0.2.19 (lot l26) : les connexions par la fenêtre, leur issue et leur
+  // rapport — une ligne de résultat comme une récupération, rangée à part.
+  const connexions = require('../connexions-fenetre').pourLeJournal({
+    connectorId,
+    resultat: parCause ? 'aucune' : (req.query.result || 'all'),
+    recherche: search,
+    limite: limitOf(req.query),
+  }).map((c) => ({ ...c, ...decor(c.connector_id) }));
+
   res.json({
-    logs: rows.map((r) => ({ ...r, kind: 'run', ...decor(r.connector_id) })),
+    logs: rows.map((r) => ({ ...r, kind: 'run', ...decor(r.connector_id) })).concat(connexions),
     // `started_at` reprend l'horodatage de la ligne : les deux familles se
     // trient et s'affichent par la même colonne de date.
     journal: journal.map((j) => {
@@ -301,6 +310,18 @@ router.get('/runs/:id/rapport', (req, res) => {
   applog.admin(req, `Rapport de la récupération n° ${id} téléchargé${sortie.pieces.length ? ` (${sortie.pieces.length} pièce(s))` : ''}.`);
   // 0.2.6 : une archive quand la récupération a des pièces (rapport-echec.envoyer).
   rapportEchec.envoyer(res, sortie, id);
+});
+
+/** Le rapport d'une connexion par la fenêtre (0.2.19, lot l26) — même permission que celui d'une récupération. */
+router.get('/connexions/:id/rapport', (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: 'Numéro de connexion invalide.' });
+  const sortie = require('../connexions-fenetre').rapport(id, { fuseau: settings.timezone() });
+  if (!sortie) return res.status(404).json({ error: 'Cette connexion n\'existe pas, ou plus.' });
+  applog.admin(req, `Rapport de la connexion par la fenêtre n° ${id} téléchargé.`);
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${sortie.nomFichier}"`);
+  res.send(sortie.texte);
 });
 
 /**

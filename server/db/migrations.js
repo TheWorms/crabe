@@ -1514,6 +1514,31 @@ const MIGRATIONS = [
       addColumn(database, 'connector_installs', 'libelle', 'TEXT');
     },
   },
+  {
+    id: 75,
+    name: 'les connexions par la fenêtre',
+    // 0.2.19 (demande du compte observé du 01/11/2026, lot l26) : une connexion par la
+    // fenêtre qui n'aboutit pas n'apparaissait nulle part. Une ligne par
+    // fenêtre ouverte — son issue, sa raison, ses vérifications — HORS de
+    // `run_logs` : l'état, les couleurs et les statistiques des services
+    // lisent cette table-là, et une fenêtre n'est pas une récupération.
+    //
+    // Additive : revenir au code d'avant laisse une table que personne ne lit.
+    up(database) {
+      database.exec(`CREATE TABLE IF NOT EXISTS connexions_fenetre (
+          id            INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          connector_id  TEXT    NOT NULL,
+          debut         TEXT    NOT NULL DEFAULT (datetime('now')),
+          fin           TEXT,
+          -- enregistree | annulee | expiree | erreur ; NULL tant qu'elle est ouverte.
+          issue         TEXT,
+          message       TEXT,
+          verifications INTEGER NOT NULL DEFAULT 0
+        );`);
+      database.exec('CREATE INDEX IF NOT EXISTS idx_connexions_fenetre_couple ON connexions_fenetre(user_id, connector_id, debut)');
+    },
+  },
 ];
 
 /**

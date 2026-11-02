@@ -326,6 +326,22 @@ CREATE TABLE IF NOT EXISTS reconnexions_auto (
 
 CREATE INDEX IF NOT EXISTS idx_reconnexions_couple ON reconnexions_auto(user_id, connector_id, at);
 
+-- Les connexions par la fenêtre (0.2.19, migration 75) : une ligne par fenêtre
+-- ouverte, hors de run_logs. Jamais un identifiant ni un cookie : l'issue,
+-- la raison affichée, le nombre de vérifications.
+CREATE TABLE IF NOT EXISTS connexions_fenetre (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  connector_id  TEXT    NOT NULL,
+  debut         TEXT    NOT NULL DEFAULT (datetime('now')),
+  fin           TEXT,
+  issue         TEXT,
+  message       TEXT,
+  verifications INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_connexions_fenetre_couple ON connexions_fenetre(user_id, connector_id, debut);
+
 -- La file d'attente des récupérations (lot 90) : une seule tourne à la fois,
 -- les autres attendent ici leur tour. Une ligne naît à la mise en file et
 -- disparaît AU DÉPART de l'exécution — ce qui reste dans la table à un arrêt

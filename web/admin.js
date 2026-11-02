@@ -4977,6 +4977,10 @@ function runStatusBadge(l) {
   // écrivait en plein travail (lot 41). Ni succès, ni échec, ni en cours.
   if (l.kind === 'journal') return '<span class="badge-pill gray">Journal</span>';
   if (!l.finished_at) return '<span class="badge-pill blue">En cours</span>';
+  // 0.2.19 (lot l26) : une connexion par la fenêtre dit son issue.
+  if (l.kind === 'fenetre') {
+    return `<span class="badge-pill ${l.success ? 'green' : 'amber'}">${l.success ? 'Connexion enregistrée' : 'Connexion non enregistrée'}</span>`;
+  }
   if (l.success) return '<span class="badge-pill green">Succès</span>';
   // Un échec dit SA cause (lot 91), servie par le serveur — orange « Session
   // expirée », rouge « Connexion refusée », rouge « Échec » pour le reste.
@@ -4991,6 +4995,8 @@ function runStatusBadge(l) {
  */
 function runTriggerCell(l) {
   if (l.kind === 'journal') return l.run_id ? `n° ${Number(l.run_id)}` : '—';
+  // 0.2.19 (lot l26) : une connexion par la fenêtre, sa ligne à elle.
+  if (l.kind === 'fenetre') return `fenêtre · n° ${Number(l.id)}`;
   return `${esc(l.trigger)} · n° ${Number(l.id)}`;
 }
 
@@ -5000,7 +5006,7 @@ function runTriggerCell(l) {
  * Sur chaque exécution, réussie ou non : une réussite partielle se lit aussi.
  */
 function runDetailLink(l) {
-  if (l.kind === 'journal') return '';
+  if (l.kind === 'journal' || l.kind === 'fenetre') return '';
   // 0.2.4 : les volets fermés (par défaut), rien du détail dans Logs.
   if (!detailAQuelqueChose(state.settings?.detailRecuperation)) return '';
   return `<button type="button" class="btn-mini"
@@ -5016,6 +5022,11 @@ function runDetailLink(l) {
  */
 function runReportLink(l) {
   if (l.kind === 'journal' || !l.finished_at) return '';
+  // 0.2.19 (lot l26) : le rapport d'une connexion par la fenêtre qui n'a pas abouti.
+  if (l.kind === 'fenetre') {
+    return l.success ? '' : `<a class="btn-mini" href="/api/admin/logs/connexions/${Number(l.id)}/rapport" download
+     title="Télécharger le rapport de cette connexion par la fenêtre, à relire puis à joindre à un signalement">Rapport</a>`;
+  }
   if (l.success && !(Number(l.non_obtenues) > 0)) return '';
   return `<a class="btn-mini" href="/api/admin/logs/runs/${Number(l.id)}/rapport" download
      title="Télécharger le rapport de cette récupération, à relire puis à joindre à un signalement">Rapport</a>`;
@@ -5088,7 +5099,7 @@ async function renderRunLogs() {
           <td data-label="Utilisateur">${esc(l.username || '—')}</td>
           <td data-label="Date" title="${esc(fmt.exact(l.started_at))}">${esc(fmt.dateTime(l.started_at))}</td>
           <td data-label="Déclencheur">${runTriggerCell(l)}</td>
-          <td data-label="Factures">${l.kind === 'journal' || !l.finished_at ? '—' : l.invoice_count}</td>
+          <td data-label="Factures">${l.kind === 'journal' || l.kind === 'fenetre' || !l.finished_at ? '—' : l.invoice_count}</td>
           <td data-label="Statut"><div class="run-statut">${runStatusBadge(l)}${runDetailLink(l)}${runReportLink(l)}</div></td>
           ${messageCell(l.message)}
         </tr>`
