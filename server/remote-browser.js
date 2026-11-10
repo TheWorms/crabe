@@ -1182,6 +1182,10 @@ function createManager(overrides = {}) {
     // à l'autorisation de TUER son processus rclone plutôt que de le laisser
     // garder le port 53682 ouvert.
     onFin = null,
+    // 0.2.20 — les origines locales que cette fenêtre-là peut joindre malgré
+    // la cloison : le serveur de retour d'`rclone authorize`, pour la seule
+    // autorisation d'un stockage (voir cloison-navigateur.originePermise).
+    adressesLocalesPermises = [],
     onDetected = async () => ({}),
   }) {
     // La garde du lot 77, avant TOUT le reste : une adresse d'ouverture absente
@@ -1323,6 +1327,7 @@ function createManager(overrides = {}) {
         .map((o) => sessionState.origineHttps(o))
         .filter(Boolean),
       onFin: typeof onFin === 'function' ? onFin : null,
+      adressesLocalesPermises: Array.isArray(adressesLocalesPermises) ? [...adressesLocalesPermises] : [],
       display,
       vncPort: vncPortFor(display),
       wsPort: wsPortFor(display),
@@ -1513,6 +1518,7 @@ function createManager(overrides = {}) {
         // Non nul → `defaultLauncher` bascule sur `launchPersistentContext`.
         profil: session.profil || null,
         langueNative: !!session.langueNative,
+        permises: session.adressesLocalesPermises || [],
       });
     } catch (err) {
       // Filet sous le verrou de profil : si un Chromium tient ENCORE le
@@ -2605,6 +2611,9 @@ function createManager(overrides = {}) {
   async function conclure(userId, connectorId, { ok, message }) {
     const session = sessionFor(userId, connectorId);
     if (!session || session.stopped) return null;
+    // 0.2.20 : le refus conclu par l'appelant (l'autorisation d'un stockage)
+    // est rédigé pour l'utilisateur — l'écran l'affiche tel quel.
+    if (!ok) session.erreurExpliquee = true;
     return terminate(session, ok ? 'saved' : 'error', message);
   }
 
@@ -3276,6 +3285,9 @@ function createManager(overrides = {}) {
       message: session.message,
       detail: session.detail || '',
       error: session.error || null,
+      // 0.2.20 : `error` est-il une phrase pour l'utilisateur (vrai) ou un
+      // incident technique, que l'écran remplace par une consigne (faux) ?
+      erreurExpliquee: !!session.erreurExpliquee,
       hint: session.hint || '',
       // Le mot de passe VNC part avec la vue : noVNC en a besoin pour ouvrir
       // le flux, et le canal qui le porte est déjà celui de la session
@@ -3474,7 +3486,7 @@ function browserLaunchOptions({ display, screen, home, env = process.env, langue
  *
  * Il pèse quelques mégaoctets, contre quelques kilo-octets pour une session.
  */
-async function persistentLauncher({ display, url, screen, home, profil, langueNative = false }) {
+async function persistentLauncher({ display, url, screen, home, profil, langueNative = false, permises = [] }) {
   const { chromium } = require('playwright');
 
   // 0700, et créé avant le lancement : Chromium ne crée pas l'arborescence.
@@ -3498,7 +3510,7 @@ async function persistentLauncher({ display, url, screen, home, profil, langueNa
       : identity.optionsContexte({ viewport: null })),
   });
   // Avant la première navigation : la fenêtre n'ouvre jamais rien hors cloison.
-  await cloison.cloisonner(context, { journal: journalDeCloison });
+  await cloison.cloisonner(context, { journal: journalDeCloison, permises });
 
   const page = context.pages()[0] || (await context.newPage());
   await page.goto(url, { waitUntil: 'domcontentloaded' }).catch(() => {});
@@ -3550,10 +3562,10 @@ function journalDeCloison(texte) {
   require('./applog').warn('remote-browser', texte);
 }
 
-async function defaultLauncher({ display, url, screen, home, profil, langueNative = false }) {
+async function defaultLauncher({ display, url, screen, home, profil, langueNative = false, permises = [] }) {
   // Un connecteur qui déclare `remoteLogin.persistent` passe par le profil
   // persistant : sa session ne survivrait pas autrement.
-  if (profil) return persistentLauncher({ display, url, screen, home, profil, langueNative });
+  if (profil) return persistentLauncher({ display, url, screen, home, profil, langueNative, permises });
 
   const { chromium } = require('playwright');
   const browser = await chromium.launch(browserLaunchOptions({ display, screen, home, langueNative }));
@@ -3570,7 +3582,7 @@ async function defaultLauncher({ display, url, screen, home, profil, langueNativ
       : identity.optionsContexte({ viewport: null }) // la fenêtre fait la loi
   );
   // Avant la première navigation : la fenêtre n'ouvre jamais rien hors cloison.
-  await cloison.cloisonner(context, { journal: journalDeCloison });
+  await cloison.cloisonner(context, { journal: journalDeCloison, permises });
   const page = await context.newPage();
   await page.goto(url, { waitUntil: 'domcontentloaded' });
 

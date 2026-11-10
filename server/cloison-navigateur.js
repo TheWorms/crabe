@@ -213,6 +213,34 @@ async function motifDeRefusResolu(adresse, { lookup = dns.lookup, memoire = null
   return motif;
 }
 
+/**
+ * L'origine locale qu'une fenêtre peut joindre par exception (0.2.20), ou
+ * `null` si elle ne qualifie pas.
+ *
+ * Le seul cas : l'autorisation d'un espace de stockage. `rclone authorize`
+ * ouvre son serveur de retour sur le serveur même (`127.0.0.1:53682`), donne
+ * une adresse locale à ouvrir, et le fournisseur y revient avec la clé
+ * (`localhost:53682` pour pCloud). Refusées depuis le 25/10/2026 comme toute
+ * adresse de bouclage, plus aucune autorisation n'aboutissait — mesuré le
+ * 09/11/2026 : `net::ERR_BLOCKED_BY_CLIENT at http://127.0.0.1:53682/auth`.
+ *
+ * Ne qualifie qu'une origine http de bouclage avec un port explicite : jamais
+ * un nom quelconque, jamais une adresse du réseau local, jamais tout un hôte.
+ * @param {string} origine
+ * @returns {string|null}
+ */
+function originePermise(origine) {
+  let url;
+  try {
+    url = new URL(String(origine || ''));
+  } catch {
+    return null;
+  }
+  if (url.protocol !== 'http:' || !url.port) return null;
+  if (url.hostname !== '127.0.0.1' && url.hostname !== 'localhost') return null;
+  return url.origin;
+}
+
 // ---------------------------------------------------------------------------
 // 3. Le contexte
 // ---------------------------------------------------------------------------
@@ -222,11 +250,13 @@ async function motifDeRefusResolu(adresse, { lookup = dns.lookup, memoire = null
  * sélecteur de fichier de chaque page (présente ou à venir) est intercepté.
  *
  * @param {import('playwright').BrowserContext} contexte
- * @param {{journal?: (texte: string) => void, lookup?: Function}} [options]
+ * @param {{journal?: (texte: string) => void, lookup?: Function, permises?: string[]}} [options]
  *   `journal` reçoit chaque refus, une fois par motif ; `lookup` remplace la
- *   résolution de noms (essais).
+ *   résolution de noms (essais) ; `permises` : les origines locales que CETTE
+ *   fenêtre peut joindre (voir `originePermise`), vide pour un service.
  */
-async function cloisonner(contexte, { journal = () => {}, lookup = dns.lookup } = {}) {
+async function cloisonner(contexte, { journal = () => {}, lookup = dns.lookup, permises = [] } = {}) {
+  const exceptions = new Set((Array.isArray(permises) ? permises : []).map(originePermise).filter(Boolean));
   const memoire = new Map();
   const dejaDits = new Set();
   const dire = (texte) => {
@@ -240,6 +270,15 @@ async function cloisonner(contexte, { journal = () => {}, lookup = dns.lookup } 
   };
 
   await contexte.route('**/*', async (route) => {
+    if (exceptions.size) {
+      let origine = null;
+      try {
+        origine = new URL(route.request().url()).origin;
+      } catch {
+        origine = null;
+      }
+      if (exceptions.has(origine)) return route.continue().catch(() => {});
+    }
     let motif = null;
     try {
       motif = await motifDeRefusResolu(route.request().url(), { lookup, memoire });
@@ -271,5 +310,6 @@ module.exports = {
   ipRefusee,
   motifDeRefus,
   motifDeRefusResolu,
+  originePermise,
   cloisonner,
 };

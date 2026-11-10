@@ -418,6 +418,27 @@ function idFenetre(destId) {
 }
 
 /**
+ * Les origines du serveur de retour d'rclone (0.2.20), à laisser passer par la
+ * cloison de la fenêtre : l'adresse locale qu'rclone donne à ouvrir
+ * (`127.0.0.1:53682`), et la même sous le nom `localhost` — celle où pCloud
+ * revient (son adresse de redirection, `http://localhost:53682/`). Le port est
+ * lu dans l'adresse donnée par rclone, jamais supposé.
+ * @param {string} adresse
+ * @returns {string[]}
+ */
+function originesDeRetour(adresse) {
+  let url;
+  try {
+    url = new URL(String(adresse || ''));
+  } catch {
+    return [];
+  }
+  if (url.protocol !== 'http:' || !url.port) return [];
+  if (url.hostname !== '127.0.0.1' && url.hostname !== 'localhost') return [];
+  return [`http://127.0.0.1:${url.port}`, `http://localhost:${url.port}`];
+}
+
+/**
  * Démarre l'autorisation d'une destination : lance `rclone authorize`, ouvre
  * l'URL dans la fenêtre visible, et branche la conclusion sur la sortie de la
  * commande. Rend la vue publique de la fenêtre (celle qu'attend le client
@@ -605,6 +626,9 @@ async function demarrer({ userId, destId, type, nom, valeurs, enregistrer, creer
       connectorName: nom,
       url: url.url,
       capture: false,
+      // 0.2.20 : la cloison laisse passer le serveur de retour d'rclone, et
+      // lui seul — sans lui, la fenêtre refusait l'adresse qu'elle doit ouvrir.
+      adressesLocalesPermises: originesDeRetour(url.url),
       hint: `Connectez-vous à ${nom} dans cette fenêtre, puis autorisez l'accès. `
         + 'La fenêtre se fermera toute seule — la clé d\'accès est rangée chiffrée, '
         + 'elle ne s\'affiche jamais.'
@@ -722,6 +746,7 @@ module.exports = {
   masquerApplication,
   enCours,
   idFenetre,
+  originesDeRetour,
   NON_AUTORISABLES,
   TYPES_A_APPLICATION,
   BANNIERE_PCLOUD,

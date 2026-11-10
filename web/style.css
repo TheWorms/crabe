@@ -2233,6 +2233,7 @@ body.light .btn-remote{color:#fff;}
   justify-content:center;gap:14px;background:var(--bg-elev);color:var(--text-dim);
   font-size:13px;text-align:center;padding:20px;line-height:1.55;}
 .rb-veil.hidden{display:none;}
+.rb-veil.echec .rb-spinner{display:none;}
 .rb-spinner{width:34px;height:34px;border:3px solid var(--border-strong);
   border-top-color:var(--accent);border-radius:50%;animation:rb-spin .8s linear infinite;}
 @keyframes rb-spin{to{transform:rotate(360deg);}}

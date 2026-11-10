@@ -7562,9 +7562,9 @@ async function openAutorisationStockage(destId, infos = {}) {
 }
 
 /** Voile d'attente par-dessus l'écran : démarrage, enregistrement, échec. */
-function showRemoteVeil(texte) {
+function showRemoteVeil(texte, { echec = false } = {}) {
   $('rb-veil-text').textContent = texte;
-  $('rb-veil').className = 'rb-veil';
+  $('rb-veil').className = echec ? 'rb-veil echec' : 'rb-veil';
 }
 
 function hideRemoteVeil() {
@@ -8280,7 +8280,7 @@ async function finishRemoteLogin(view) {
   detachRemoteScreen();
 
   if (view.state !== 'saved') {
-    return void failRemoteLogin(view.error || view.message, { fatal: true });
+    return void failRemoteLogin(view.error || view.message, { fatal: true, explique: !!view.erreurExpliquee });
   }
 
   // L'autorisation d'un espace de stockage (lot 34) : pas de découverte à
@@ -8354,23 +8354,31 @@ async function finishRemoteLogin(view) {
 const RB_ECHEC_GENERIQUE =
   'La fenêtre de connexion n\'a pas pu s\'ouvrir. Réessayez dans un instant.';
 
-function remoteFailureText(cause) {
+function remoteFailureText(cause, { explique = false } = {}) {
   const status = typeof cause === 'string' ? 0 : Number(cause?.status || 0);
   const message = typeof cause === 'string' ? cause : String(cause?.message || '');
-  // 409 (une connexion déjà ouverte) et 503 (mémoire, paquets manquants) sont
-  // les seuls refus que le serveur rédige à l'intention de l'utilisateur.
-  const actionnable = status === 409 || status === 503;
-  return actionnable && message ? message : RB_ECHEC_GENERIQUE;
+  if (!message) return RB_ECHEC_GENERIQUE;
+  // Une phrase sans statut vient de la fenêtre elle-même : rédigée pour
+  // l'utilisateur seulement quand le serveur le dit (`erreurExpliquee`, 0.2.20).
+  if (typeof cause === 'string') return explique ? message : RB_ECHEC_GENERIQUE;
+  // 0.2.20 : tout refus 4xx est rédigé pour l'utilisateur (le serveur ne cache
+  // que les 5xx, voir middleware.errorHandler), comme 409 et 503, et les 502
+  // de l'autorisation d'un stockage (« rclone n'a pas fourni d'adresse… »).
+  // Jusque-là, ils tombaient tous sur la phrase générique : le refus de
+  // l'application pCloud ne se lisait nulle part.
+  const actionnable = (status >= 400 && status < 500) || status === 502 || status === 503;
+  return actionnable && message !== 'Erreur interne du serveur.' ? message : RB_ECHEC_GENERIQUE;
 }
 
 /** Échec : on reste sur place, on dit quoi faire, et « Réessayer » apparaît. */
-function failRemoteLogin(cause, { fatal = false } = {}) {
+function failRemoteLogin(cause, { fatal = false, explique = false } = {}) {
   stopRemoteTimers();
   stopRemoteStages();
   detachRemoteScreen();
 
-  const texte = remoteFailureText(cause);
-  showRemoteVeil(texte);
+  const texte = remoteFailureText(cause, { explique });
+  // 0.2.20 : plus de rond qui tourne sur un échec — rien n'attend plus.
+  showRemoteVeil(texte, { echec: true });
   $('rb-result').className = 'test-result show fail';
   $('rb-result').textContent = texte;
   $('rb-cancel').textContent = 'Fermer';

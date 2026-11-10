@@ -6,6 +6,15 @@ Pour mettre à jour votre crabe : [docs/MISE-A-JOUR.md](docs/MISE-A-JOUR.md) (En
 
 ---
 
+## 0.2.20 — l'autorisation des espaces de stockage rétablie (10/11/2026)
+
+### Corrigé
+- **« Se connecter » / « Renouveler l'autorisation » d'un espace de stockage (pCloud, Dropbox, Google Drive…) échouait depuis la 0.2.0** sur « La fenêtre de connexion n'a pas pu s'ouvrir » : la fenêtre, qui refuse les adresses de la machine depuis cette version, refusait aussi le serveur de retour qu'rclone ouvre pour l'autorisation. Elle le laisse désormais passer, lui seul (`127.0.0.1` et `localhost`, au port qu'rclone a donné), et pour cette seule fenêtre ; les fenêtres de connexion des services ne changent pas.
+- **Un jeton collé dans la case « Jeton d'accès » d'une carte remplie avec un bloc de configuration rclone était ignoré** : les dépôts continuaient avec l'ancien. Il remplace désormais celui du bloc, et l'état de l'autorisation affiché sur la carte est celui du jeton réellement utilisé.
+- **Les refus de l'autorisation s'affichent** (application pCloud incomplète ou refusée, rclone sans réponse…) au lieu de la phrase générique, et l'indicateur d'attente s'arrête quand la tentative a échoué.
+
+---
+
 ## 0.2.19 — les connexions par la fenêtre dans les journaux (02/11/2026)
 
 ### Journaux

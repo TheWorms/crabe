@@ -657,8 +657,11 @@ async function etatAutorisationPour(normalise, base, dechiffrementEchoue) {
   const type = normalise.type || base.type || '';
   if (!(await autorisation.typeAutorisable(type))) return { possible: false };
   if (dechiffrementEchoue) return { possible: true, etat: 'indeterminee', echeance: null };
-  const jeton = String(normalise.valeurs?.token || '').trim()
-    || (String(normalise.rcloneConfig || '').match(/^token\s*=\s*(.+)$/m)?.[1] || '').trim();
+  // 0.2.20 : le jeton du bloc d'abord — c'est lui que les dépôts jouent. La
+  // case pouvait dire « connecté » sur un jeton neuf pendant que le bloc
+  // gardait l'ancien, révoqué.
+  const jeton = (String(normalise.rcloneConfig || '').match(/^token\s*=\s*(.+)$/m)?.[1] || '').trim()
+    || String(normalise.valeurs?.token || '').trim();
   return { possible: true, ...autorisation.etatDuJeton(jeton) };
 }
 
@@ -715,6 +718,21 @@ function applicationEnregistree(conf) {
     client_id: duBloc('client_id') || desChamps('client_id'),
     client_secret: duBloc('client_secret') || desChamps('client_secret'),
   };
+}
+
+/**
+ * Un jeton collé à la main, sur UNE ligne (0.2.20) : la ligne `token = …` d'un
+ * bloc rclone n'en tient qu'une, et le bloc copié d'un terminal arrive souvent
+ * sur plusieurs. Du JSON se recompacte ; le reste perd ses retours à la ligne.
+ * @param {string} texte
+ * @returns {string}
+ */
+function jetonSurUneLigne(texte) {
+  try {
+    return JSON.stringify(JSON.parse(texte));
+  } catch {
+    return String(texte).replace(/\s*[\r\n]+\s*/g, '');
+  }
 }
 
 /**
@@ -1126,6 +1144,22 @@ function saveConfig(destId, values, champsConnus = []) {
 
   // Un bloc rclone vide signifie « garder l'existant ».
   let rcloneConfig = values.rcloneConfig ? String(values.rcloneConfig) : previous.rcloneConfig || '';
+
+  // ─── Un jeton collé dans sa case rejoint le bloc (0.2.20) ─────────────────
+  //
+  // Un bloc collé PRIME sur les champs nommés (`normalizeConf`) : le jeton
+  // saisi dans la case « Jeton d'accès » d'une carte qui a un bloc restait
+  // dans `valeurs`, et les dépôts jouaient l'ancien, révoqué, en silence
+  // (pCloud, 09/11/2026). Il prend la place de celui du bloc, comme le jeton
+  // que rapporte l'autorisation (`enregistrerJeton`). Un bloc collé dans ce
+  // même geste reste maître : il remplace tout.
+  const jetonSaisi = typeof values.valeurs?.token === 'string' ? values.valeurs.token.trim() : '';
+  if (jetonSaisi && !values.rcloneConfig && rcloneConfig) {
+    const ligne = `token = ${jetonSurUneLigne(jetonSaisi)}`;
+    rcloneConfig = /^token\s*=/m.test(rcloneConfig)
+      ? rcloneConfig.replace(/^token\s*=.*$/m, () => ligne)
+      : `${rcloneConfig.trim()}\n${ligne}`;
+  }
   // Le type n'est modifiable que quand le fournisseur ne l'impose pas
   // (« Autre stockage ») : ailleurs, il est celui du fournisseur choisi, et
   // le laisser changer n'aurait aucun sens.
