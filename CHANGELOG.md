@@ -6,6 +6,16 @@ Pour mettre à jour votre crabe : [docs/MISE-A-JOUR.md](docs/MISE-A-JOUR.md) (En
 
 ---
 
+## 0.2.21 — la fenêtre de connexion n'est plus refusée sur une mémoire mal comptée (10/11/2026)
+
+### Corrigé
+- **« Se connecter » / « Se reconnecter » refusait d'ouvrir la fenêtre (« Mémoire insuffisante ») pendant les récupérations**, alors que la mémoire était là : le cache des fichiers (documents, copies vers les stockages, base), que le système rend dès qu'on en a besoin, comptait comme occupé. Mesuré pendant une série de récupérations planifiées : 803 Mo annoncés, 1 511 Mo réellement disponibles. Seule la mémoire qui ne se libère pas compte désormais, sous le plafond du service (`MemoryHigh` / `MemoryMax`, ou la limite du conteneur Docker).
+
+### Amélioré
+- **Le refus faute de mémoire dit ce qui occupe crabe** : la récupération en cours et depuis quand, combien attendent leur tour, ou une visite d'entretien des sessions — sans nommer les services d'un autre compte. Sans rien en cours, il le dit aussi.
+
+---
+
 ## 0.2.20 — l'autorisation des espaces de stockage rétablie (10/11/2026)
 
 ### Corrigé

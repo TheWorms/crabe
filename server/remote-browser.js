@@ -461,6 +461,54 @@ function describeMissing(missing) {
   );
 }
 
+/**
+ * La mémoire encore disponible sous le plafond du service (0.2.21), en octets,
+ * ou `null` quand aucun plafond ne se lit (pas de cgroup v2, aucune limite).
+ *
+ * `process.availableMemory()` rend le plafond MOINS `memory.current` — et
+ * `memory.current` compte le cache des fichiers lus et écrits (documents,
+ * copies vers les stockages, base), que le noyau rend dès qu'on lui demande.
+ * Mesuré en production le 10/11/2026, une récupération en cours : 1 828 Mo
+ * « occupés », dont 983 Mo de cache (736 Mo inactifs) pour 801 Mo de mémoire
+ * des programmes. La fenêtre de connexion était refusée pendant toute la
+ * série des récupérations planifiées, sur « 846 Mo libres ».
+ *
+ * Ici, l'occupation est celle qui ne se reprend pas : `memory.current` moins
+ * le cache inactif (`inactive_file`), comme le « working set » des outils de
+ * supervision des conteneurs. Le plafond est le plus bas de `memory.high` et
+ * `memory.max` — le premier fait ralentir le service, le second l'arrête.
+ *
+ * @param {{fs?: object, dossier?: string|null}} [options] `dossier` : le cgroup
+ *   à lire (essais, et mesure depuis l'extérieur du service) ; sinon celui du
+ *   processus, lu dans `/proc/self/cgroup`.
+ * @returns {{disponible: number, plafond: number, occupe: number, cacheInactif: number}|null}
+ */
+function memoireDuCgroupe({ fs = nodeFs, dossier = null } = {}) {
+  try {
+    let chemin = dossier;
+    if (!chemin) {
+      const ligne = String(fs.readFileSync('/proc/self/cgroup', 'utf8'))
+        .split('\n').find((l) => l.startsWith('0::'));
+      if (!ligne) return null;
+      chemin = nodePath.posix.join('/sys/fs/cgroup', ligne.slice(3).trim());
+    }
+    const lire = (nom) => String(fs.readFileSync(nodePath.posix.join(chemin, nom), 'utf8')).trim();
+    const limite = (nom) => {
+      const v = lire(nom);
+      return v === 'max' ? Infinity : Number(v);
+    };
+    const plafond = Math.min(limite('memory.max'), limite('memory.high'));
+    if (!Number.isFinite(plafond) || plafond <= 0) return null;
+    const courant = Number(lire('memory.current'));
+    const cacheInactif = Number(/^inactive_file (\d+)$/m.exec(lire('memory.stat'))?.[1] || 0);
+    if (!Number.isFinite(courant) || !Number.isFinite(cacheInactif)) return null;
+    const occupe = Math.max(0, courant - cacheInactif);
+    return { disponible: Math.max(0, plafond - occupe), plafond, occupe, cacheInactif };
+  } catch {
+    return null;
+  }
+}
+
 /** Mémoire du conteneur, en mégaoctets. */
 function memorySnapshot(runtime) {
   const toMb = (bytes) => Math.round(bytes / (1024 * 1024));
@@ -468,12 +516,73 @@ function memorySnapshot(runtime) {
   // Bilan du 25/10/2026 : la mémoire disponible POUR CRABE, plafond du service
   // compris (`MemoryMax` de systemd, `mem_limit` de Docker), quand c'est le
   // vrai système qu'on interroge — `os.freemem()` ne voit que la machine
-  // entière. Un `os` injecté (essais) fait foi.
-  const libre = runtime.os === nodeOs && typeof process.availableMemory === 'function'
-    ? process.availableMemory()
-    : runtime.os.freemem();
+  // entière. Un `os` injecté (essais) fait foi. 0.2.21 : sous le plafond, le
+  // cache libérable ne compte plus comme occupé (`memoireDuCgroupe`), et la
+  // machine elle-même borne toujours le résultat.
+  let libre;
+  if (runtime.os === nodeOs) {
+    const cgroupe = (runtime.memoireDuCgroupe || memoireDuCgroupe)();
+    libre = cgroupe
+      ? Math.min(cgroupe.disponible, nodeOs.freemem())
+      : typeof process.availableMemory === 'function' ? process.availableMemory() : nodeOs.freemem();
+  } else {
+    libre = runtime.os.freemem();
+  }
   const freeMb = toMb(libre);
   return { totalMb, freeMb, enough: freeMb >= MEMOIRE_LIBRE_MINIMALE_MO };
+}
+
+/**
+ * Ce qui occupe crabe en ce moment, en une phrase pour l'utilisateur (0.2.21),
+ * ou '' quand rien ne tourne. Lu en mémoire, sans sonde : les récupérations
+ * en cours et en file (une à la fois pour tout crabe, lot 90), et la visite
+ * d'entretien des sessions. Les services d'un AUTRE compte ne sont pas nommés.
+ *
+ * @param {number} userId
+ * @param {{enCours: {userId: number, connectorId: string, startedAt: string}[],
+ *          enAttente: {userId: number}[], visite: boolean}} occupations
+ * @param {{nom?: (id: string) => string, maintenant?: number}} [options]
+ */
+function phraseOccupations(userId, { enCours = [], enAttente = [], visite = false } = {}, { nom = (id) => id, maintenant = Date.now() } = {}) {
+  const depuis = (iso) => {
+    const minutes = Math.floor((maintenant - Date.parse(iso)) / 60000);
+    if (!Number.isFinite(minutes)) return '';
+    return minutes < 1 ? ' (depuis moins d\'une minute)' : ` (depuis ${minutes} min)`;
+  };
+  const morceaux = enCours.map((p) => (p.userId === userId
+    ? `la récupération ${nom(p.connectorId)}${depuis(p.startedAt)}`
+    : 'une récupération d\'un autre compte'));
+  if (enAttente.length) {
+    morceaux.push(`${enAttente.length} autre${enAttente.length > 1 ? 's' : ''} en attente`);
+  }
+  if (visite && !enCours.length) morceaux.push('une visite d\'entretien des sessions');
+  return morceaux.length ? `En cours : ${morceaux.join(', ')}.` : '';
+}
+
+/** Les occupations réelles de crabe, pour `phraseOccupations`. Ne lève jamais. */
+function occupationsDeCrabe() {
+  try {
+    const scheduler = require('./scheduler');
+    let visite = false;
+    try {
+      visite = !!require('./entretien-sessions').visiteEnCours?.();
+    } catch {
+      visite = false;
+    }
+    return { enCours: scheduler.runningPairs(), enAttente: scheduler.pairesEnAttente(), visite };
+  } catch {
+    return { enCours: [], enAttente: [], visite: false };
+  }
+}
+
+/** Le nom affiché d'un service, son identifiant à défaut. */
+function nomDuService(connectorId) {
+  try {
+    const registry = require('./connectors/registry');
+    return registry.has(connectorId) ? registry.manifest(connectorId).name : connectorId;
+  } catch {
+    return connectorId;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1222,11 +1331,23 @@ function createManager(overrides = {}) {
     // service : un Chromium qui meurt à mi-parcours ne dit jamais pourquoi.
     const memory = memorySnapshot(runtime);
     if (!memory.enough) {
-      const err = new Error(
-        `Mémoire insuffisante pour ouvrir un navigateur : ${memory.freeMb} Mo libres sur `
-          + `${memory.totalMb} Mo, il en faut au moins ${MEMOIRE_LIBRE_MINIMALE_MO}. `
-          + 'Attendez la fin des récupérations en cours, ou utilisez un fichier de session.'
+      // 0.2.21 : le refus dit CE QUI occupe crabe — « attendez la fin des
+      // récupérations en cours » laissait chercher, le 10/11/2026, une série
+      // planifiée que rien à l'écran ne montrait.
+      const occupations = phraseOccupations(
+        userId,
+        (runtime.occupations || occupationsDeCrabe)(),
+        { nom: runtime.nomDuService || nomDuService, maintenant: runtime.now() }
       );
+      const err = new Error(
+        `Mémoire insuffisante pour ouvrir un navigateur : ${memory.freeMb} Mo libres, il en faut `
+          + `au moins ${MEMOIRE_LIBRE_MINIMALE_MO}. `
+          + (occupations
+            ? `${occupations} Réessayez quand ce sera terminé, ou utilisez un fichier de session.`
+            : 'Aucune récupération n\'est en cours : réessayez dans un instant, ou utilisez un '
+              + 'fichier de session ; si cela persiste, signalez-le.')
+      );
+      runtime.log('warn', `Fenêtre refusée faute de mémoire : ${memory.freeMb} Mo libres. ${occupations || 'Rien en cours.'}`);
       err.statusCode = 503;
       err.expose = true;
       throw err;
@@ -3754,6 +3875,8 @@ module.exports = {
   findNovnc,
   // Exporté pour l'essai du bilan du 25/10/2026 (la garde lit le plafond du service).
   memorySnapshot,
+  memoireDuCgroupe,
+  phraseOccupations,
   vncPortFor,
   wsPortFor,
   manager,

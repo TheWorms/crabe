@@ -373,6 +373,11 @@ function occupe(c) {
 
 let enCours = false;
 
+/** Une visite d'entretien tourne-t-elle ? (0.2.21 : le refus de la fenêtre le dit.) */
+function visiteEnCours() {
+  return enCours;
+}
+
 /** Visite, une à une, ce qui est dû. Ne lève jamais. */
 async function tour(maintenant = horloge.maintenant()) {
   if (enCours) return [];
@@ -476,6 +481,7 @@ module.exports = {
   releveCookies,
   visiter,
   tour,
+  visiteEnCours,
   demarrer,
   arreter,
   etat,
