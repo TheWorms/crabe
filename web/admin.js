@@ -5592,7 +5592,11 @@ async function renderSysteme() {
           )}
         </div>
       </section>
-    </div>
+    </div><section class="carte" id="systeme-memoire">
+      <h2 class="carte-titre">Mémoire</h2>
+      <p class="carte-sous-titre">Ce qu'il reste à crabe, ce qui l'occupe, et la réserve qu'il garde avant d'ouvrir un navigateur</p>
+      <div id="memoire-content"><span class="text-faint">lecture…</span></div>
+    </section>
 
 
     ${
@@ -5604,6 +5608,122 @@ async function renderSysteme() {
     }`;
 
   loadRcloneStatus();
+  chargerMemoire();
+}
+
+// --- Mémoire (0.2.26) -------------------------------------------------------
+// La carte est accolée à la grille qui la précède : les essais d'écran la
+// retirent sans laisser de blanc.
+
+const memoireMo = (n) => `${esc(fmt.number(n))} Mo`;
+
+/** Lit la mémoire et remplit la carte ; « Actualiser » repasse par ici. */
+async function chargerMemoire() {
+  const el = $('memoire-content');
+  if (!el) return;
+  try {
+    renderMemoire(await api('/system/memoire'));
+  } catch {
+    el.textContent = 'indisponible';
+  }
+}
+
+/**
+ * La mesure de gauche est celle que lisent la fenêtre de connexion et la file
+ * des récupérations ; la pastille dit ce qu'elles en feraient maintenant.
+ */
+function renderMemoire(data) {
+  const r = data.reglages;
+  const [ton, verdict] = data.fenetrePossible
+    ? ['green', 'suffisante']
+    : data.recuperationPossible
+      ? ['amber', 'trop peu pour une fenêtre de connexion']
+      : ['red', 'trop peu pour une récupération'];
+  const occupations = [data.occupations, data.fenetreOuverte ? 'Une fenêtre de connexion est ouverte.' : '']
+    .filter(Boolean).join(' ') || 'Rien ne tourne.';
+
+  const mesures = `
+    <div class="storage-rows">
+      ${sysRow(
+        'Libre pour crabe',
+        `<span class="badge-pill ${ton}">${esc(verdict)}</span> ${memoireMo(data.libreMo)}
+         <span class="text-faint">· sur ${memoireMo(data.capaciteMo)}</span>`
+      )}
+      ${sysRow(
+        'Machine',
+        `${memoireMo(data.machine.totalMo)} <span class="text-faint">· ${memoireMo(data.machine.libreMo)} libres</span>`
+      )}
+      ${sysRow(
+        'Plafond du service',
+        data.service
+          ? `${memoireMo(data.service.plafondMo)} <span class="text-faint">· ${memoireMo(data.service.occupeMo)} occupés,
+             ${memoireMo(data.service.cacheMo)} de cache repris à la demande</span>`
+          : 'aucun <span class="text-faint">· crabe dispose de la mémoire de la machine</span>'
+      )}
+      ${sysRow('crabe lui-même', `${memoireMo(data.crabeMo)} <span class="text-faint">· sans ses navigateurs</span>`)}
+      ${sysRow('En ce moment', esc(occupations))}
+    </div>`;
+
+  const champ = (id, cle, libelle, aide) => `
+    <div class="field">
+      <label for="${id}">${esc(libelle)}</label>
+      <input type="number" id="${id}" inputmode="numeric" step="1"
+             min="${Number(data.bornes[cle][0])}" max="${Number(data.bornes[cle][1])}" value="${Number(r[cle])}">
+      <div class="field-help">${esc(aide)} Par défaut : ${esc(fmt.number(data.defauts[cle]))}.</div>
+    </div>`;
+
+  // L'heure de la mesure, à côté d'« Actualiser » : la carte ne se relit pas seule.
+  const lue = `<span class="text-faint memoire-lue">mesure de ${esc(fmt.time(data.lueA))}</span>`;
+
+  const reglages = can('security.manage')
+    ? `<div class="memoire-reglages">
+        ${champ('memoire-fenetre', 'fenetreMo', 'Réserve pour ouvrir une fenêtre de connexion (Mo)',
+          'En dessous, « Se connecter » est refusé, avec ce qui occupe la mémoire.')}
+        ${champ('memoire-recuperation', 'recuperationMo', 'Réserve avant une récupération (Mo)',
+          'En dessous, la file attend que la mémoire revienne avant de lancer la suivante.')}
+        ${champ('memoire-attente', 'attenteS', 'Attente la plus longue (secondes)',
+          'Passé ce délai, la récupération part quand même. 0 : ne jamais attendre.')}
+        <div class="memoire-actions">
+          <button type="button" class="btn-mini" onclick="enregistrerMemoire()">Enregistrer</button>
+          <button type="button" class="btn-mini" onclick="enregistrerMemoire(true)">Valeurs par défaut</button>
+          <button type="button" class="btn-mini" onclick="chargerMemoire()">Actualiser</button>${lue}
+        </div>
+      </div>`
+    : `<div class="storage-rows">
+        ${sysRow('Réserve de la fenêtre de connexion', memoireMo(r.fenetreMo))}
+        ${sysRow('Réserve des récupérations', memoireMo(r.recuperationMo))}
+        ${sysRow('Attente de la file', r.attenteS ? `${esc(fmt.number(r.attenteS))} s au plus` : 'aucune')}
+        <div class="memoire-actions">
+          <button type="button" class="btn-mini" onclick="chargerMemoire()">Actualiser</button>${lue}
+        </div>
+      </div>`;
+
+  $('memoire-content').innerHTML = `<div class="split-2">${mesures}${reglages}</div>`;
+}
+
+/**
+ * Enregistre les trois réserves — ou rend les valeurs par défaut. Un champ
+ * vide ou qui n'est pas un nombre entier part tel quel : le serveur dit la
+ * borne, et rien n'est enregistré.
+ */
+async function enregistrerMemoire(parDefaut = false) {
+  const lu = (id) => {
+    const brut = String($(id).value).trim();
+    return /^\d+$/.test(brut) ? Number(brut) : brut;
+  };
+  const corps = parDefaut
+    ? { fenetreMo: null, recuperationMo: null, attenteS: null }
+    : {
+        fenetreMo: lu('memoire-fenetre'),
+        recuperationMo: lu('memoire-recuperation'),
+        attenteS: lu('memoire-attente'),
+      };
+  try {
+    renderMemoire(await api('/system/memoire', { method: 'PUT', body: corps }));
+    showToast(parDefaut ? 'Réserves de mémoire : valeurs par défaut' : 'Réserves de mémoire enregistrées');
+  } catch (err) {
+    showToast(err.message);
+  }
 }
 
 /** Ouvre la modale Date et heure, listes remplies au moment de l'ouverture. */

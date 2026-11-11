@@ -1004,6 +1004,12 @@
         <div style="font-weight:500;font-size:15px;" id="rb-name"></div>
         <div class="modal-sub" id="rb-state"></div>
       </div>
+      <!-- 0.2.25 — ne se montre que si le bandeau d'explication a été rangé
+           (« Ne plus afficher ») : il le remontre le temps d'une connexion. -->
+      <button type="button" class="rb-aide" id="rb-aide" hidden
+              title="Revoir les explications de cette fenêtre"
+              aria-label="Revoir les explications de cette fenêtre"
+              onclick="afficherBandeauConnexion(true)">?</button>
       <div class="rb-countdown" id="rb-countdown"></div>
       <button class="modal-close" onclick="cancelRemoteLogin()">✕</button>
     </div>
@@ -1013,8 +1019,19 @@
          différents : « Connectez-vous comme vous le feriez sur le site… » puis
          le `hint` du manifeste, « Connectez-vous comme d'habitude… ». Celui
          qui reste porte la seule information utile : la fenêtre se ferme
-         seule, et la connexion enregistrée vaut environ un an. -->
-    <div class="rb-banner" id="rb-banner"></div>
+         seule, et la connexion enregistrée vaut environ un an.
+
+         0.2.25 — « Ne plus afficher » : utile la première fois, le bandeau
+         prend ensuite trois lignes à chaque reconnexion, autant de hauteur
+         retirée à l'écran distant. Le choix est mémorisé par compte
+         (`connexion.bandeau.masque`) ; le bandeau ne revient jamais de
+         lui-même, « ? » (dans la tête de la fenêtre) le remontre. -->
+    <div class="rb-banner" id="rb-bandeau">
+      <span class="rb-banner-texte" id="rb-banner"></span>
+      <button type="button" class="rb-banner-fermer" id="rb-banner-fermer"
+              title="Ranger ces explications pour de bon : le « ? » en haut de la fenêtre les remontrera"
+              onclick="masquerBandeauConnexion()">Ne plus afficher</button>
+    </div>
 
     <!-- « Saisir mes identifiants » (§7.3a).
          Le presse-papiers est un cul-de-sac dans les deux sens : l'API n'existe

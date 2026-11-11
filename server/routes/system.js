@@ -25,6 +25,8 @@ const horloge = require('../horloge');
 const emailTemplates = require('../email-templates');
 const { config } = require('../config');
 const version = require('../version');
+const memoire = require('../memoire');
+const remoteBrowser = require('../remote-browser');
 const {
   requirePermission,
   requireAnyAdminPermission,
@@ -229,6 +231,66 @@ router.put(
         '.'
     );
     res.json({ ok: true, settings: updated });
+  })
+);
+
+// ---------------------------------------------------------------------------
+// Mémoire (0.2.26) : ce qui reste à crabe, ce qui l'occupe, ses deux réserves
+// ---------------------------------------------------------------------------
+
+/**
+ * La mémoire à l'instant et les réserves en vigueur. `libreMo` est la mesure
+ * que lisent la fenêtre de connexion et la file des récupérations : les deux
+ * verdicts (`fenetrePossible`, `recuperationPossible`) sont ceux qu'elles
+ * rendraient maintenant. Les occupations ne nomment que les services du compte
+ * qui regarde, comme partout ailleurs.
+ */
+function vueMemoire(req) {
+  const etat = memoire.etat();
+  const reglages = memoire.reglages();
+  let fenetreOuverte = false;
+  try {
+    fenetreOuverte = remoteBrowser.manager().ouverte();
+  } catch {
+    fenetreOuverte = false;
+  }
+  return {
+    ...etat,
+    reglages,
+    defauts: memoire.DEFAUTS,
+    bornes: memoire.BORNES,
+    fenetrePossible: etat.libreMo >= reglages.fenetreMo,
+    recuperationPossible: etat.libreMo >= reglages.recuperationMo,
+    occupations: remoteBrowser.phraseOccupations(req.user.id, remoteBrowser.occupationsDeCrabe(), {
+      nom: remoteBrowser.nomDuService,
+    }),
+    fenetreOuverte,
+    lueA: new Date().toISOString(),
+  };
+}
+
+router.get('/memoire', requireAnyAdminPermission, (req, res) => {
+  res.json(vueMemoire(req));
+});
+
+/**
+ * Régler les réserves : `null` rend la valeur par défaut. Appliquées
+ * aussitôt — la fenêtre lit la sienne à chaque ouverture, la file reçoit la
+ * sienne ici —, sans redémarrage.
+ */
+router.put(
+  '/memoire',
+  requireSecurity,
+  asyncHandler(async (req, res) => {
+    const apres = memoire.regler(req.body, { capaciteMo: memoire.etat().capaciteMo });
+    scheduler.appliquerReglagesMemoire(apres);
+    applog.admin(
+      req,
+      `Mémoire : réserve de la fenêtre de connexion ${apres.fenetreMo} Mo, `
+        + `réserve des récupérations ${apres.recuperationMo} Mo, `
+        + (apres.attenteS ? `attente de la file ${apres.attenteS} s au plus.` : 'la file n\'attend pas.')
+    );
+    res.json({ ok: true, ...vueMemoire(req) });
   })
 );
 

@@ -509,6 +509,20 @@ function memoireDuCgroupe({ fs = nodeFs, dossier = null } = {}) {
   }
 }
 
+/**
+ * La réserve qu'il faut pour ouvrir la fenêtre : celle de l'administration
+ * (0.2.26, `server/memoire.js` — 1 200 Mo tant que rien n'est réglé), ou celle
+ * qu'un essai injecte.
+ */
+function reserveDeLaFenetreMo(runtime) {
+  if (Number.isFinite(runtime?.reserveFenetreMo)) return runtime.reserveFenetreMo;
+  try {
+    return require('./memoire').reglages().fenetreMo;
+  } catch {
+    return MEMOIRE_LIBRE_MINIMALE_MO;
+  }
+}
+
 /** Mémoire du conteneur, en mégaoctets. */
 function memorySnapshot(runtime) {
   const toMb = (bytes) => Math.round(bytes / (1024 * 1024));
@@ -529,7 +543,8 @@ function memorySnapshot(runtime) {
     libre = runtime.os.freemem();
   }
   const freeMb = toMb(libre);
-  return { totalMb, freeMb, enough: freeMb >= MEMOIRE_LIBRE_MINIMALE_MO };
+  const neededMb = reserveDeLaFenetreMo(runtime);
+  return { totalMb, freeMb, neededMb, enough: freeMb >= neededMb };
 }
 
 /**
@@ -1341,7 +1356,7 @@ function createManager(overrides = {}) {
       );
       const err = new Error(
         `Mémoire insuffisante pour ouvrir un navigateur : ${memory.freeMb} Mo libres, il en faut `
-          + `au moins ${MEMOIRE_LIBRE_MINIMALE_MO}. `
+          + `au moins ${memory.neededMb}. `
           + (occupations
             ? `${occupations} Réessayez quand ce sera terminé, ou utilisez un fichier de session.`
             : 'Aucune récupération n\'est en cours : réessayez dans un instant, ou utilisez un '
@@ -3913,6 +3928,8 @@ module.exports = {
   memorySnapshot,
   memoireDuCgroupe,
   phraseOccupations,
+  occupationsDeCrabe,
+  nomDuService,
   vncPortFor,
   wsPortFor,
   manager,

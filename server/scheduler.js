@@ -86,6 +86,23 @@ const reglagesMemoire = {
   },
 };
 
+/**
+ * Les réserves réglées dans l'administration (0.2.26, `server/memoire.js`)
+ * posées sur la pompe : au démarrage, puis à chaque enregistrement. Pendant
+ * les essais l'attente reste nulle — aucun essai n'attend la mémoire de la
+ * machine qui le joue. Une attente réglée à 0 coupe l'attente, pas la file.
+ *
+ * @param {{recuperationMo: number, attenteS: number}} [reglages] ceux de la base à défaut
+ */
+function appliquerReglagesMemoire(reglages, { essai = process.env.NODE_ENV === 'test' } = {}) {
+  try {
+    const lus = reglages || require('./memoire').reglages();
+    reglagesMemoire.seuilMo = lus.recuperationMo;
+    if (!essai) reglagesMemoire.attenteMaxMs = lus.attenteS * 1000;
+  } catch { /* les valeurs en place restent */ }
+  return reglagesMemoire;
+}
+
 async function attendreLaMemoire() {
   if (!(reglagesMemoire.attenteMaxMs > 0)) return;
   const debut = Date.now();
@@ -2072,6 +2089,8 @@ function cloreLesExecutionsInterrompues() {
 
 function start() {
   enArret = false;
+  // 0.2.26 : les réserves de mémoire de l'administration, avant tout départ.
+  appliquerReglagesMemoire();
   // L'ordre compte : les lignes restées « en cours » se ferment d'abord (la
   // récupération qui tournait à l'arrêt devient un échec dit, jamais une
   // relance), puis ce qui ATTENDAIT son tour reprend, une seule fois (lot 90).
@@ -2106,6 +2125,7 @@ module.exports = {
   isRunning,
   tientLaCle,
   reglagesMemoire,
+  appliquerReglagesMemoire,
   attendreLaMemoire,
   runningPairs,
   attentePour,

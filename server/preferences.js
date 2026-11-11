@@ -241,6 +241,21 @@ const KEYS = {
    * à jour, il change parce que quelqu'un a cliqué.
    */
   'fichiers.convention': 'avec-service',
+  /**
+   * La fenêtre de connexion : le bandeau d'explication est rangé (0.2.25).
+   *
+   * « Connectez-vous comme sur le site : la fenêtre se fermera d'elle-même… »
+   * sert la première fois ; ensuite, il prend trois lignes à chaque
+   * reconnexion, retirées à l'écran distant. « Ne plus afficher » pose ce
+   * réglage, et le bandeau ne revient plus de lui-même — « ? » le remontre
+   * à la demande.
+   *
+   * Un seul réglage pour tous les services, et non un par service : c'est la
+   * même consigne partout, et la ranger quarante fois ne serait pas la ranger.
+   * Par COMPTE : chacun la lit une première fois, et le choix suit d'un poste
+   * à l'autre.
+   */
+  'connexion.bandeau.masque': false,
 };
 
 /**

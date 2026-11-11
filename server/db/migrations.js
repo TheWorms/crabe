@@ -1539,6 +1539,23 @@ const MIGRATIONS = [
       database.exec('CREATE INDEX IF NOT EXISTS idx_connexions_fenetre_couple ON connexions_fenetre(user_id, connector_id, debut)');
     },
   },
+  {
+    id: 76,
+    name: 'les réserves de mémoire',
+    // 0.2.26 (demande du compte observé du 11/11/2026) : la réserve de la fenêtre de
+    // connexion, celle des récupérations et l'attente de la file se règlent
+    // dans Administration › Système (`server/memoire.js`). Une colonne vide
+    // vaut la valeur par défaut du code : rien ne change pour qui ne règle rien.
+    //
+    // Additive : revenir au code d'avant laisse trois colonnes que personne
+    // ne lit.
+    up(database) {
+      if (!hasTable(database, 'app_settings')) return;
+      addColumn(database, 'app_settings', 'memoire_fenetre_mo', 'INTEGER');
+      addColumn(database, 'app_settings', 'memoire_recuperation_mo', 'INTEGER');
+      addColumn(database, 'app_settings', 'memoire_attente_s', 'INTEGER');
+    },
+  },
 ];
 
 /**

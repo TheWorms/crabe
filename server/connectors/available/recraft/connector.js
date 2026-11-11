@@ -57,8 +57,10 @@ const ouverture = {
   lancement: () => identity.optionsLancement(),
   contexte: () => ({}),
   adresseDuPdf: (url) => url,
-  /** L'attente d'un portail peint (30 s ; réduite par les essais). */
+  /** L'attente de l'historique du portail (30 s ; réduite par les essais). */
   delaiPeintureMs: 30_000,
+  /** Puis celle de ses lignes de factures, une fois l'intertitre affiché. */
+  delaiLignesMs: 15_000,
 };
 
 /**
@@ -72,14 +74,23 @@ const INTERTITRE_FACTURATION = /informations de facturation|billing (details|inf
 const LIBELLE_PORTAIL = /^\s*(g[ée]rer|manage)\s*$|manage billing|billing details/i;
 
 /**
- * Le portail est-il PEINT ? MESURÉ (01/11/2026) : l'intertitre « Historique de
- * facturation » (« Invoice history » en anglais) et le lien « Retour vers
- * Recraft, Inc. » (`data-testid="return-to-business-link"`). Le premier essai
- * réel a relevé le portail trop tôt — aucun lien, pas même celui-là — et
- * concluait « aucune facture » : un faux succès.
+ * L'historique du portail est-il PEINT ? MESURÉ (01/11/2026) : l'intertitre
+ * « Historique de facturation » (« Invoice history » en anglais), puis une
+ * ligne `a[data-testid="hip-link"]` par facture. Le premier essai réel a relevé
+ * le portail trop tôt — aucun lien — et concluait « aucune facture » : un faux
+ * succès.
+ *
+ * MESURÉ (11/11/2026, récupérations n° 1020 et 1022) : le portail peint
+ * d'abord son volet de gauche — le lien « Retour vers Recraft, Inc. »
+ * (`data-testid="return-to-business-link"`) — et l'historique seulement après
+ * la réponse de `…/invoices`. Le lien de retour ne dit donc RIEN de
+ * l'historique : attendu à sa place, il laissait lire une page à moitié peinte,
+ * et l'échec annonçait trente secondes d'attente qui n'avaient pas eu lieu.
+ * C'est l'historique lui-même qui s'attend : son intertitre, ou une ligne de
+ * facture (si Stripe renomme l'intertitre, les lignes suffisent).
  */
-const PORTAIL_PEINT = '[data-testid="return-to-business-link"], [data-testid="billing-portal-invoice-row"]';
-const INTERTITRE_HISTORIQUE = /historique de facturation|invoice history|billing history/i;
+const INTERTITRE_HISTORIQUE = /historique de(s)? factur(ation|es)|invoice history|billing history/i;
+const LIGNE_DE_FACTURE = 'a[data-testid="hip-link"], [data-testid="billing-portal-invoice-row"], a[href*="invoice.stripe.com/i/"]';
 
 /** Le bouton du portail Stripe qui déplie l'historique. */
 const LIBELLE_PLUS = /^\s*(view more|voir plus|afficher plus|show more)\s*$/i;
@@ -206,19 +217,36 @@ async function ouvrirLePortail(page, context, log) {
   return portail;
 }
 
+/**
+ * Les repères de la page (`data-testid`), pour le journal d'un échec : ils
+ * disent de quoi le portail est fait sans rien dire du compte. Ceux qui
+ * portent un chiffre ou un tiret bas (un identifiant de Stripe) sont écartés.
+ */
+async function reperesDuPortail(portail) {
+  const vus = await portail.evaluate(() => [...document.querySelectorAll('[data-testid]')]
+    .map((e) => e.getAttribute('data-testid') || '')).catch(() => []);
+  return [...new Set(vus.filter((nom) => /^[a-z][a-z-]{1,40}$/i.test(nom)))].slice(0, 30);
+}
+
 /** Déplie l'historique des factures, puis rend ses documents. */
 async function releverLePortail(portail, log) {
-  // Attendre que le portail soit peint : « networkidle » arrive tôt quand des
-  // ressources de Stripe sont bloquées (filtre DNS, mesuré le 01/11/2026).
-  await portail.waitForSelector(PORTAIL_PEINT, { timeout: ouverture.delaiPeintureMs }).catch(() => {});
-  const texte = await portail.evaluate(() => (document.body ? document.body.innerText : '')).catch(() => '');
-  if (!INTERTITRE_HISTORIQUE.test(texte)) {
-    throw new Error(`Le portail de facturation de ${NOM} s'est ouvert mais ne s'est pas affiché `
-      + `(ni « Historique de facturation », ni la liste des factures, après ${ouverture.delaiPeintureMs / 1000} s) : `
+  // Attendre l'historique LUI-MÊME : « networkidle » arrive tôt quand des
+  // ressources de Stripe sont bloquées (filtre DNS, mesuré le 01/11/2026), et
+  // le volet de gauche se peint avant lui (mesuré le 11/11/2026).
+  const lignes = portail.locator(LIGNE_DE_FACTURE);
+  const historique = portail.getByText(INTERTITRE_HISTORIQUE).first().or(lignes.first()).first();
+  const peint = await historique.waitFor({ state: 'attached', timeout: ouverture.delaiPeintureMs }).then(() => true, () => false)
+    // Un intertitre découpé en plusieurs éléments échappe au sélecteur, pas au texte de la page.
+    || INTERTITRE_HISTORIQUE.test(await portail.evaluate(() => (document.body ? document.body.innerText : '')).catch(() => ''));
+  if (!peint) {
+    const reperes = await reperesDuPortail(portail);
+    log(`${ID} : historique du portail introuvable ; repères de la page : ${reperes.length ? reperes.join(', ') : 'aucun'}.`);
+    throw new Error(`Le portail de facturation de ${NOM} s'est ouvert, mais son historique ne s'est pas affiché `
+      + `en ${Math.round(ouverture.delaiPeintureMs / 1000)} s (ni « Historique de facturation », ni une ligne de facture) : `
       + 'rien n\'a pu être lu. Relancez la récupération ; si cela se reproduit, signalez-le.');
   }
-  // Les lignes de factures, si l'historique en a.
-  await portail.waitForSelector('a[data-testid="hip-link"]', { timeout: 5_000 }).catch(() => {});
+  // Les lignes de factures suivent l'intertitre : elles attendent la réponse de Stripe.
+  await lignes.first().waitFor({ state: 'attached', timeout: ouverture.delaiLignesMs }).catch(() => {});
   for (let i = 0; i < DEPLIAGES_MAX; i++) {
     const plus = portail.getByRole('button', { name: LIBELLE_PLUS }).first();
     if (!(await plus.count().catch(() => 0)) || !(await plus.isVisible().catch(() => false))) break;

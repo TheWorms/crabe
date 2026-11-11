@@ -7483,7 +7483,7 @@ async function openRemoteLogin(connectorId) {
   // chose en des termes à peine différents. Celui-ci porte l'information
   // utile — la fenêtre se ferme seule, la connexion vaut environ un an — et le
   // `hint` du manifeste quand il ajoute quelque chose de propre au service.
-  $('rb-banner').textContent = bandeauConnexion(connector);
+  poserBandeauConnexion(bandeauConnexion(connector));
   $('rb-result').className = 'test-result';
   $('rb-result').textContent = '';
   // « Fermer / Abandonner » est disponible dès l'ouverture et à tout moment
@@ -7552,9 +7552,9 @@ async function openAutorisationStockage(destId, infos = {}) {
   applyLogo($('rb-logo'), { color: infos.color || 'var(--teal)', letters: infos.letters || '' });
   $('rb-name').textContent = `Se connecter à ${nom}`;
   $('rb-state').textContent = 'Préparation…';
-  $('rb-banner').textContent = `Connectez-vous à ${nom} dans cette fenêtre, puis autorisez `
+  poserBandeauConnexion(`Connectez-vous à ${nom} dans cette fenêtre, puis autorisez `
     + 'l\'accès. La fenêtre se fermera toute seule — la clé d\'accès est rangée chiffrée, '
-    + 'elle ne s\'affiche jamais.';
+    + 'elle ne s\'affiche jamais.');
   $('rb-result').className = 'test-result';
   $('rb-result').textContent = '';
   $('rb-cancel').textContent = 'Fermer / Abandonner';
@@ -8134,6 +8134,35 @@ function bandeauConnexion(connector) {
   if (propre && !redondant) morceaux.push(propre);
   if (!/se souvenir|rester connect/i.test(propre)) morceaux.push(conseil);
   return morceaux.join(' ');
+}
+
+/**
+ * Pose le bandeau d'explication de la fenêtre de connexion (0.2.25).
+ *
+ * Utile la première fois, il prend ensuite trois lignes à chaque reconnexion —
+ * autant de hauteur retirée à l'écran distant. « Ne plus afficher » le range
+ * pour de bon : le choix est mémorisé PAR COMPTE (`connexion.bandeau.masque`),
+ * vaut pour tous les services et suit d'un poste à l'autre. Le bandeau ne
+ * revient jamais de lui-même ; « ? », dans la tête de la fenêtre, le
+ * remontre le temps d'une connexion — l'indice propre à un service qu'on
+ * connecte pour la première fois reste ainsi à un clic.
+ */
+function poserBandeauConnexion(texte) {
+  $('rb-banner').textContent = texte;
+  afficherBandeauConnexion(!prefs.values['connexion.bandeau.masque']);
+}
+
+/** Montre le bandeau, ou le range ; « ? » n'existe que bandeau rangé. */
+function afficherBandeauConnexion(visible) {
+  $('rb-bandeau').hidden = !visible;
+  $('rb-aide').hidden = !!visible;
+}
+
+/** « Ne plus afficher » : rangé tout de suite, mémorisé ensuite. */
+function masquerBandeauConnexion() {
+  prefs.values['connexion.bandeau.masque'] = true;
+  afficherBandeauConnexion(false);
+  savePref('connexion.bandeau.masque', true);
 }
 
 /** Le bouton de saisie repart inactif : l'état réel vient du serveur. */

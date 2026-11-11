@@ -6,6 +6,37 @@ Pour mettre à jour votre crabe : [docs/MISE-A-JOUR.md](docs/MISE-A-JOUR.md) (En
 
 ---
 
+## 0.2.26 — la mémoire se lit et se règle dans l'administration (11/11/2026)
+
+### Administration › Système
+- **Une carte « Mémoire »**, sous « Logiciel » et « Infrastructure ». À gauche, la mémoire à l'instant : ce qu'il reste à crabe — la mesure même que lisent la fenêtre de connexion et la file des récupérations —, avec une pastille qui dit ce qu'elles en feraient maintenant (« suffisante », « trop peu pour une fenêtre de connexion », « trop peu pour une récupération ») ; la mémoire de la machine ; le plafond du service quand il y en a un, ce qu'il occupe et le cache repris à la demande ; ce que pèse crabe lui-même ; et ce qui tourne en ce moment — la récupération en cours (son service n'est nommé que si elle est à vous), celles qui attendent leur tour, une fenêtre de connexion ouverte. « Actualiser » relit la mesure, dont l'heure est affichée à côté.
+- **Trois réglages**, à droite, là où le code portait des valeurs fixes — justes pour 4 Go de mémoire, et pour cette taille seulement :
+  - la réserve pour ouvrir une fenêtre de connexion (1 200 Mo par défaut) : en dessous, « Se connecter » est refusé, et le refus cite désormais la réserve réglée ;
+  - la réserve avant une récupération (600 Mo par défaut) : en dessous, la file attend que la mémoire revienne avant de lancer la suivante ;
+  - l'attente la plus longue (180 secondes par défaut) : passé ce délai, la récupération part quand même ; à 0, la file n'attend jamais.
+- Les réglages s'appliquent aussitôt, sans redémarrage, et chaque changement s'écrit au journal d'administration. « Valeurs par défaut » rend celles de crabe.
+- crabe refuse une valeur hors bornes, et une réserve plus grande que la mémoire dont il dispose : elle ne serait jamais atteinte — la fenêtre ne s'ouvrirait plus, la file attendrait à chaque départ.
+- La carte se lit avec n'importe quelle permission d'administration ; les réglages demandent « Configurer la sécurité ».
+
+### Pour les mainteneurs
+- Migration 76 : trois colonnes dans `app_settings` (`memoire_fenetre_mo`, `memoire_recuperation_mo`, `memoire_attente_s`). Vides, elles valent les valeurs par défaut : rien ne change pour une installation qui ne règle rien. crabe copie la base avant de l'appliquer, comme à chaque migration.
+- `GET` et `PUT /api/system/memoire` ; `server/memoire.js`.
+
+---
+
+## 0.2.25 — Recraft rétabli, et des explications qui se rangent (11/11/2026)
+
+### Corrigé
+- **Recraft : « Le portail de facturation s'est ouvert mais ne s'est pas affiché »**, une seconde après son ouverture — et non au bout des trente secondes annoncées. Le portail de facturation (Stripe) affiche désormais son lien de retour avant la liste des factures ; crabe prenait ce lien pour le signe que la page était prête, la lisait trop tôt et n'y trouvait rien. Il attend maintenant l'historique lui-même — son intertitre ou une première ligne de facture, trente secondes au plus —, puis les lignes. Une facture affichée sous un intertitre que crabe ne connaît pas est lue quand même.
+- Si l'historique ne s'affiche vraiment pas, le message dit le délai réellement attendu, et le journal garde les repères de la page : un rapport suffit alors à corriger.
+
+### Fenêtre de connexion
+- **« Ne plus afficher »** : le bandeau d'explication (« Connectez-vous comme sur le site : la fenêtre se fermera d'elle-même… ») se range d'un clic et ne revient plus — ni à la reconnexion suivante, ni pour un autre service, ni sur un autre poste : le choix est gardé sur votre compte. À chaque reconnexion, il prenait jusqu'à trois lignes au-dessus de l'écran du site, davantage sur un téléphone.
+- Une pastille « ? », en haut de la fenêtre, le remontre le temps d'une connexion : l'indice propre à un service que vous connectez pour la première fois reste à un clic.
+- Sur un écran étroit, le bouton passe sous le texte au lieu de lui prendre de la largeur.
+
+---
+
 ## 0.2.24 — crabe compresse lui-même ses réponses (11/11/2026)
 
 ### Plus rapide

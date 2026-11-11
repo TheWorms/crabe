@@ -516,6 +516,11 @@ CREATE TABLE IF NOT EXISTS app_settings (
   entretien_sessions INTEGER NOT NULL DEFAULT 1,
   -- Migration 73 : la reconnexion automatique, active par défaut.
   reconnexion_auto INTEGER NOT NULL DEFAULT 1,
+  -- Migration 76 : les réserves de mémoire (server/memoire.js) — vide : la
+  -- valeur par défaut du code.
+  memoire_fenetre_mo      INTEGER,
+  memoire_recuperation_mo INTEGER,
+  memoire_attente_s       INTEGER,
   updated_at       TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
