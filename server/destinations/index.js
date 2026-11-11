@@ -2016,9 +2016,12 @@ function connectorNameOf(connectorId) {
  * @param {{connector_id: string, account_id?: string, filename: string,
  *          issued_on?: string, destinations?: string}} invoice
  * @param {string} username propriétaire de la facture
+ * @param {(chemin: string) => boolean} [existe] 0.2.23 : la question « ce
+ *   fichier est-il là ? » — par défaut posée au stockage, candidat par
+ *   candidat. « Mes documents » y passe une réponse lue un dossier à la fois.
  * @returns {string|null}
  */
-function invoicePath(invoice, username) {
+function invoicePath(invoice, username, existe = null) {
   const root = readConfig('local')?.path;
   if (!root || !invoice) return null;
 
@@ -2048,7 +2051,7 @@ function invoicePath(invoice, username) {
 
   for (const candidat of candidats) {
     try {
-      if (fsLocal.existsSync(candidat)) return candidat;
+      if (existe ? existe(candidat) : fsLocal.existsSync(candidat)) return candidat;
     } catch {
       /* chemin illisible : on essaie le suivant */
     }

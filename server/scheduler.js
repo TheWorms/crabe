@@ -52,6 +52,59 @@ function isRunning(userId, connectorId) {
   return running.has(lockKey(userId, connectorId));
 }
 
+/**
+ * La clé d'un profil de navigateur (`inflight.profilKey`, même forme que
+ * `lockKey`) est-elle celle d'une récupération qui tourne encore ? C'est la
+ * preuve de vie du verrou de profil (0.2.23) : l'entrée ne quitte la table
+ * qu'à la vraie fin de l'exécution.
+ */
+function tientLaCle(cle) {
+  return running.has(String(cle));
+}
+
+/**
+ * La mémoire avant chaque départ de la file (0.2.23).
+ *
+ * La fenêtre de connexion refuse de s'ouvrir sous son seuil ; une récupération
+ * planifiée, elle, lançait son Chromium sans rien regarder — par-dessus une
+ * fenêtre ouverte et une visite d'entretien, c'est le plafond du service qui
+ * tranchait, en tuant un navigateur au hasard. La pompe ATTEND désormais que
+ * la mémoire revienne, sans jamais refuser : passé le délai, elle part quand
+ * même et le dit au journal. La demande reste en file pendant l'attente —
+ * un arrêt de crabe ne la perd pas.
+ */
+const reglagesMemoire = {
+  seuilMo: 600,
+  attenteMaxMs: process.env.NODE_ENV === 'test' ? 0 : 3 * 60_000,
+  pasMs: 10_000,
+  /** @returns {number} la mémoire libre pour crabe, en mégaoctets */
+  lire() {
+    const os = require('node:os');
+    const cgroupe = require('./remote-browser').memoireDuCgroupe();
+    const octets = cgroupe ? Math.min(cgroupe.disponible, os.freemem()) : os.freemem();
+    return Math.round(octets / (1024 * 1024));
+  },
+};
+
+async function attendreLaMemoire() {
+  if (!(reglagesMemoire.attenteMaxMs > 0)) return;
+  const debut = Date.now();
+  let libre = Infinity;
+  for (;;) {
+    try { libre = reglagesMemoire.lire(); } catch { return; }
+    if (libre >= reglagesMemoire.seuilMo || enArret) return;
+    if (Date.now() - debut >= reglagesMemoire.attenteMaxMs) break;
+    await new Promise((resolve) => setTimeout(resolve, reglagesMemoire.pasMs));
+  }
+  try {
+    applog.warn(
+      'scheduler',
+      `Mémoire toujours basse après ${Math.round((Date.now() - debut) / 1000)} s d'attente `
+        + `(${libre} Mo libres, ${reglagesMemoire.seuilMo} souhaités) — la récupération suivante part quand même.`
+    );
+  } catch { /* le journal est en base */ }
+}
+
 /** Couples en cours d'exécution, pour l'affichage de l'accueil. */
 function runningPairs() {
   return [...running.entries()].map(([key, startedAt]) => {
@@ -98,6 +151,32 @@ const fileAttente = [];
 /** Clés `userId:connectorId` en file — le refus de doublon se lit d'un regard. */
 const clesEnFile = new Set();
 let pompeEnMarche = false;
+/** 0.2.22 : vrai entre `stop()` et le `start()` suivant — la pompe ne sert plus. */
+let enArret = false;
+
+/**
+ * Retire une tâche de node-cron pour de bon (`destroy`) ; `stop` seul la
+ * laisse dans son registre.
+ */
+function detruire(task) {
+  try {
+    const fin = task?.destroy ? task.destroy() : task?.stop?.();
+    fin?.catch?.(() => {});
+  } catch { /* une tâche déjà détruite */ }
+}
+
+/**
+ * Un Chromium qui n'est PAS celui d'une récupération tourne-t-il ? La fenêtre
+ * de connexion et la visite d'entretien ne figurent pas dans `running`.
+ */
+function autreNavigateurOuvert() {
+  try {
+    if (require('./remote-browser').manager().ouverte()) return true;
+    return !!require('./entretien-sessions').visiteEnCours();
+  } catch {
+    return true; // dans le doute, on n'éteint aucun profil jetable
+  }
+}
 
 const prioriteDe = (trigger) => (trigger === 'cron' ? PRIORITE_PROGRAMMEE : PRIORITE_PERSONNE);
 
@@ -198,10 +277,15 @@ function mettreEnFile(user, connectorId, trigger, options) {
  * récupération — c'est ce qui garantit « une seule en cours pour tout crabe ».
  */
 async function pomperLaFile() {
-  if (pompeEnMarche) return;
+  if (pompeEnMarche || enArret) return;
   pompeEnMarche = true;
   try {
-    while (fileAttente.length) {
+    // 0.2.22 : à l'arrêt du service, la pompe ne sort plus rien de la file.
+    // La récupération en cours tombait avec son Chromium, la pompe passait à
+    // la suivante — sortie de la table, donc jamais reprise au redémarrage.
+    while (fileAttente.length && !enArret) {
+      if (reglagesMemoire.attenteMaxMs > 0) await attendreLaMemoire();
+      if (enArret || !fileAttente.length) break;
       const entree = fileAttente.shift();
       clesEnFile.delete(entree.key);
       // Bilan du 25/10/2026 : une erreur ici (écriture en base refusée, disque
@@ -1407,9 +1491,12 @@ async function runLocked(user, connectorId, trigger, options = {}) {
       // Ce couple-ci tient encore son verrou (`running.delete` vit dans le
       // `finally` de runForUser, qui n'a pas encore joué) : s'il est seul dans
       // la table, aucune autre exécution ne peut revendiquer un navigateur.
+      // 0.2.22 : la table ne connaît que les récupérations. Une fenêtre de
+      // connexion ou une visite d'entretien ont aussi leur Chromium à profil
+      // jetable — l'abandon éteignait celui d'un utilisateur en pleine saisie.
       const seul = runningPairs().every(
         (p) => p.userId === userId && p.connectorId === connectorId
-      );
+      ) && !autreNavigateurOuvert();
       eteindreNavigateur.eteindre(
         { profil: profilPersistant.chemin(userId, connectorId), seul },
         {
@@ -1725,7 +1812,9 @@ function echeancesARattraper(maintenant, { armee = (s) => tasks.has(s.id) } = {}
 
 /** Arrête toutes les tâches cron enregistrées. */
 function stopAll() {
-  for (const task of tasks.values()) task.stop();
+  // 0.2.22 : `destroy`, pas `stop` — node-cron garde dans son registre une
+  // tâche seulement arrêtée, et chaque rechargement en laissait autant.
+  for (const task of tasks.values()) detruire(task);
   tasks.clear();
 }
 
@@ -1899,6 +1988,10 @@ function startMaintenance() {
         // filet peut agir — cache seul, journalisé. Ne lève jamais.
         require('./optimisation').entretienQuotidien();
 
+        // 0.2.22 : après les purges, les statistiques de la base et le repli
+        // de son journal d'écriture (voir db.entretenir).
+        db.entretenir();
+
         lastMaintenanceAt = new Date().toISOString();
       } catch (err) {
         applog.error('scheduler', `Entretien quotidien en échec : ${err.message}`);
@@ -1978,6 +2071,7 @@ function cloreLesExecutionsInterrompues() {
 }
 
 function start() {
+  enArret = false;
   // L'ordre compte : les lignes restées « en cours » se ferment d'abord (la
   // récupération qui tournait à l'arrêt devient un échec dit, jamais une
   // relance), puis ce qui ATTENDAIT son tour reprend, une seule fois (lot 90).
@@ -1995,10 +2089,11 @@ function start() {
 }
 
 function stop() {
+  enArret = true;
   stopAll();
   require('./entretien-sessions').arreter();
   if (maintenanceTask) {
-    maintenanceTask.stop();
+    detruire(maintenanceTask);
     maintenanceTask = null;
   }
 }
@@ -2009,6 +2104,9 @@ module.exports = {
   decisionDepot,
   premierNomLibre,
   isRunning,
+  tientLaCle,
+  reglagesMemoire,
+  attendreLaMemoire,
   runningPairs,
   attentePour,
   pairesEnAttente,

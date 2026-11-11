@@ -1487,7 +1487,10 @@ function createManager(overrides = {}) {
     try {
       await bringUp(session);
     } catch (err) {
-      await terminate(session, 'error', err.message);
+      // Déjà éteinte (annulation pendant la mise en route) : son état dit
+      // pourquoi, on ne le remplace pas par une erreur.
+      if (session.stopped) await terminate(session);
+      else await terminate(session, 'error', err.message);
       throw err;
     }
 
@@ -1619,7 +1622,16 @@ function createManager(overrides = {}) {
       `127.0.0.1:${session.vncPort}`,
     ]);
 
-    session.browser = await openBrowser(session);
+    const navigateur = await openBrowser(session);
+    // 0.2.22 : annulée (ou service arrêté) pendant les secondes de mise en
+    // route, la session est déjà éteinte — sans navigateur à fermer, puisqu'il
+    // n'était pas encore là. Celui qui arrive ici n'aurait plus eu personne
+    // pour le fermer.
+    if (session.stopped) {
+      await Promise.resolve().then(() => navigateur.close?.()).catch(() => {});
+      throw fail('La fenêtre a été fermée pendant sa mise en route.', 409);
+    }
+    session.browser = navigateur;
     session.state = 'running';
     session.message = 'Connectez-vous dans la fenêtre ci-dessous.';
   }
@@ -3457,9 +3469,15 @@ function createManager(overrides = {}) {
     return view;
   }
 
+  /** 0.2.22 : une fenêtre vit-elle en ce moment, tous comptes confondus ? */
+  function ouverte() {
+    return !!current && !current.stopped;
+  }
+
   return {
     // cycle de vie
     start,
+    ouverte,
     stop: (userId, connectorId) => cancel(userId, connectorId),
     conclure,
     stopAll,
@@ -3630,11 +3648,20 @@ async function persistentLauncher({ display, url, screen, home, profil, langueNa
       ? identity.optionsSansLangueForcee({ viewport: null })
       : identity.optionsContexte({ viewport: null })),
   });
-  // Avant la première navigation : la fenêtre n'ouvre jamais rien hors cloison.
-  await cloison.cloisonner(context, { journal: journalDeCloison, permises });
+  // 0.2.22 : un échec entre le lancement et la remise de la page (cloison,
+  // onglet) laissait ce Chromium sans personne pour le fermer — la session
+  // n'en avait pas encore la poignée.
+  let page;
+  try {
+    // Avant la première navigation : la fenêtre n'ouvre jamais rien hors cloison.
+    await cloison.cloisonner(context, { journal: journalDeCloison, permises });
 
-  const page = context.pages()[0] || (await context.newPage());
-  await page.goto(url, { waitUntil: 'domcontentloaded' }).catch(() => {});
+    page = context.pages()[0] || (await context.newPage());
+    await page.goto(url, { waitUntil: 'domcontentloaded' }).catch(() => {});
+  } catch (err) {
+    await context.close().catch(() => {});
+    throw err;
+  }
 
   return {
     page,
@@ -3697,15 +3724,24 @@ async function defaultLauncher({ display, url, screen, home, profil, langueNativ
   // exactement le genre d'écart qu'un pare-feu applicatif relève.
   // Ici le mode est VISIBLE, donc pas de « HeadlessChrome » à corriger — mais
   // la session capturée doit ressembler à celle que le connecteur rejouera.
-  const context = await browser.newContext(
-    langueNative
-      ? identity.optionsSansLangueForcee({ viewport: null }) // lot 91
-      : identity.optionsContexte({ viewport: null }) // la fenêtre fait la loi
-  );
-  // Avant la première navigation : la fenêtre n'ouvre jamais rien hors cloison.
-  await cloison.cloisonner(context, { journal: journalDeCloison, permises });
-  const page = await context.newPage();
-  await page.goto(url, { waitUntil: 'domcontentloaded' });
+  // 0.2.22 : un échec après le lancement (site injoignable à l'ouverture,
+  // cloison) laissait ce Chromium sans personne pour le fermer.
+  let context;
+  let page;
+  try {
+    context = await browser.newContext(
+      langueNative
+        ? identity.optionsSansLangueForcee({ viewport: null }) // lot 91
+        : identity.optionsContexte({ viewport: null }) // la fenêtre fait la loi
+    );
+    // Avant la première navigation : la fenêtre n'ouvre jamais rien hors cloison.
+    await cloison.cloisonner(context, { journal: journalDeCloison, permises });
+    page = await context.newPage();
+    await page.goto(url, { waitUntil: 'domcontentloaded' });
+  } catch (err) {
+    await browser.close().catch(() => {});
+    throw err;
+  }
 
   return {
     page,

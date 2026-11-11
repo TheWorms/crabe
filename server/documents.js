@@ -40,6 +40,7 @@
  */
 
 const fs = require('node:fs');
+const nodePath = require('node:path');
 
 const db = require('./db/db');
 const registry = require('./connectors/registry');
@@ -143,6 +144,33 @@ function resolveDestination(wanted) {
 }
 
 /**
+ * « Ce fichier est-il là ? », un dossier lu une fois (0.2.23).
+ *
+ * `fs.existsSync` par document interrogeait le stockage autant de fois qu'il y
+ * a de documents — sur un montage réseau, plusieurs secondes pendant
+ * lesquelles crabe ne répondait à personne. Les documents d'un service
+ * partagent quelques dossiers : chacun est listé une seule fois par affichage.
+ *
+ * @returns {(chemin: string) => boolean}
+ */
+function presenceParDossier() {
+  const dossiers = new Map();
+  return (chemin) => {
+    const dossier = nodePath.dirname(chemin);
+    if (!dossiers.has(dossier)) {
+      let noms;
+      try {
+        noms = new Set(fs.readdirSync(dossier));
+      } catch {
+        noms = new Set(); // dossier absent ou illisible : rien n'y est
+      }
+      dossiers.set(dossier, noms);
+    }
+    return dossiers.get(dossier).has(nodePath.basename(chemin));
+  };
+}
+
+/**
  * Documents d'un compte présents sur une destination donnée.
  *
  * @param {object} user
@@ -152,6 +180,7 @@ function resolveDestination(wanted) {
 function documentsOn(user, destId) {
   const catalog = registry.catalogueParId();
   const racine = destId === 'local' ? destinations.readConfig('local')?.path : null;
+  const present = presenceParDossier();
 
   return db
     .get()
@@ -179,8 +208,8 @@ function documentsOn(user, destId) {
       const connector = catalog.get(row.connector_id);
       // Sur le stockage local, on peut vérifier — et c'est le seul endroit où « telle
       // qu'elle existe sur le stockage » se contrôle sans coût.
-      const chemin = racine ? destinations.invoicePath(row, user.username) : null;
-      const absent = !!racine && (!chemin || !fs.existsSync(chemin));
+      const chemin = racine ? destinations.invoicePath(row, user.username, present) : null;
+      const absent = !!racine && (!chemin || !present(chemin));
 
       return {
         id: row.id,

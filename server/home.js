@@ -319,7 +319,7 @@ function installedConnectors(user) {
   // le rallume : le faire disparaître des DEUX écrans enfermerait
   // l'utilisateur dehors, sans porte de retour.
   return tri.parNom(
-    registry.listForUser(user).filter((c) => c.installed && !c.disabledAt)
+    catalogueDe(user).filter((c) => c.installed && !c.disabledAt)
   );
 }
 
@@ -779,7 +779,7 @@ function recentErrors(user, limit = LIMITE_DEFAUTS) {
   //
   // ⚠ Ni un non faisable désinstallé (lot 108) : il a quitté le logiciel, et
   // son échec ne se résoudra par aucun geste — la règle des annonces.
-  const catalogue = registry.listForUser(user).filter((c) => !c.disabledAt && montrable(c));
+  const catalogue = catalogueDe(user).filter((c) => !c.disabledAt && montrable(c));
   const messageDe = db.get().prepare('SELECT message FROM run_logs WHERE id = ?');
 
   const ligne = (connector, { at, cause, message }) => ({
@@ -891,7 +891,7 @@ function recentSuccesses(user, limit = 6) {
   // Mêmes exclus qu'en face (recentErrors) : un service en pause quitte
   // l'accueil en entier, pas seulement par sa moitié rouge.
   const catalog = new Map(
-    registry.listForUser(user).filter((c) => !c.disabledAt && montrable(c)).map((c) => [c.id, c])
+    catalogueDe(user).filter((c) => !c.disabledAt && montrable(c)).map((c) => [c.id, c])
   );
 
   // Même filtre `finished_at IS NOT NULL` que recentErrors, pour la raison
@@ -1097,6 +1097,35 @@ function hiddenDestinationsNote(hidden) {
  * Tout ce dont l'accueil a besoin, en un appel : la page ne doit pas
  * s'assembler à coups de six requêtes séquentielles sur un téléphone.
  */
+/**
+ * Le catalogue du compte, lu UNE fois par affichage (0.2.22).
+ *
+ * `registry.listForUser` relit, pour chaque service installé, son installation
+ * (déchiffrée), ses découvertes, son carnet et sa cause d'échec. Les blocs de
+ * l'accueil le demandaient chacun de leur côté — cinq à six fois par
+ * affichage, une demi-seconde pendant laquelle crabe ne répondait à personne.
+ *
+ * La mémoire ne vit que le temps de `fn`, qui est SYNCHRONE : rien ne peut
+ * changer en base entre deux lectures, et aucune autre requête ne s'y glisse.
+ */
+let catalogues = null;
+
+function unSeulCatalogue(fn) {
+  if (catalogues) return fn(); // déjà dans un affichage
+  catalogues = new Map();
+  try {
+    return fn();
+  } finally {
+    catalogues = null;
+  }
+}
+
+function catalogueDe(user) {
+  if (!catalogues) return registry.listForUser(user);
+  if (!catalogues.has(user.id)) catalogues.set(user.id, registry.listForUser(user));
+  return catalogues.get(user.id);
+}
+
 async function dashboard(user) {
   // Les destinations de CE compte : celles que l'administration a activées,
   // moins celles que le compte a refusées dans son écran de Stockage (lot 24).
@@ -1112,7 +1141,7 @@ async function dashboard(user) {
   const syncPageSize = preferences.get(user.id, 'home.sync.pageSize');
   const documentsPageSize = preferences.get(user.id, 'home.documents.pageSize');
 
-  return {
+  return unSeulCatalogue(() => ({
     user: {
       id: user.id,
       username: user.username,
@@ -1191,7 +1220,7 @@ async function dashboard(user) {
     destinations: cards,
     hiddenDestinations: hidden,
     hiddenDestinationsNote: hiddenDestinationsNote(hidden),
-  };
+  }));
 }
 
 /**
@@ -1201,12 +1230,12 @@ async function dashboard(user) {
  */
 function suivi(user) {
   const enabledIds = destinations.destinationsForUser(user.id);
-  return {
+  return unSeulCatalogue(() => ({
     errors: recentErrors(user),
     pendingActions: pendingActions(user),
     successes: recentSuccesses(user, -1),
     copyFailures: copyFailures(user, enabledIds),
-  };
+  }));
 }
 
 module.exports = {

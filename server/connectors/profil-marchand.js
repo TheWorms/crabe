@@ -321,7 +321,10 @@ async function surLeProfil({ id, nom, ctx, urlDepart, estAuthentification, navig
     () => surLeProfilVerrouille({ id, nom, log, userId, urlDepart, estAuthentification, naviguer }, fn),
     `Une récupération ${nom} est déjà en cours sur ce serveur : elle utilise la même `
       + 'connexion enregistrée. Attendez qu\'elle se termine — quelques minutes — puis réessayez.',
-    inflight.PORTEUR_RECUPERATION
+    inflight.PORTEUR_RECUPERATION,
+    // 0.2.23 : passé le sursis, le verrou tient tant que le planificateur
+    // compte encore cette récupération parmi celles qui tournent.
+    { preuveDeVie: () => require('../scheduler').tientLaCle(cleProfil) }
   );
 }
 

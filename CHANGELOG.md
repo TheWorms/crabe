@@ -6,6 +6,58 @@ Pour mettre à jour votre crabe : [docs/MISE-A-JOUR.md](docs/MISE-A-JOUR.md) (En
 
 ---
 
+## 0.2.24 — crabe compresse lui-même ses réponses (11/11/2026)
+
+### Plus rapide
+- **L'interface voyage trois à quatre fois plus légère, même sans mandataire devant crabe.** Jusqu'ici, seule une installation placée derrière un mandataire qui compresse (Caddy et son `encode`, nginx et son `gzip`) en profitait ; servi en direct sur son port, crabe envoyait ses fichiers tels quels. Il compresse désormais lui-même les scripts, la feuille de style et les pages — environ 1 Mo au premier affichage, ramené à 250 Ko — ainsi que les réponses de l'API. Sur un réseau lent (Wi-Fi faible, accès à distance par VPN), la première ouverture et les longues listes s'en ressentent.
+- Chaque fichier de l'interface est compressé une seule fois, au démarrage, puis gardé en mémoire ; il est refait s'il change. Personne n'attend une compression : tant qu'elle n'est pas prête, le fichier part en clair.
+
+### Ce qui ne change pas
+- Les PDF, les archives et tout ce qui se télécharge partent tels quels, comme les images et la fenêtre de connexion.
+- Derrière un mandataire qui compresse déjà, rien à régler : il laisse passer ce que crabe a compressé.
+- Un client qui ne demande pas de compression reçoit les réponses en clair, comme avant.
+- Aucune dépendance nouvelle, aucun réglage : la compression est celle de Node.
+
+---
+
+## 0.2.23 — le bilan de stabilité et de rapidité, suite (11/11/2026)
+
+### Plus stable
+- **Une récupération planifiée attend que la mémoire revienne avant d'ouvrir son navigateur.** Jusqu'ici, seule la fenêtre de connexion regardait la mémoire : une récupération partait par-dessus une fenêtre ouverte et une visite d'entretien, et c'est le plafond de mémoire du service qui tranchait, en fermant un navigateur au hasard. L'attente dure trois minutes au plus ; passé ce délai, la récupération part quand même, et le journal le dit. Elle reste en file pendant l'attente : un arrêt de crabe ne la perd pas.
+- **Le profil de navigateur d'une récupération longue reste réservé jusqu'au bout.** Une récupération peut durer quarante-cinq minutes, sa réservation du profil tombait au bout de quinze : une fenêtre de connexion, ou une visite d'entretien, pouvait ouvrir le même profil pendant qu'elle travaillait encore. La réservation tient désormais tant que la récupération tourne.
+- **L'état de santé répond sans attendre le réseau** : la première vérification de mise à jour de la journée pouvait le retenir dix secondes, assez pour que le contrôle de santé du conteneur compte crabe en panne.
+
+### Plus rapide
+- **« Mes documents » sur le stockage local ne pose plus une question au stockage par document** (jusqu'à trois, en réalité) : chaque dossier est lu une fois par affichage. Sur un partage réseau, c'était plusieurs secondes pendant lesquelles crabe ne répondait à personne.
+- **La page s'ouvre en moins d'allers-retours** : les préférences, les services, le carnet et l'état de la fenêtre de connexion se demandent ensemble, et non l'un après l'autre.
+
+---
+
+## 0.2.22 — le bilan de stabilité et de rapidité (11/11/2026)
+
+### Plus rapide
+- **L'accueil et le suivi s'affichent environ deux fois plus vite sur un compte chargé** (mesuré sur 45 services et 5 000 documents : l'accueil de 545 à 280 ms, le suivi de 270 à 130 ms, la liste des services de 100 à 40 ms). Le logo de chaque destination était relu en base pour chaque document, et le catalogue des services recalculé jusqu'à six fois par écran.
+- **Les fichiers de l'interface se gardent dans le navigateur** tant qu'ils n'ont pas changé (un an sous leur empreinte, au lieu d'une heure), et sortent sans lecture de session ni de compte.
+- **La session n'est plus réécrite en base à chaque requête** : son échéance avance par pas de cinq minutes. Un onglet ouvert écrivait dans la base toutes les quelques secondes.
+- **Un onglet caché n'interroge plus crabe** ; il reprend dès qu'il redevient visible.
+- Un index sur les exécutions pour « la dernière de chaque service », la question que l'interface pose toutes les quatre secondes pendant une récupération.
+
+### Plus stable
+- **Une récupération abandonnée après sa durée maximale ne ferme plus le navigateur de la fenêtre de connexion** ni celui d'une visite d'entretien, quand l'un des deux était ouvert au même moment.
+- **À l'arrêt de crabe, la file des récupérations n'avance plus** : celles qui attendaient restent en file et reprennent au démarrage suivant, au lieu d'être lancées puis perdues.
+- **Un verrou de profil n'est rendu que par celui qui le tient** : une récupération très longue ne libère plus, en finissant, le verrou qu'une autre avait repris entre-temps.
+- **Une fenêtre de connexion fermée pendant sa mise en route** ne laisse plus son navigateur ouvert ; un navigateur dont l'ouverture échoue à mi-chemin est refermé.
+- **Une visite d'entretien qui ne rend jamais la main** n'arrête plus toutes les visites suivantes : passé dix minutes, le tour continue sans elle.
+- Les tâches planifiées remplacées sont retirées pour de bon à chaque changement de planification (elles s'accumulaient en mémoire).
+- La base met ses statistiques à jour et replie son journal d'écriture chaque nuit et à l'arrêt ; ce journal ne dépasse plus 64 Mo sur le disque.
+
+### Interface
+- **Si crabe ne répond pas à l'ouverture** (redémarrage, réseau coupé), la page le dit et propose de réessayer, au lieu de se recharger en boucle.
+- Une coupure de réseau s'annonce en français (« crabe ne répond pas… ») et non par le message brut du navigateur ; une coupure d'un instant ne ferme plus la fenêtre de connexion.
+- La fenêtre de connexion et la synchronisation des destinations n'envoient plus qu'une demande à la fois sur un réseau lent.
+
+---
+
 ## 0.2.21 — la fenêtre de connexion n'est plus refusée sur une mémoire mal comptée (10/11/2026)
 
 ### Corrigé

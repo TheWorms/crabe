@@ -19,14 +19,25 @@ const $ = (id) => document.getElementById(id);
 
 /** Appel API. Lève une Error portant le message renvoyé par le serveur. */
 async function api(path, options = {}) {
-  const res = await fetch(`/api${path}`, {
-    method: options.method || 'GET',
-    headers: options.body ? { 'Content-Type': 'application/json' } : {},
-    credentials: 'same-origin',
-    body: options.body ? JSON.stringify(options.body) : undefined,
-    // Lot 107 : une demande peut être annulée par la suivante (recherche).
-    signal: options.signal,
-  });
+  let res;
+  try {
+    res = await fetch(`/api${path}`, {
+      method: options.method || 'GET',
+      headers: options.body ? { 'Content-Type': 'application/json' } : {},
+      credentials: 'same-origin',
+      body: options.body ? JSON.stringify(options.body) : undefined,
+      // Lot 107 : une demande peut être annulée par la suivante (recherche).
+      signal: options.signal,
+    });
+  } catch (cause) {
+    // Une demande annulée (lot 107) reste ce qu'elle est : l'appelant la trie.
+    if (cause && cause.name === 'AbortError') throw cause;
+    // 0.2.22 : le navigateur dit « Failed to fetch » ou « NetworkError when
+    // attempting to fetch resource » — rien qu'on puisse montrer tel quel.
+    const err = new Error('crabe ne répond pas. Vérifiez votre connexion, puis réessayez.');
+    err.reseau = true;
+    throw err;
+  }
 
   if (res.status === 401) {
     location.href = '/';
@@ -890,28 +901,34 @@ document.addEventListener('click', (event) => {
 // ---------------------------------------------------------------------------
 
 async function loadConnectors() {
-  const data = await api('/connectors');
+  // 0.2.23 : les trois lectures partent ensemble — elles ne dépendent pas
+  // l'une de l'autre, et s'attendaient à la file avant le premier écran.
+  const [data, carnet, caps] = await Promise.all([
+    api('/connectors'),
+    // 0.2.13 : le carnet du compte, pour le choix de la fiche. Son absence (un
+    // serveur plus ancien) n'empêche rien : la fiche garde ses champs.
+    api('/carnet').catch(() => ({ entrees: [] })),
+    // Ce que le serveur peut faire, pas ce qu'on espère qu'il puisse faire : les
+    // paquets système du navigateur distant peuvent manquer, le conteneur être à
+    // court de mémoire, une autre connexion tourner déjà. C'est cette réponse
+    // qui grise le bouton AVEC son explication, plutôt que de le laisser échouer.
+    // Son échec n'est pas bloquant : on retombe alors sur le repli par fichier.
+    api('/connectors/remote-login/capabilities').catch(() => ({
+      available: false,
+      busy: false,
+      reason:
+        'État du navigateur distant indisponible — utilisez un fichier de session.',
+    })),
+  ]);
   state.connectors = data.connectors;
-  // 0.2.13 : le carnet du compte, pour le choix de la fiche. Son absence (un
-  // serveur plus ancien) n'empêche rien : la fiche garde ses champs.
-  state.carnet = (await api('/carnet').catch(() => ({ entrees: [] }))).entrees || [];
+  state.carnet = carnet.entrees || [];
   // Catégories et comptes viennent du serveur : une liste écrite en dur ici
   // aurait été à tenir à jour à chaque catégorie ajoutée, et le compte affiché
   // aurait pu diverger de ce que la grille montre réellement.
   state.categories = data.categories || [];
   state.storeCounts = data.counts || { available: 0, planned: 0 };
 
-  // Ce que le serveur peut faire, pas ce qu'on espère qu'il puisse faire : les
-  // paquets système du navigateur distant peuvent manquer, le conteneur être à
-  // court de mémoire, une autre connexion tourner déjà. C'est cette réponse
-  // qui grise le bouton AVEC son explication, plutôt que de le laisser échouer.
-  // Son échec n'est pas bloquant : on retombe alors sur le repli par fichier.
-  state.remoteLogin.caps = await api('/connectors/remote-login/capabilities').catch(() => ({
-    available: false,
-    busy: false,
-    reason:
-      'État du navigateur distant indisponible — utilisez un fichier de session.',
-  }));
+  state.remoteLogin.caps = caps;
 
   return state.connectors;
 }
@@ -3187,12 +3204,17 @@ async function surveillerSynchronisation() {
   if (!etat.running) return;
   majProgressionSync(etat);
 
+  let enVol = false; // 0.2.22 : un sondage à la fois, même sur un réseau lent
   syncVeille = setInterval(async () => {
+    if (enVol) return;
+    enVol = true;
     let suivant;
     try {
       suivant = await api('/home/destinations/sync');
     } catch {
       return; // réseau momentanément muet : on retentera au prochain tic
+    } finally {
+      enVol = false;
     }
     if (suivant.running) {
       majProgressionSync(suivant);
@@ -7992,9 +8014,18 @@ function detachRemoteScreen() {
 function startRemotePolling() {
   stopRemoteTimers();
   const base = rbBase();
+  // 0.2.22 : un relevé à la fois. Sur un réseau lent, les réponses d'une
+  // seconde s'empilaient et arrivaient dans le désordre ; et une coupure de
+  // réseau d'un instant ne ferme plus la fenêtre — seul un refus du serveur le
+  // fait, ou la coupure qui dure.
+  let enVol = false;
+  let coupures = 0;
   rb().poll = setInterval(async () => {
+    if (enVol) return;
+    enVol = true;
     try {
       const view = await api(base);
+      coupures = 0;
       rb().view = view;
       applyRemoteView(view);
       if (view.done) await finishRemoteLogin(view);
@@ -8004,8 +8035,11 @@ function startRemotePolling() {
       if (err?.status === 404 && ['saving', 'saved'].includes(rb().view?.state)) {
         return void terminerSansSession();
       }
+      if (err?.reseau && ++coupures < 5) return;
       // 404 : la session a disparu côté serveur (redémarrage du service).
       failRemoteLogin(err.message);
+    } finally {
+      enVol = false;
     }
   }, 1000);
   rb().tick = setInterval(tickRemoteCountdown, 1000);
@@ -10739,6 +10773,13 @@ function opsFermees() {
 /** Interroge le serveur, redessine, et se re-planifie à la bonne cadence. */
 async function veilleOperations() {
   clearTimeout(opsBandeau.timer);
+  // 0.2.22 : un onglet caché n'interroge plus le serveur ; il reprend dès
+  // qu'il redevient visible (voir l'écouteur `visibilitychange`, au démarrage).
+  if (document.hidden) {
+    opsBandeau.enSommeil = true;
+    return;
+  }
+  opsBandeau.enSommeil = false;
   try {
     const data = await api('/operations');
     opsBandeau.operations = data.operations || [];
@@ -11241,6 +11282,12 @@ $('maj-overlay')?.addEventListener?.('click', (event) => {
 // Démarrage
 // ---------------------------------------------------------------------------
 
+// 0.2.22 : la veille des opérations s'endort dans un onglet caché ; elle
+// reprend ici, dès qu'il redevient visible.
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && opsBandeau.enSommeil) veilleOperations().catch(() => {});
+});
+
 document.addEventListener('keydown', (event) => {
   if (event.key !== 'Escape') return;
   for (const id of ['modal-overlay', 'qv-overlay', 'access-overlay', 'generic-overlay', 'info-config-overlay', 'dr-overlay']) {
@@ -11284,9 +11331,8 @@ async function boot() {
 
   // Cartes ou liste, et les tris : chargés AVANT le premier écran, sinon il
   // s'afficherait dans le mode par défaut puis sauterait dans le bon.
-  await loadPrefs();
-
-  await loadConnectors();
+  // 0.2.23 : avec le catalogue, et non plus avant lui.
+  await Promise.all([loadPrefs(), loadConnectors()]);
 
   // Il n'existe plus qu'un accueil : le tableau de bord configurable.
   // `users.landing_page` reste en base (migration non destructive) mais

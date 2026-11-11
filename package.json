@@ -1,6 +1,6 @@
 {
   "name": "crabe",
-  "version": "0.2.21",
+  "version": "0.2.24",
   "description": "Gestionnaire de factures auto-hébergé, multi-compte",
   "type": "commonjs",
   "main": "server/index.js",

@@ -26,7 +26,12 @@ function open(file = config.dbFile, { avantEcriture = null } = {}) {
 
   db = new Database(file);
   db.pragma('foreign_keys = ON');
-  if (file !== ':memory:') db.pragma('journal_mode = WAL');
+  if (file !== ':memory:') {
+    db.pragma('journal_mode = WAL');
+    // 0.2.22 : le journal d'écriture rendu au disque au-delà de 64 Mo, au lieu
+    // de garder pour toujours la taille de sa plus grosse écriture.
+    db.pragma('journal_size_limit = 67108864');
+  }
 
   // Chargement tardif : migrations.js dépend de modules qui dépendent d'ici.
   const migrations = require('./migrations');
@@ -197,8 +202,28 @@ function get() {
 
 function close() {
   if (db) {
+    // 0.2.22 : statistiques à jour pour le planificateur de requêtes, et
+    // journal replié dans le fichier — au mieux, jamais au prix de l'arrêt.
+    entretenir(db);
     db.close();
     db = null;
+  }
+}
+
+/**
+ * L'entretien courant de la base : `PRAGMA optimize` (SQLite ne recalcule que
+ * ce qui a bougé) et le repli du journal d'écriture. Appelé à la fermeture et
+ * après la purge de chaque nuit ; jamais d'exception.
+ * @returns {boolean} tout s'est-il bien passé ?
+ */
+function entretenir(base = db) {
+  if (!base) return false;
+  try {
+    base.pragma('optimize');
+    base.pragma('wal_checkpoint(TRUNCATE)');
+    return true;
+  } catch {
+    return false; // base occupée ou en mémoire : la prochaine fois
   }
 }
 
@@ -225,6 +250,7 @@ module.exports = {
   open,
   get,
   close,
+  entretenir,
   transaction,
   fileSizeBytes,
   get migrations() {

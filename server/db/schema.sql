@@ -252,6 +252,11 @@ CREATE TABLE IF NOT EXISTS run_logs (
 
 CREATE INDEX IF NOT EXISTS idx_runlogs_conn ON run_logs(connector_id, started_at DESC);
 CREATE INDEX IF NOT EXISTS idx_runlogs_user ON run_logs(user_id, started_at DESC);
+-- 0.2.22 : « la dernière exécution de chaque service de ce compte » — la
+-- question de la veille des opérations (toutes les 4 s pendant une
+-- récupération) et des blocs de l'accueil. Sans lui, chaque réponse relisait
+-- toutes les exécutions du compte.
+CREATE INDEX IF NOT EXISTS idx_runlogs_user_conn ON run_logs(user_id, connector_id, id);
 
 -- L'heure d'enregistrement de chaque connexion (lot 91, migration 59) — la
 -- fenêtre « Se connecter », un fichier de session, des identifiants saisis.

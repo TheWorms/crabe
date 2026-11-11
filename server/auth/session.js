@@ -14,6 +14,8 @@ const { config } = require('../config');
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 const MAX_AGE_MS = 12 * 60 * 60 * 1000; // 12 h
+/** L'échéance d'une session en base n'est repoussée que par pas de cette taille. */
+const PAS_DE_TOUCHE_MS = 5 * 60 * 1000;
 
 class SqliteStore extends session.Store {
   constructor() {
@@ -73,8 +75,23 @@ class SqliteStore extends session.Store {
     }
   }
 
+  /**
+   * Repousse l'échéance — sans réécrire la session à chaque requête (0.2.22).
+   * `rolling` appelait `set` pour chaque réponse, sondages compris : une
+   * écriture en base toutes les quelques secondes par onglet ouvert. L'échéance
+   * n'avance désormais que par pas de cinq minutes ; entre deux, rien n'est
+   * écrit. Le contenu, lui, passe toujours par `set` quand il change.
+   */
   touch(sid, sess, cb) {
-    return this.set(sid, sess, cb);
+    try {
+      const expires = Date.now() + (sess.cookie?.maxAge ?? MAX_AGE_MS);
+      db.get()
+        .prepare('UPDATE sessions SET expires_at = ? WHERE sid = ? AND expires_at < ?')
+        .run(expires, sid, expires - PAS_DE_TOUCHE_MS);
+      return cb(null);
+    } catch (err) {
+      return cb(err);
+    }
   }
 
   /** Supprime toutes les sessions d'un utilisateur (révocation immédiate). */

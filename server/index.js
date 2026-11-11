@@ -24,6 +24,7 @@ const permissions = require('./permissions');
 const applog = require('./applog');
 const version = require('./version');
 const cleTemoin = require('./cle-temoin');
+const compression = require('./compression');
 
 const WEB_DIR = path.join(__dirname, '..', 'web');
 
@@ -154,6 +155,9 @@ function createApp() {
   app.use(express.json({ limit: '1mb' }));
   app.use(express.urlencoded({ extended: false, limit: '1mb' }));
 
+  // 0.2.24 : crabe compresse lui-même l'API et les pages — voir compression.js.
+  app.use(compression.reponses());
+
   // La santé et la version : publiques, sans session — c'est cette route que
   // le HEALTHCHECK du conteneur sonde, et elle porte aussi la bannière de mise
   // à jour. Rien de secret ne s'y lit : « le service répond », la version
@@ -163,7 +167,18 @@ function createApp() {
   // seulement si `CRABE_UPDATE_REPO` a exactement la forme d'un dépôt GitHub
   // (version.liensDeMiseAJour).
   app.get('/api/sante', async (req, res) => {
-    const maj = await version.verifierMiseAJour();
+    // 0.2.23 : la santé n'attend jamais le réseau. La première vérification
+    // du jour pouvait la retenir dix secondes — le contrôle de santé du
+    // conteneur (cinq secondes) la comptait alors en panne. Passé une seconde
+    // et demie, elle répond sans la mise à jour ; la vérification finit seule
+    // et sa réponse sert à l'appel suivant.
+    const verification = version.verifierMiseAJour().catch(() => null);
+    let minuterie;
+    const maj = await Promise.race([
+      verification,
+      new Promise((resolve) => { minuterie = setTimeout(() => resolve(null), 1500); }),
+    ]);
+    clearTimeout(minuterie);
     const liens = maj ? version.liensDeMiseAJour(process.env.CRABE_UPDATE_REPO) : null;
     res.json({
       ok: true,
@@ -171,6 +186,34 @@ function createApp() {
       miseAJour: maj && liens ? { ...maj, commentFaire: liens.commentFaire } : maj,
     });
   });
+
+  // --- Fichiers de l'interface ---
+  //
+  // 0.2.22 : AVANT la session. Ces fichiers ne dépendent d'aucun compte (la
+  // page de connexion les charge déjà sans en avoir), et les servir après
+  // coûtait à chacun une lecture de session, une lecture du compte et un
+  // cookie renvoyé. Une adresse qui porte l'empreinte du fichier (`?v=`, voir
+  // pages.js) change quand il change : le navigateur peut la garder un an sans
+  // rien redemander ; les autres gardent l'heure d'avant.
+  //
+  // 0.2.24 : scripts, feuille de style et pages partent compressés quand le
+  // navigateur l'accepte (compression.fichiers) ; `express.static` garde le
+  // reste, avec la même durée de cache. Les versions compressées se préparent
+  // une fois que crabe écoute (voir main) : createApp ne compresse rien.
+  const gardeUnAn = (req) => config.env === 'production' && /[?&]v=/.test(req.url || '');
+  const dureeEnCache = (req) => (gardeUnAn(req)
+    ? 'public, max-age=31536000, immutable'
+    : `public, max-age=${config.env === 'production' ? 3600 : 0}`);
+  const fichiersCompresses = compression.fichiers(WEB_DIR, { cache: dureeEnCache });
+  app.locals.preparerLaCompression = fichiersCompresses.preparer;
+  app.use(fichiersCompresses);
+  app.use(express.static(WEB_DIR, {
+    index: false,
+    maxAge: config.env === 'production' ? '1h' : 0,
+    setHeaders(res) {
+      if (res.req && gardeUnAn(res.req)) res.setHeader('Cache-Control', dureeEnCache(res.req));
+    },
+  }));
 
   app.use(sessionAuth.middleware());
   app.use(middleware.loadUser);
@@ -227,7 +270,7 @@ function createApp() {
   }
 
   // --- Frontend ---
-  app.use(express.static(WEB_DIR, { index: false, maxAge: config.env === 'production' ? '1h' : 0 }));
+  // (les fichiers de l'interface sont servis plus haut, avant la session)
 
   // Les pages portent la version dans l'adresse de leurs fichiers (0.2.2) :
   // sans elle, le cache d'une heure ci-dessus gardait l'ancien écran après une
@@ -419,6 +462,11 @@ async function main() {
   const server = app.listen(config.port, config.host, () => {
     // 0.2.6 : le jeton de la ligne de commande, tiré à chaque démarrage.
     require('./routes/local').preparer(config.port);
+    // 0.2.24 : les fichiers de l'interface compressés d'avance, hors du chemin
+    // du démarrage — d'ici là, ils partent en clair.
+    app.locals.preparerLaCompression().catch((err) => {
+      applog.warn('system', `Compression de l'interface non préparée (${err.message}) : elle se fera à la demande.`);
+    });
     applog.info(
       'system',
       `crabe v${config.version} démarré sur ${config.host}:${config.port} (Node ${process.version}, `
@@ -468,8 +516,12 @@ async function main() {
       db.close();
       process.exit(0);
     });
-    // Filet de sécurité si des connexions traînent.
-    setTimeout(() => process.exit(0), 10_000).unref();
+    // Filet de sécurité si des connexions traînent. 0.2.22 : il ferme la base
+    // lui aussi — sortir sans la fermer laissait son journal non replié.
+    setTimeout(() => {
+      try { db.close(); } catch { /* déjà fermée */ }
+      process.exit(0);
+    }, 10_000).unref();
   };
 
   process.on('SIGTERM', () => shutdown('SIGTERM'));

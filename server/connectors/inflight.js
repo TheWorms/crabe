@@ -116,17 +116,26 @@ function createLock({ now = () => Date.now(), timeoutMs = VERROU_PERIME_MS } = {
    * @param {() => Promise<*>} fn
    * @param {string} [message] refus affiché à l'utilisateur si le verrou est pris
    * @param {string} [label] qui prend le verrou — relu par `holder()`
+   * @param {{preuveDeVie?: () => boolean}} [options] 0.2.23 : comme pour
+   *   `acquire()` — passé le sursis, le verrou tient tant qu'elle rend vrai.
+   *   Une récupération dure jusqu'à 45 minutes, le sursis du profil 15 : sans
+   *   elle, une fenêtre de connexion pouvait ouvrir le profil d'une
+   *   récupération encore au travail.
    * @returns {Promise<*>}
    * @throws {Error} avec `statusCode = 409` et `alreadyRunning` si déjà pris
    */
-  async function run(key, fn, message = 'Une opération est déjà en cours — attendez qu\'elle se termine.', label = '') {
+  async function run(key, fn, message = 'Une opération est déjà en cours — attendez qu\'elle se termine.', label = '', { preuveDeVie = null } = {}) {
     if (busy(key)) throw refus(key, message);
 
-    enCours.set(key, { depuis: now(), label, preuveDeVie: null });
+    const prise = { depuis: now(), label, preuveDeVie: typeof preuveDeVie === 'function' ? preuveDeVie : null };
+    enCours.set(key, prise);
     try {
       return await fn();
     } finally {
-      enCours.delete(key);
+      // 0.2.22 : seul le porteur rend le verrou. Passé le sursis, un autre a pu
+      // le reprendre — le retour tardif du premier effaçait alors le verrou du
+      // second, et un troisième ouvrait le même profil par-dessus.
+      if (enCours.get(key) === prise) enCours.delete(key);
     }
   }
 

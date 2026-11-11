@@ -373,6 +373,24 @@ function occupe(c) {
 
 let enCours = false;
 
+/**
+ * 0.2.22 : la durée au-delà de laquelle le tour n'attend plus une visite. Une
+ * visite dure d'ordinaire moins d'une minute ; un Chromium qui ne rend jamais
+ * la main gardait `enCours` levé jusqu'au redémarrage du service — plus aucune
+ * visite, pour personne. La visite abandonnée écrira sa ligne si elle finit.
+ */
+const LIMITE_VISITE_MS = 10 * 60_000;
+const reglages = { limiteVisiteMs: LIMITE_VISITE_MS };
+
+/** `promesse`, ou `null` si elle n'a rien rendu dans le délai. */
+function dansLeDelai(promesse, ms) {
+  let minuterie;
+  const delai = new Promise((resolve) => {
+    minuterie = setTimeout(() => resolve(null), ms);
+  });
+  return Promise.race([promesse, delai]).finally(() => clearTimeout(minuterie));
+}
+
 /** Une visite d'entretien tourne-t-elle ? (0.2.21 : le refus de la fenêtre le dit.) */
 function visiteEnCours() {
   return enCours;
@@ -387,7 +405,12 @@ async function tour(maintenant = horloge.maintenant()) {
     for (const c of candidats()) {
       if (pasMaintenant(c.userId, c.connectorId, maintenant)) continue;
       if (occupe(c)) break; // le tour suivant reprendra là
-      faites.push({ ...c, ligne: await visiter(c) });
+      const ligne = await dansLeDelai(visiter(c), reglages.limiteVisiteMs);
+      if (!ligne) {
+        applog.warn('entretien', `${c.manifest.name} : la visite d'entretien ne rend pas la main après ${Math.round(reglages.limiteVisiteMs / 60_000)} min — le tour s'arrête là.`);
+        break;
+      }
+      faites.push({ ...c, ligne });
     }
   } catch (err) {
     applog.warn('entretien', `Le tour des visites d'entretien s'est interrompu : ${err.message}`);
@@ -405,7 +428,11 @@ function demarrer() {
 }
 
 function arreter() {
-  tache?.stop?.();
+  // 0.2.22 : `destroy` retire la tâche du registre de node-cron, `stop` non.
+  try {
+    const fin = tache?.destroy ? tache.destroy() : tache?.stop?.();
+    fin?.catch?.(() => {});
+  } catch { /* déjà détruite */ }
   tache = null;
 }
 
@@ -482,6 +509,8 @@ module.exports = {
   visiter,
   tour,
   visiteEnCours,
+  reglages,
+  LIMITE_VISITE_MS,
   demarrer,
   arreter,
   etat,

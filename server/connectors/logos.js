@@ -688,14 +688,23 @@ function sujet(id) {
   return sujets().find((s) => s.id === String(id || '')) || null;
 }
 
+/**
+ * La requête de `lire`, préparée une fois par base ouverte (0.2.22). L'état
+ * d'une facture demande l'identité de chacune de ses destinations, logo
+ * compris : l'accueil d'un compte de 5 000 factures préparait cette requête
+ * 5 000 fois — la moitié de son temps de réponse.
+ */
+let requeteLire = null;
+let baseDeLire = null;
+
 /** Ligne de la table, ou `null`. */
 function lire(connectorId) {
-  return (
-    db
-      .get()
-      .prepare('SELECT * FROM connector_logos WHERE connector_id = ?')
-      .get(String(connectorId)) || null
-  );
+  const base = db.get();
+  if (base !== baseDeLire) {
+    requeteLire = base.prepare('SELECT * FROM connector_logos WHERE connector_id = ?');
+    baseDeLire = base;
+  }
+  return requeteLire.get(String(connectorId)) || null;
 }
 
 /** Chemin du fichier d'un logo enregistré, ou `null`. */

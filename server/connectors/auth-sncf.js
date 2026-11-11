@@ -267,7 +267,8 @@ async function surLeProfil({ id, nom, ctx, urlDepart }, fn) {
   return inflight.profil.run(cleProfil, () => surLeProfilVerrouille({ id, nom, log, userId, urlDepart }, fn),
     `Une récupération ${nom} est déjà en cours sur ce serveur : elle utilise la même `
       + 'connexion enregistrée. Attendez qu\'elle se termine — quelques minutes — puis réessayez.',
-    inflight.PORTEUR_RECUPERATION);
+    inflight.PORTEUR_RECUPERATION,
+    { preuveDeVie: () => require('../scheduler').tientLaCle(cleProfil) });
 }
 
 /** Le corps de `surLeProfil`, une fois le verrou de profil pris. */

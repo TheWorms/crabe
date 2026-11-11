@@ -1322,7 +1322,24 @@
 document.addEventListener('DOMContentLoaded', () => {
   boot().catch((err) => {
     console.error(err);
-    location.href = '/';
+    // 0.2.22 : une session expirée est déjà renvoyée à l'accueil par api().
+    // Tout autre échec (serveur en cours de redémarrage, réseau coupé) ne
+    // recharge plus la page en boucle : il le dit, et propose de réessayer.
+    if (err && err.message === 'Session expirée.') return;
+    const panne = document.createElement('div');
+    panne.setAttribute('role', 'alert');
+    panne.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;gap:16px;align-items:center;justify-content:center;padding:24px;text-align:center;background:var(--bg,#fff);color:var(--text,#222);font:16px/1.5 system-ui,sans-serif';
+    const texte = document.createElement('p');
+    texte.textContent = err && err.reseau
+      ? 'crabe ne répond pas. Il redémarre peut-être : réessayez dans un instant.'
+      : 'crabe n\'a pas pu s\'ouvrir. Réessayez dans un instant.';
+    const bouton = document.createElement('button');
+    bouton.type = 'button';
+    bouton.className = 'btn btn-primary';
+    bouton.textContent = 'Réessayer';
+    bouton.addEventListener('click', () => location.reload());
+    panne.append(texte, bouton);
+    document.body.append(panne);
   });
 });
 </script>
