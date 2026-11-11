@@ -103,15 +103,33 @@ function appliquerReglagesMemoire(reglages, { essai = process.env.NODE_ENV === '
   return reglagesMemoire;
 }
 
+/**
+ * L'attente en cours, pour l'écran (0.2.27) : la file est arrêtée sur la
+ * mémoire, pas sur une récupération — sans cela une demande en tête de file
+ * annonçait « elle démarre dans un instant » pendant trois minutes.
+ * @type {{depuis: number, libreMo: number, seuilMo: number} | null}
+ */
+let attenteMemoire = null;
+
+/** Ce que la file attend en ce moment, ou null si elle n'attend pas la mémoire. */
+function attenteDeMemoire() {
+  return attenteMemoire ? { ...attenteMemoire } : null;
+}
+
 async function attendreLaMemoire() {
   if (!(reglagesMemoire.attenteMaxMs > 0)) return;
   const debut = Date.now();
   let libre = Infinity;
-  for (;;) {
-    try { libre = reglagesMemoire.lire(); } catch { return; }
-    if (libre >= reglagesMemoire.seuilMo || enArret) return;
-    if (Date.now() - debut >= reglagesMemoire.attenteMaxMs) break;
-    await new Promise((resolve) => setTimeout(resolve, reglagesMemoire.pasMs));
+  try {
+    for (;;) {
+      try { libre = reglagesMemoire.lire(); } catch { return; }
+      if (libre >= reglagesMemoire.seuilMo || enArret) return;
+      if (Date.now() - debut >= reglagesMemoire.attenteMaxMs) break;
+      attenteMemoire = { depuis: debut, libreMo: libre, seuilMo: reglagesMemoire.seuilMo };
+      await new Promise((resolve) => setTimeout(resolve, reglagesMemoire.pasMs));
+    }
+  } finally {
+    attenteMemoire = null;
   }
   try {
     applog.warn(
@@ -203,11 +221,18 @@ const prioriteDe = (trigger) => (trigger === 'cron' ? PRIORITE_PROGRAMMEE : PRIO
  */
 const devantAuRang = (position) => position + running.size;
 
-/** L'attente d'un couple : `{ devant, enqueuedAt }`, ou null s'il n'attend pas. */
+/**
+ * L'attente d'un couple : `{ devant, enqueuedAt, memoire }`, ou null s'il
+ * n'attend pas. `memoire` (0.2.27) : la file attend que la mémoire revienne.
+ */
 function attentePour(userId, connectorId) {
   const position = fileAttente.findIndex((e) => e.key === lockKey(userId, connectorId));
   if (position === -1) return null;
-  return { devant: devantAuRang(position), enqueuedAt: fileAttente[position].enqueuedAt };
+  return {
+    devant: devantAuRang(position),
+    enqueuedAt: fileAttente[position].enqueuedAt,
+    memoire: Boolean(attenteMemoire),
+  };
 }
 
 /** Les couples en attente, dans l'ordre de la file — pour l'affichage. */
@@ -2127,6 +2152,7 @@ module.exports = {
   reglagesMemoire,
   appliquerReglagesMemoire,
   attendreLaMemoire,
+  attenteDeMemoire,
   runningPairs,
   attentePour,
   pairesEnAttente,

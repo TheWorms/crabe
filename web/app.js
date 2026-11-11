@@ -394,6 +394,103 @@ function appliquerPageSize(bloc, taille) {
 }
 
 /**
+ * Les nombres de lignes proposés pour un bloc, en repli (0.2.29).
+ *
+ * Comme pour les tailles de page, la liste qui fait foi est celle du serveur
+ * (`/api/home` la renvoie) : c'est lui qui refuse le reste.
+ */
+const LIGNES_BLOC = [5, 10, 15, 20, 50];
+
+/** Les nombres réellement acceptés : ceux du serveur dès qu'on les connaît. */
+function lignesProposees() {
+  return home.data?.lignesCatalog?.length ? home.data.lignesCatalog : LIGNES_BLOC;
+}
+
+/**
+ * Les deux blocs de l'accueil qui montrent le DÉBUT de leur liste, et la clé
+ * de préférence de chacun (0.2.29).
+ *
+ * Ils ne se feuillettent pas, et c'est ce qui les sépare des blocs paginés :
+ * « Suivi d'actions » empile ce qui demande un geste avant ce qui rassure,
+ * « Mes connecteurs » est une grille de vignettes. Une page 2 n'y voudrait
+ * rien dire — on choisit combien on en voit, et le bloc dit ce qu'il ne
+ * montre pas.
+ *
+ * Les défauts sont ceux du serveur, répétés pour le seul cas où `/api/home`
+ * n'a pas répondu : une dizaine de lignes de suivi (ce que le bloc montrait
+ * sur un compte ordinaire), et le plus grand choix pour les vignettes (le
+ * bloc les montrait toutes).
+ */
+const BLOCS_BORNES = {
+  errors: {
+    cle: 'home.suivi.lignes',
+    champ: 'suiviLignes',
+    defaut: 10,
+    titre: "Suivi d'actions",
+    nom: 'Lignes affichées',
+    unite: 'lignes',
+    note: "Le bloc montre d'abord ce qui demande un geste, puis les réussites ; ce qui reste est compté sous la liste.",
+  },
+  connecteurs: {
+    cle: 'home.connecteurs.lignes',
+    champ: 'connecteursLignes',
+    defaut: 50,
+    titre: 'Mes connecteurs',
+    nom: 'Connecteurs affichés',
+    unite: 'connecteurs',
+    note: 'Le bloc montre les premiers dans l\'ordre choisi ; les autres sont comptés sous les vignettes.',
+  },
+};
+
+/** Le nombre de lignes en vigueur d'un bloc, quoi qu'il y ait en mémoire. */
+function lignesDuBloc(bloc) {
+  const config = BLOCS_BORNES[bloc];
+  const n = Number(prefs.values[config.cle] ?? home.data?.[config.champ]);
+  return lignesProposees().includes(n) ? n : config.defaut;
+}
+
+/**
+ * Change le nombre de lignes d'UN bloc, depuis le panneau de l'accueil.
+ *
+ * Même marche que la taille de page : le bloc est redessiné tout de suite,
+ * sans rappeler `/api/home` — il a déjà reçu de quoi tenir le plus grand
+ * choix. Si le serveur refuse, l'affichage REVIENT à la valeur d'avant, le
+ * menu aussi, et le refus est dit.
+ */
+function choisirLignes(bloc, valeur) {
+  const config = BLOCS_BORNES[bloc];
+  if (!config) return;
+
+  const demande = Number(valeur);
+  const avant = lignesDuBloc(bloc);
+
+  if (!lignesProposees().includes(demande)) {
+    showToast(
+      `Nombre de ${config.unite} impossible : « ${valeur} ». ` +
+        `Choisissez ${lignesProposees().slice(0, -1).join(', ')} ou ${lignesProposees().at(-1)}.`
+    );
+    renderHomePanel();
+    return;
+  }
+  if (demande === avant) return;
+
+  appliquerLignes(bloc, demande);
+  savePref(config.cle, demande, (message) => {
+    showToast(message);
+    appliquerLignes(bloc, avant);
+    renderHomePanel();
+  });
+}
+
+/** Pose un nombre de lignes sur un bloc et le redessine. */
+function appliquerLignes(bloc, lignes) {
+  const config = BLOCS_BORNES[bloc];
+  prefs.values[config.cle] = lignes;
+  if (home.data) home.data[config.champ] = lignes;
+  renderHomeWidgets();
+}
+
+/**
  * Change la présentation d'un bloc de l'accueil — cartes ou liste.
  *
  * Clé PROPRE à chaque bloc (`view.home-sync`, `view.home-documents`), et
@@ -537,7 +634,13 @@ function showView(name, { section = null, historique = 'ajouter' } = {}) {
   else if (name === 'documents' && interfaceDocuments() === 'explorer') { /* voir adresseExplorateur() */ }
   else if (location.pathname === '/suivi' || location.pathname === '/documents') history.replaceState?.(null, '', '/');
 
-  if (name === 'home') renderHome();
+  if (name === 'home') {
+    // 0.2.28 : l'accueil S'OUVRE — le prochain rendu de ses blocs joue l'entrée
+    // des statistiques (voir animerStatistiques). Un rafraîchissement, lui,
+    // appelle renderHome() sans passer par ici : il ne rejoue rien.
+    statsEntree.attendue = true;
+    renderHome();
+  }
   if (name === 'documents') renderDocuments();
   if (name === 'store') renderStore();
   if (name === 'notifications') renderNotifications();
@@ -612,7 +715,7 @@ function marquerSection(vue, nom, entree, historique) {
   for (const e of entreesDeSection(vue)) e.removeAttribute('aria-current');
   entree?.setAttribute('aria-current', 'page');
   $(`view-${vue}`)?.setAttribute('data-section', nom);
-  document.title = `${page.titre} › ${navItemLabel(entree) || page.titre} — Crabe`;
+  poserTitreDeLOnglet(`${page.titre} › ${navItemLabel(entree) || page.titre} — Crabe`);
   const cible = entree?.getAttribute('href');
   if (cible) poserAdresse(cible, { vue, section: nom }, historique);
   // Une section choisie s'ouvre en haut, comme un écran neuf ; le bouton
@@ -649,7 +752,7 @@ function ouvertureDePage() {
  * l'onglet redevient celui de la coque.
  */
 function quitterPageAAdresse(name, historique) {
-  if (typeof document !== 'undefined' && document.title !== TITRE_DE_LA_COQUE) document.title = TITRE_DE_LA_COQUE;
+  poserTitreDeLOnglet(TITRE_DE_LA_COQUE);
   if (historique === 'aucun' || !sectionDeLAdresse(location.pathname)) return;
   if (historique === 'remplacer') history.replaceState?.({ vue: name }, '', '/');
   else history.pushState?.({ vue: name }, '', '/');
@@ -1112,6 +1215,10 @@ function renderHomeSkeleton() {
 /** Charge puis rend l'accueil. Toute erreur reste lisible dans la page. */
 async function renderHome() {
   if (!home.data) renderHomeSkeleton();
+  // 0.2.28 : au retour sur l'accueil, les blocs de la visite précédente sont
+  // déjà là — l'entrée des statistiques part tout de suite, sur eux, sans
+  // attendre /home ; le rendu qui suit la réponse la prolonge sans la rejouer.
+  else if (statsEntree.attendue) renderHomeWidgets();
   try {
     await loadHome();
   } catch (err) {
@@ -1248,6 +1355,7 @@ function renderHomeWidgets() {
       </div>`
     )
     .join('');
+  animerStatistiques();
 }
 
 function widgetBody(id) {
@@ -1385,7 +1493,16 @@ function widgetConnectors() {
   // session expirée, rouge pour une connexion refusée ou un autre échec — et
   // ses MOTS, dits au survol et aux lecteurs d'écran. La vignette s'atteint au
   // clavier (Tab, puis Entrée), comme un bouton.
-  const tiles = home.data.connectors
+  //
+  // 0.2.29 : le bloc montre autant de vignettes que choisi dans le panneau de
+  // l'accueil, dans l'ordre du tri. Les autres sont comptées — et parmi elles,
+  // celles qui demandent un geste : une pastille « ! » ne doit pas disparaître
+  // sans mot.
+  const tous = home.data.connectors;
+  const caches = tous.slice(lignesDuBloc('connecteurs'));
+  const aVerifier = caches.filter((c) => c.alert).length;
+  const tiles = tous
+    .slice(0, lignesDuBloc('connecteurs'))
     .map((c) => {
       // Lot 111 : un site hors ligne n'appelle aucun geste (pas de « ! ») —
       // son icône passe en gris, son étiquette le dit, et la dernière réussite
@@ -1421,7 +1538,13 @@ function widgetConnectors() {
       <div class="conn-icon">+</div>
       <div class="conn-name">Ajouter</div>
     </div>
-  </div>`;
+  </div>${
+    caches.length
+      ? `<div class="conn-plus">Et ${caches.length} autre${caches.length > 1 ? 's' : ''} connecteur${caches.length > 1 ? 's' : ''}${
+          aVerifier ? `, dont ${aVerifier} à vérifier` : ''
+        }.</div>`
+      : ''
+  }`;
 }
 
 /** Entrée ou Espace sur une vignette de l'accueil : le même geste que le clic (lot 91). */
@@ -2110,6 +2233,191 @@ function graphiqueExecutions(series) {
   </div>`;
 }
 
+// --- b quater. L'entrée du bloc « Statistiques » (0.2.28) -------------------
+//
+// À l'ouverture de l'accueil, les statistiques arrivent en mouvement : les
+// compteurs montent jusqu'à leur valeur, les barres poussent, les courbes se
+// tracent, l'anneau se ferme. Une seconde, une fois par ouverture.
+//
+// ⚠ L'accueil est redessiné EN ENTIER à chaque rafraîchissement
+// (renderHomeWidgets : après une récupération, une pause, un réglage du
+// bloc…). L'entrée ne se joue donc pas « à chaque rendu » — les chiffres
+// repartiraient de zéro sous les yeux, plusieurs fois par minute pendant une
+// récupération — mais sur un signal que showView() pose quand l'écran s'ouvre,
+// et que le premier rendu qui suit consomme. Un rendu qui tombe PENDANT
+// l'entrée (la réponse de /home, au retour sur l'accueil) la prolonge là où
+// elle en est : l'heure du départ est gardée ici, pas dans la page.
+//
+// ⚠ L'entrée se pose SUR le rendu et s'en retire. widgetStats() et les
+// graphiques écrivent le même HTML qu'avant ; la classe, les rangs et les
+// valeurs intermédiaires sont posés après coup, et retirés à la fin. À
+// l'arrêt, le bloc est au caractère près celui d'un rendu sans entrée : c'est
+// ce que lisent un lecteur d'écran, une recherche dans la page — et
+// l'empreinte de l'accueil (lot 108), qui n'a pas bougé.
+//
+// Rien ne bouge si le système demande moins de mouvement, ni dans un onglet
+// caché : personne ne regarde, et un navigateur n'y dessine aucune image.
+
+/** L'entrée entière : passé ce délai, tout est retiré (les durées du style tiennent dedans). */
+const STATS_ENTREE_MS = 1000;
+/** Les compteurs et l'anneau sont arrivés un peu avant : la fin se regarde posée. */
+const STATS_COMPTE_MS = 800;
+
+const statsEntree = {
+  /** showView() vient d'ouvrir l'accueil : le prochain rendu joue l'entrée. */
+  attendue: false,
+  /** Heure du départ (performance.now), ou 0 : rien ne joue. */
+  debut: 0,
+  /** L'image demandée, et le délai qui ferme l'entrée même sans image. */
+  image: 0,
+  fin: 0,
+  /** Ce qui a été posé sur la page, pour le retirer. */
+  compteurs: [],
+  arcs: [],
+  rangs: [],
+  classes: [],
+};
+
+/**
+ * Ce qu'il faut pour faire monter un compteur jusqu'à son texte : « 1 234 » →
+ * 1234 ; « 12.4 Mo » → 12,4 à une décimale, suivi de « Mo ». Rien si le texte
+ * n'est pas un nombre seul ou suivi de son unité (une date, « jamais »), s'il
+ * vaut zéro, ou si ecrireCompteur() ne sait pas le réécrire à l'identique : un
+ * compteur ne monte que vers un texte qu'on sait retrouver.
+ */
+function lireCompteur(el) {
+  const texte = el.textContent;
+  const m = /^(\d+(?:\s\d{3})*)(?:\.(\d+))?(\s[A-Za-z]{1,2})?$/.exec(texte);
+  if (!m) return null;
+  const compteur = {
+    el,
+    texte,
+    valeur: Number(`${m[1].replace(/\s/g, '')}${m[2] ? `.${m[2]}` : ''}`),
+    decimales: (m[2] || '').length,
+    suite: m[3] || '',
+  };
+  return compteur.valeur > 0 && ecrireCompteur(compteur, compteur.valeur) === texte ? compteur : null;
+}
+
+function ecrireCompteur(compteur, valeur) {
+  const nombre = compteur.decimales ? valeur.toFixed(compteur.decimales) : fmt.number(Math.round(valeur));
+  return `${nombre}${compteur.suite}`;
+}
+
+/**
+ * Pose l'entrée sur le bloc que renderHomeWidgets() vient d'écrire. Appelée à
+ * CHAQUE rendu de l'accueil : elle ne fait rien hors d'une ouverture.
+ */
+function animerStatistiques() {
+  const ouverture = statsEntree.attendue;
+  statsEntree.attendue = false;
+  const bloc = document.querySelector('#home-widgets [data-widget="stats"]');
+  if (ouverture) {
+    // Le bloc est cherché AVANT l'horloge : sans lui (masqué par
+    // l'utilisateur), il n'y a rien à faire entrer.
+    const immobile = !bloc || document.hidden
+      || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    statsEntree.debut = immobile ? 0 : performance.now();
+  }
+  if (!statsEntree.debut || !bloc) return;
+  const ecoule = performance.now() - statsEntree.debut;
+  if (ecoule >= STATS_ENTREE_MS) return void finirEntreeDesStatistiques();
+
+  // Un rendu précédent a pu poser l'entrée sur des éléments que celui-ci
+  // vient de remplacer : ils ne sont plus dans la page, on les oublie.
+  statsEntree.rangs = [];
+  statsEntree.classes = [];
+
+  const style = (el, propriete, valeur) => {
+    el.style.setProperty(propriete, valeur);
+    statsEntree.rangs.push(el);
+  };
+  const classe = (el, nom) => {
+    el.classList.add(nom);
+    statsEntree.classes.push(el);
+  };
+  /** `--i` : le rang ; `--p` : la place dans la série, de 0 à 1 (douze barres ou trois, même durée). */
+  const rang = (liste) => liste.forEach((el, i) => style(el, '--i', String(i)));
+  const place = (liste) => liste.forEach((el, i) =>
+    style(el, '--p', liste.length > 1 ? (i / (liste.length - 1)).toFixed(3) : '0'));
+
+  classe(bloc, 'stats-entree');
+  // Le temps déjà joué : le style s'en sert comme d'un retard négatif.
+  style(bloc, '--stats-ecoule', `${Math.round(ecoule)}ms`);
+  rang([...bloc.querySelectorAll('.stat-box')]);
+  const cadres = [...bloc.querySelectorAll('.chart')];
+  rang(cadres);
+  for (const cadre of cadres) {
+    place([...cadre.querySelectorAll('.chart-svg rect')]);
+    place([...cadre.querySelectorAll('.chart-row-bar')]);
+    // Une courbe se trace de gauche à droite, ses repères avec elle.
+    for (const svg of cadre.querySelectorAll('.chart-svg')) {
+      if (svg.querySelector('polyline')) classe(svg, 'stats-trace');
+    }
+  }
+
+  // « dernière récupération réussie » (`.small`) est une date : elle ne monte pas.
+  statsEntree.compteurs = [...bloc.querySelectorAll('.stat-val:not(.small), .chart-donut text')]
+    .map(lireCompteur)
+    .filter(Boolean);
+  // L'anneau : chaque part est un tiret posé à sa place sur le cercle
+  // (anneauParConnecteur) ; l'entrée raccourcit le tiret, jamais sa place.
+  statsEntree.arcs = [...bloc.querySelectorAll('.chart-donut circle')]
+    .map((el) => {
+      const [longueur, vide] = String(el.getAttribute('stroke-dasharray') || '').split(' ').map(Number);
+      return { el, longueur, tour: longueur + vide, depart: -Number(el.getAttribute('stroke-dashoffset')) };
+    })
+    .filter((arc) => arc.tour > 0);
+
+  // La première image est posée tout de suite, avant que le navigateur ne
+  // dessine : sans elle, les valeurs finales apparaîtraient le temps d'un éclair.
+  imageDesStatistiques();
+  cancelAnimationFrame(statsEntree.image);
+  const pas = () => {
+    if (!statsEntree.debut) return;
+    if (performance.now() - statsEntree.debut >= STATS_ENTREE_MS) return void finirEntreeDesStatistiques();
+    imageDesStatistiques();
+    statsEntree.image = requestAnimationFrame(pas);
+  };
+  statsEntree.image = requestAnimationFrame(pas);
+  // Un onglet passé à l'arrière-plan ne reçoit plus d'image : ce délai rend
+  // les vraies valeurs quoi qu'il arrive.
+  clearTimeout(statsEntree.fin);
+  statsEntree.fin = setTimeout(finirEntreeDesStatistiques, STATS_ENTREE_MS - ecoule + 50);
+}
+
+/** Les compteurs et l'anneau, là où l'entrée en est. */
+function imageDesStatistiques() {
+  const part = Math.min(1, Math.max(0, (performance.now() - statsEntree.debut) / STATS_COMPTE_MS));
+  // Vite au départ, posé à l'arrivée : les derniers chiffres se lisent.
+  const avance = 1 - (1 - part) ** 3;
+  for (const compteur of statsEntree.compteurs) {
+    compteur.el.textContent = ecrireCompteur(compteur, compteur.valeur * avance);
+  }
+  for (const arc of statsEntree.arcs) {
+    const vu = Math.min(arc.longueur, Math.max(0, avance * arc.tour - arc.depart));
+    arc.el.style.setProperty('stroke-dasharray', `${vu.toFixed(3)} ${(arc.tour - vu).toFixed(3)}`);
+  }
+}
+
+/** Retire tout ce que l'entrée a posé : le bloc redevient celui du rendu. */
+function finirEntreeDesStatistiques() {
+  cancelAnimationFrame(statsEntree.image);
+  clearTimeout(statsEntree.fin);
+  statsEntree.debut = 0;
+  for (const compteur of statsEntree.compteurs) compteur.el.textContent = compteur.texte;
+  for (const el of [...statsEntree.rangs, ...statsEntree.arcs.map((arc) => arc.el)]) {
+    for (const propriete of ['--stats-ecoule', '--i', '--p', 'stroke-dasharray']) el.style.removeProperty(propriete);
+    // Un attribut `style` vidé resterait écrit dans la page : ils n'en avaient pas.
+    if (!el.getAttribute('style')) el.removeAttribute('style');
+  }
+  for (const el of statsEntree.classes) el.classList.remove('stats-entree', 'stats-trace');
+  statsEntree.compteurs = [];
+  statsEntree.arcs = [];
+  statsEntree.rangs = [];
+  statsEntree.classes = [];
+}
+
 // --- c. Synchronisation -----------------------------------------------------
 
 function widgetSync() {
@@ -2222,7 +2530,7 @@ function syncEtatCorps(c) {
   // En file d'attente (lot 90) : les récupérations passent l'une après
   // l'autre. Le dire — avec combien passent avant — évite de ressembler à une
   // panne, et surtout de ressembler à une erreur : c'est un état normal.
-  if (c.waiting) return `<span class="sync-ligne">en attente — ${esc(attentePhrase(c.waiting.devant))}</span>`;
+  if (c.waiting) return `<span class="sync-ligne">en attente — ${esc(attentePhrase(c.waiting.devant, c.waiting.memoire))}</span>`;
   if (c.lastMessage) return syncMessageHtml(c.lastMessage, { echec: c.lastOk === false });
   // En défaut (lot 91) : la cause en toutes lettres, jamais une simple durée.
   const defaut = syncDefautHtml(c);
@@ -2230,11 +2538,15 @@ function syncEtatCorps(c) {
   return `<span class="sync-ligne">${esc(c.lastRunAt ? fmt.relative(c.lastRunAt) : 'jamais synchronisé')}</span>`;
 }
 
-/** Combien passent avant une récupération en attente, en toutes lettres. */
-function attentePhrase(devant) {
+/**
+ * Combien passent avant une récupération en attente, en toutes lettres.
+ * `memoire` (0.2.27) : la file attend que la mémoire revienne — la demande de
+ * tête ne « démarre » pas « dans un instant », elle attend jusqu'à trois minutes.
+ */
+function attentePhrase(devant, memoire = false) {
   if (devant > 1) return `${devant} récupérations passent avant elle`;
   if (devant === 1) return 'une récupération passe avant elle';
-  return 'elle démarre dans un instant';
+  return memoire ? 'elle attend que la mémoire revienne' : 'elle démarre dans un instant';
 }
 
 /**
@@ -2494,11 +2806,10 @@ function widgetErrors() {
     .filter((r) => !vus.has(r.connectorId))
     .map((r) => ({ ...r, nature: 'succes' }));
   // Combien de services sont à jour, TOUS (lot 97) — la liste n'en montre que
-  // les plus récents (six), et le bilan disait « 6 à jour » pour 41 services
-  // à jour, mesuré le 06/10/2026. Même exclusion que les lignes.
+  // les plus récents, et le bilan disait « 6 à jour » pour 41 services à
+  // jour, mesuré le 06/10/2026. Même exclusion que les lignes.
   const aJour = (home.data.aJour || reussites.map((r) => r.connectorId))
     .filter((id) => !vus.has(id)).length;
-  const autres = aJour - reussites.length;
 
   const copies = (home.data.copyFailures || []).map(copyFailureRow).join('');
   const lignes = [...echecs, ...attentes, ...reussites];
@@ -2510,12 +2821,46 @@ function widgetErrors() {
     </div>`;
   }
 
+  // 0.2.29 : le bloc montre autant de lignes que choisi dans le panneau de
+  // l'accueil — les premières, donc ce qui demande un geste avant ce qui
+  // rassure. Le bilan, lui, compte TOUT, et ce qui n'est pas montré est dit
+  // par nature. Une copie restée en échec n'entre pas dans le compte : elle ne
+  // sera jamais reprise toute seule, elle se voit toujours.
+  const montrees = lignes.slice(0, lignesDuBloc('errors'));
+
   return bilanSuivi(lignes, home.data.copyFailures || [], aJour)
-    + lignes.map((e) => errorRow(e)).join('')
-    + (autres > 0
-      ? `<div class="err-plus">Et ${autres} autre${autres > 1 ? 's' : ''} service${autres > 1 ? 's' : ''} à jour : leur dernière récupération a réussi.</div>`
-      : '')
+    + montrees.map((e) => errorRow(e)).join('')
+    + resteDuSuivi(lignes.slice(montrees.length), aJour - reussites.length)
     + copies;
+}
+
+/**
+ * Ce que le bloc ne montre pas, en une ligne.
+ *
+ * Le cas de tous les jours — il ne reste que des services à jour — garde sa
+ * phrase du lot 97. Dès qu'une ligne qui demande un geste est du nombre, la
+ * phrase le DIT, nature par nature et dans l'ordre du bloc : « Et 4 autres
+ * services : 1 en échec, 3 à jour. » Un échec ne se range pas sous « autres ».
+ *
+ * @param {object[]} cachees  les lignes reçues que le bloc ne montre pas
+ * @param {number} enPlus     les services à jour que l'accueil n'a pas reçus
+ */
+function resteDuSuivi(cachees, enPlus) {
+  const compte = Object.fromEntries(NATURES.map((n) => [n.cle, 0]));
+  for (const l of cachees) if (l.nature in compte) compte[l.nature] += 1;
+  compte.succes += Math.max(0, enPlus);
+
+  const reste = NATURES.reduce((somme, n) => somme + compte[n.cle], 0);
+  if (!reste) return '';
+
+  const s = reste > 1 ? 's' : '';
+  if (reste === compte.succes) {
+    return `<div class="err-plus">Et ${reste} autre${s} service${s} à jour : ${reste > 1 ? 'leur' : 'sa'} dernière récupération a réussi.</div>`;
+  }
+  const detail = NATURES.filter((n) => compte[n.cle])
+    .map((n) => `${compte[n.cle]} ${compte[n.cle] > 1 ? n.plusieurs : n.un}`)
+    .join(', ');
+  return `<div class="err-plus">Et ${reste} autre${s} service${s} : ${esc(detail)}.</div>`;
 }
 
 /**
@@ -3426,6 +3771,7 @@ function renderHomePanel() {
  */
 function reglageInterne(widget, editable) {
   if (BLOCS_PAGINES[widget.id]) return reglageBlocListe(widget);
+  if (BLOCS_BORNES[widget.id]) return reglageBlocBorne(widget);
   if (widget.id !== 'stats') return '';
 
   const choisis = statsChartsChoisis();
@@ -3511,6 +3857,37 @@ function reglageBlocListe(widget) {
     <div class="panel-sub-note">
       Chaque bloc a son propre réglage : celui-ci ne touche pas l'autre.
     </div>
+  </div>`;
+}
+
+/**
+ * Le réglage d'un bloc qui montre le début de sa liste : combien de lignes
+ * (0.2.29) — « Suivi d'actions » et « Mes connecteurs ».
+ *
+ * Dans le panneau, sous la ligne du bloc, comme la taille de page de ses
+ * voisins : qui vient régler son accueil trouve tout au même endroit, et le
+ * bloc lui-même ne porte que ce qu'il montre. Un menu comme le leur, pas une
+ * rangée de boutons : le panneau n'a qu'une façon de demander « combien ».
+ *
+ * Réglage de LECTURE, lui aussi : il n'est pas grisé quand l'accueil est figé
+ * (voir `reglageBlocListe`).
+ */
+function reglageBlocBorne(widget) {
+  const config = BLOCS_BORNES[widget.id];
+  const courant = lignesDuBloc(widget.id);
+  const options = lignesProposees()
+    .map(
+      (n) => `<option value="${Number(n)}"${n === courant ? ' selected' : ''}>${Number(n)} ${esc(config.unite)}</option>`
+    )
+    .join('');
+
+  return `<div class="panel-sub">
+    <div class="panel-sub-title">Affichage du bloc</div>
+    <div class="panel-sub-form">
+      <select aria-label="${esc(config.nom)} — ${esc(config.titre)}"
+              onchange="choisirLignes('${esc(widget.id)}', this.value)">${options}</select>
+    </div>
+    <div class="panel-sub-note">${esc(config.note)}</div>
   </div>`;
 }
 
@@ -10775,7 +11152,10 @@ const OPS_ETATS = {
   echec: { classe: 'echec', un: 'en échec', plusieurs: 'en échec' },
   'en-cours': { classe: 'encours', un: 'en cours', plusieurs: 'en cours' },
   // La file d'attente (lot 90) : un état calme, jamais l'allure d'une erreur.
-  'en-attente': { classe: 'attente', un: 'en attente', plusieurs: 'en attente' },
+  // 0.2.27 : `enattente`, et non `attente` — cette classe-là est déjà celle du
+  // bloc d'attente d'une connexion (une colonne, toute la largeur) : le bandeau
+  // en héritait, le point passait au-dessus de sa phrase.
+  'en-attente': { classe: 'enattente', un: 'en attente', plusieurs: 'en attente' },
   succes: { classe: 'succes', un: 'terminée', plusieurs: 'terminées' },
 };
 
@@ -10787,6 +11167,8 @@ function opOuverte(op) {
 /** Cadences de la veille, en millisecondes. */
 const OPS_CADENCE_ACTIVE = 4000;
 const OPS_CADENCE_REPOS = 45000;
+/** Onglet caché, une opération ouverte : le titre de l'onglet doit suivre (0.2.27). */
+const OPS_CADENCE_CACHEE = 15000;
 
 /** Les fins déjà fermées, mémorisées pour la session du navigateur. */
 function opsFermees() {
@@ -10804,7 +11186,10 @@ async function veilleOperations() {
   clearTimeout(opsBandeau.timer);
   // 0.2.22 : un onglet caché n'interroge plus le serveur ; il reprend dès
   // qu'il redevient visible (voir l'écouteur `visibilitychange`, au démarrage).
-  if (document.hidden) {
+  // 0.2.27 : sauf tant qu'une opération est OUVERTE — le titre de l'onglet dit
+  // que crabe travaille, il doit aussi dire qu'il a fini. La veille continue
+  // alors, lentement, et s'endort à la première lecture sans rien d'ouvert.
+  if (document.hidden && !opsBandeau.operations.some(opOuverte)) {
     opsBandeau.enSommeil = true;
     return;
   }
@@ -10817,9 +11202,10 @@ async function veilleOperations() {
   } catch { /* session expirée ou réseau : le bandeau garde son dernier état */ }
 
   const active = opsBandeau.operations.length > 0;
+  const cadence = active ? OPS_CADENCE_ACTIVE : OPS_CADENCE_REPOS;
   opsBandeau.timer = setTimeout(
     () => veilleOperations().catch(() => {}),
-    active ? OPS_CADENCE_ACTIVE : OPS_CADENCE_REPOS
+    document.hidden ? Math.max(cadence, OPS_CADENCE_CACHEE) : cadence
   );
 }
 
@@ -10840,7 +11226,7 @@ function majCartesDepuisOperations() {
     if (!c || !$(`sync-status-${c.id}`)) continue; // l'accueil n'est pas affiché
     if (op.etat === 'en-attente') {
       c.running = false;
-      c.waiting = { devant: op.devant ?? 0 };
+      c.waiting = { devant: op.devant ?? 0, memoire: Boolean(op.memoire) };
     } else if (op.etat === 'en-cours') {
       c.running = true;
       c.waiting = null;
@@ -10946,7 +11332,9 @@ function opsResume(visibles) {
   }
   const combien = visibles.filter((op) => op.etat === dominant).length;
   const mots = OPS_ETATS[dominant];
-  return `${visibles.length} opérations — ${combien} ${combien > 1 ? mots.plusieurs : mots.un}`;
+  // 0.2.27 : la file attend la mémoire — le dire, plutôt qu'une attente sans cause.
+  const deMemoire = dominant === 'en-attente' && visibles.some((op) => op.memoire) ? ' de mémoire' : '';
+  return `${visibles.length} opérations — ${combien} ${combien > 1 ? mots.plusieurs : mots.un}${deMemoire}`;
 }
 
 /** La croix : elle ne ferme que ce qui est FINI, et ne navigue pas. */
@@ -11033,8 +11421,142 @@ function planifierEffacement(visibles) {
   opsBandeau.effacement = setTimeout(majBandeauOperations, Math.min(...echeances) + 50);
 }
 
+// ---------------------------------------------------------------------------
+// Le témoin d'activité (0.2.27)
+//
+// Le bandeau dit QUOI tourne ; le témoin dit, d'un coup d'œil, QUE crabe
+// travaille — là où le regard se pose sans lire : le logo de l'en-tête, qui
+// agite les pinces, et l'onglet du navigateur, pour qui est parti faire autre
+// chose. Trois états, lus sur les opérations de la veille :
+//
+//   travaille — une opération tourne, ou attend son tour derrière une autre :
+//               les pinces s'agitent, le titre de l'onglet porte un signe qui
+//               tourne (« ◐ 1 récupération en cours — Crabe ») ;
+//   attente   — rien ne tourne ici et la file attend que la mémoire revienne :
+//               le logo reste immobile, un point bleu suit le nom, le titre
+//               porte un point fixe (« • 2 en attente de mémoire — Crabe ») ;
+//   repos     — rien d'ouvert : le logo et le titre de l'écran, tels quels.
+//
+// Un navigateur n'anime pas l'icône d'un onglet : elle porte une pastille,
+// ambre ou bleue (deux fichiers, `scripts/icones-onglet.js`). Le témoin suit
+// les opérations de CE compte, comme le bandeau — pas l'activité des autres.
+// ---------------------------------------------------------------------------
+
+/** Le signe en tête du titre de l'onglet quand crabe travaille : un pas par seconde. */
+const TEMOIN_SIGNES = ['◐', '◓', '◑', '◒'];
+
+/** L'icône de l'onglet, par état. */
+const TEMOIN_ICONES = {
+  repos: '/favicon.png',
+  travaille: '/favicon-travail.png',
+  attente: '/favicon-attente.png',
+};
+
+const temoin = {
+  etat: 'repos',
+  /** Ce que dit le titre de l'onglet : « 1 récupération en cours ». */
+  phrase: '',
+  /** Le titre de l'écran affiché — celui que l'onglet retrouve au repos. */
+  titre: TITRE_DE_LA_COQUE,
+  icone: TEMOIN_ICONES.repos,
+  pas: 0,
+  timer: null,
+};
+
+/** « 1 récupération », « 3 récupérations » — « opérations » si les types sont mêlés. */
+function temoinCompte(ops) {
+  const nom = ops.every((op) => op.type === 'recuperation') ? 'récupération' : 'opération';
+  return `${ops.length} ${nom}${ops.length > 1 ? 's' : ''}`;
+}
+
+/** L'état du témoin, sa phrase pour l'onglet et celle de la bulle du logo. */
+function etatDuTemoin(operations) {
+  const enCours = operations.filter((op) => op.etat === 'en-cours');
+  if (enCours.length) {
+    const phrase = `${temoinCompte(enCours)} en cours`;
+    return { etat: 'travaille', phrase, bulle: `crabe travaille — ${phrase}` };
+  }
+  const enAttente = operations.filter((op) => op.etat === 'en-attente');
+  if (!enAttente.length) return { etat: 'repos', phrase: '', bulle: '' };
+  if (enAttente.some((op) => op.memoire)) {
+    return {
+      etat: 'attente',
+      phrase: `${enAttente.length} en attente de mémoire`,
+      bulle: `La file attend que la mémoire revienne — ${temoinCompte(enAttente)} en attente`,
+    };
+  }
+  const phrase = `${temoinCompte(enAttente)} en attente`;
+  return { etat: 'travaille', phrase, bulle: `crabe travaille — ${phrase}` };
+}
+
+/** Le titre de l'onglet : celui de l'écran au repos, celui du témoin sinon. */
+function ecrireTitreDeLOnglet() {
+  if (typeof document === 'undefined') return;
+  const signe = temoin.etat === 'travaille' ? TEMOIN_SIGNES[temoin.pas % TEMOIN_SIGNES.length] : '•';
+  const titre = temoin.etat === 'repos' ? temoin.titre : `${signe} ${temoin.phrase} — Crabe`;
+  if (document.title !== titre) document.title = titre;
+}
+
+/**
+ * Un écran pose son titre : le témoin le retient, et ne l'écrit dans l'onglet
+ * que s'il n'a rien à y dire — sinon une section ouverte pendant une
+ * récupération effacerait le signe, et la fin de la récupération rendrait
+ * le titre d'un écran quitté.
+ */
+function poserTitreDeLOnglet(titre) {
+  temoin.titre = titre;
+  ecrireTitreDeLOnglet();
+}
+
+/** Fait tourner le signe du titre, une fois par seconde, tant que crabe travaille. */
+function tournerLeSigne() {
+  clearTimeout(temoin.timer);
+  temoin.timer = null;
+  if (temoin.etat !== 'travaille') return;
+  temoin.timer = setTimeout(() => {
+    temoin.pas += 1;
+    ecrireTitreDeLOnglet();
+    tournerLeSigne();
+  }, 1000);
+  // Hors d'un navigateur (les essais de rendu), ce minuteur ne retient pas le
+  // processus ; dans un navigateur, `setTimeout` rend un nombre : rien à faire.
+  temoin.timer?.unref?.();
+}
+
+/** Redessine le témoin depuis `opsBandeau.operations` : le logo, le titre, l'icône. */
+function majTemoin() {
+  const { etat, phrase, bulle } = etatDuTemoin(opsBandeau.operations);
+  temoin.etat = etat;
+  temoin.phrase = phrase;
+  ecrireTitreDeLOnglet();
+
+  const logo = $('tb-logo');
+  if (logo) {
+    logo.classList.toggle('tb-travaille', etat === 'travaille');
+    logo.classList.toggle('tb-attente', etat === 'attente');
+    logo.title = bulle;
+  }
+
+  // L'icône n'est réécrite que si elle change : la reposer à l'identique la
+  // ferait recharger — et clignoter — à chaque lecture de la veille.
+  const icone = $('icone-onglet');
+  if (icone && temoin.icone !== TEMOIN_ICONES[etat]) {
+    temoin.icone = TEMOIN_ICONES[etat];
+    icone.href = temoin.icone;
+  }
+
+  if (etat !== 'travaille') {
+    clearTimeout(temoin.timer);
+    temoin.timer = null;
+  } else if (!temoin.timer) {
+    tournerLeSigne();
+  }
+}
+
 /** Redessine le bandeau depuis `opsBandeau.operations`. */
 function majBandeauOperations() {
+  majTemoin();
+
   const zone = $('op-banner');
   if (!zone) return;
 
@@ -11312,14 +11834,16 @@ $('maj-overlay')?.addEventListener?.('click', (event) => {
 // ---------------------------------------------------------------------------
 
 // 0.2.22 : la veille des opérations s'endort dans un onglet caché ; elle
-// reprend ici, dès qu'il redevient visible.
+// reprend ici, dès qu'il redevient visible. 0.2.27 : ralentie plutôt
+// qu'endormie tant qu'une opération est ouverte, elle relit aussitôt aussi.
 document.addEventListener('visibilitychange', () => {
-  if (!document.hidden && opsBandeau.enSommeil) veilleOperations().catch(() => {});
+  if (document.hidden) return;
+  if (opsBandeau.enSommeil || opsBandeau.operations.some(opOuverte)) veilleOperations().catch(() => {});
 });
 
 document.addEventListener('keydown', (event) => {
   if (event.key !== 'Escape') return;
-  for (const id of ['modal-overlay', 'qv-overlay', 'access-overlay', 'generic-overlay', 'info-config-overlay', 'dr-overlay']) {
+  for (const id of ['modal-overlay', 'qv-overlay', 'access-overlay', 'generic-overlay', 'info-config-overlay', 'dr-overlay', 'memoire-overlay']) {
     $(id).classList.remove('show');
   }
   closeHomePanel();

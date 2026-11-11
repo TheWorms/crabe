@@ -6,6 +6,62 @@ Pour mettre à jour votre crabe : [docs/MISE-A-JOUR.md](docs/MISE-A-JOUR.md) (En
 
 ---
 
+## 0.2.29 — sur l'accueil, on choisit combien de lignes on lit (11/11/2026)
+
+### Accueil
+- **« Suivi d'actions » et « Mes connecteurs » montrent 5, 10, 15, 20 ou 50 lignes, au choix.** Le réglage est dans « Personnaliser l'accueil », sous la ligne de chacun des deux blocs, comme la taille de page de « Synchronisation » et de « Derniers documents ». Le bloc change tout de suite. Chaque bloc a son réglage, chaque compte le sien, et il vous suit d'un appareil à l'autre.
+- **Sans rien régler** : dix lignes dans « Suivi d'actions », cinquante vignettes dans « Mes connecteurs ».
+- **Ce qui n'est pas montré est compté.** « Suivi d'actions » montre d'abord ce qui demande un geste — les échecs, puis les services à configurer —, ensuite les réussites, des plus récentes aux plus anciennes. Sous la liste, une phrase dit le reste, par nature : « Et 3 autres services : 1 à configurer, 2 à jour. » Le bilan en tête du bloc compte toujours tout. « Mes connecteurs » fait de même — « Et 7 autres connecteurs, dont 2 à vérifier. » —, et la vignette « Ajouter » reste là.
+- **Une copie restée en échec se voit toujours**, en plus des lignes choisies : elle ne sera pas reprise toute seule.
+- **Un accueil figé garde ce réglage** : « Figer mon accueil » protège la disposition des blocs, pas ce qu'on y lit.
+- Ce qui change sans rien régler. Jusqu'ici, « Suivi d'actions » montrait tout ce qui demande un geste, puis six réussites ; il montre maintenant dix lignes en tout. Avec plus de quatre services qui demandent un geste, il y a donc moins de réussites à l'écran qu'avant, et au-delà de dix, des services en défaut que la liste ne montre plus : la phrase les nomme, le bilan les compte, « 15 lignes », « 20 lignes » ou « 50 lignes » les ramènent.
+- Ce que le réglage ne fait pas. Les deux blocs ne se feuillettent pas : ils montrent le début de leur liste, cinquante lignes au plus. Au-delà, la phrase compte le reste ; la page « Suivi d'actions » — le titre du bloc y mène — et Profil › Connecteurs installés montrent tout. Quand l'administrateur a retiré la personnalisation de l'accueil à un compte, le panneau ne s'ouvre pas, et ce réglage avec lui : le choix déjà fait continue de s'appliquer.
+
+### Pour les mainteneurs
+- Deux préférences par compte, `home.suivi.lignes` (10) et `home.connecteurs.lignes` (50), dans une liste fermée (`LIGNES_BLOC`) distincte des tailles de page. `PUT /api/users/me/preferences` refuse une valeur hors liste et dit lesquelles sont permises. Pas de migration.
+- `GET /api/home` rend jusqu'à cinquante réussites (`successes`) — un service en pause n'y prend la place d'aucune —, et `suiviLignes`, `connecteursLignes`, `lignesCatalog`. Le bloc se redessine avec ce qu'il a déjà reçu : un choix n'appelle que l'enregistrement de la préférence. Le réglage est un menu du panneau (`reglageBlocBorne`, à côté de `reglageBlocListe`) : un refus ramène le bloc et le menu à la valeur d'avant.
+
+---
+
+## 0.2.28 — les statistiques de l'accueil arrivent en mouvement (11/11/2026)
+
+### Accueil
+- **Les statistiques s'animent à l'ouverture de l'accueil.** Les compteurs montent jusqu'à leur valeur — les documents du mois, le total, le poids, les connecteurs actifs —, les cadres se posent l'un après l'autre, les barres poussent, les courbes se tracent de gauche à droite, l'anneau se ferme part après part pendant que son total monte. Le tout dure une seconde.
+- **Une fois par ouverture.** L'accueil se redessine à chaque rafraîchissement — la fin d'une récupération, une pause, un graphique coché ou décoché : rien ne se rejoue alors, les chiffres changent sur place. Revenir sur l'accueil depuis un autre écran, c'est l'ouvrir ; cliquer sur le logo ou sur « Accueil » quand on y est déjà, aussi.
+- **Ce qui ne bouge pas** : un chiffre à zéro, « jamais », la date de la dernière récupération réussie. Et rien ne s'anime si votre système demande moins de mouvement, ni quand l'accueil s'ouvre dans un onglet à l'arrière-plan : les chiffres sont là d'emblée.
+- L'entrée terminée, le bloc est au caractère près celui d'avant : rien ne reste dans la page. Pendant la seconde qu'elle dure, en revanche, un lecteur d'écran ou une recherche dans la page peuvent tomber sur un chiffre encore en chemin.
+
+### Pour les mainteneurs
+- Pas de migration, rien côté serveur : `web/app.js` et `web/style.css` seulement.
+- L'entrée se pose sur le rendu et s'en retire (`animerStatistiques`, la classe `stats-entree`) : les fonctions qui écrivent les statistiques et leurs graphiques ne changent pas.
+
+---
+
+## 0.2.27 — la mémoire en une ligne, et crabe montre qu'il travaille (11/11/2026)
+
+### Administration › Système
+- **La mémoire tient en une ligne**, dans « Infrastructure », sous « Disque restant » : la pastille (« suffisante », « trop peu pour une fenêtre de connexion », « trop peu pour une récupération »), ce qu'il reste à crabe, et un bouton « Configurer » — comme l'heure du serveur. La carte de la 0.2.26, sous les deux colonnes, n'existe plus.
+- **« Configurer » ouvre une fenêtre.** En haut, une jauge : ce qu'il reste à crabe, et les deux réserves posées dessus à leur place. Dessous, les mesures — la machine, le plafond du service, crabe lui-même, ce qui tourne — et les trois réglages de la 0.2.26, inchangés.
+- **La jauge suit la saisie** : avant d'enregistrer, elle montre ce que crabe ferait de la mémoire qui reste avec les réserves tapées. « Valeurs par défaut » remplit les champs avec celles de crabe sans rien enregistrer ; « Enregistrer » applique et ferme. « Actualiser » relit la mesure sans toucher à ce qui est tapé. Échap ferme la fenêtre.
+- Sans la permission « Configurer la sécurité », le bouton s'appelle « Détails » : la fenêtre montre les réserves, sans les champs.
+
+### crabe montre qu'il travaille
+- **Le logo agite les pinces**, dans l'en-tête, tant qu'une opération tourne — une récupération, une synchronisation, un renommage, une optimisation. Au repos, il ne bouge pas. Quand la file attend que la mémoire revienne, il reste immobile et un point bleu suit le nom. Si votre système demande moins de mouvement, rien ne s'anime : un point ambre se pose sur le logo.
+- **L'onglet du navigateur le dit aussi**, pour qui est parti faire autre chose. Son titre commence par un signe qui tourne et dit ce qui se passe — « ◐ 1 récupération en cours — Crabe » —, son icône porte une pastille : ambre quand crabe travaille, bleue quand la file attend la mémoire. À la fin, le titre et l'icône de l'écran reviennent.
+- **La file dit pourquoi elle attend** : « en attente de mémoire » dans le bandeau, « elle attend que la mémoire revienne » sur la carte du service — là où crabe écrivait « elle démarre dans un instant » pendant une attente qui peut durer trois minutes.
+- Ce que le témoin ne fait pas. Il suit vos opérations, comme le bandeau — pas celles des autres comptes. Un onglet laissé en arrière-plan pendant une opération la suit jusqu'au bout, plus lentement (une lecture toutes les quinze secondes, parfois une par minute quand le navigateur ralentit l'onglet) ; un onglet laissé en arrière-plan au repos ne voit pas partir une récupération planifiée avant qu'on y revienne. Un navigateur n'anime pas l'icône d'un onglet, d'où la pastille ; certains ne la changent pas toujours.
+
+### Corrigé
+- **Le bandeau « en attente »** : depuis la file d'attente des récupérations, son point se posait au-dessus de sa phrase et le bandeau s'étirait sur toute la largeur.
+- **Sur téléphone, le bouton d'une fenêtre faisait 160 px de haut** — « Enregistrer » dans « Date et heure », par exemple. Il retrouve sa hauteur.
+
+### Pour les mainteneurs
+- Pas de migration.
+- `GET /api/operations` : une opération en attente porte `memoire` — vrai quand la file attend la mémoire. `scheduler.attenteDeMemoire()`.
+- Deux icônes d'onglet, `web/favicon-travail.png` et `web/favicon-attente.png`, servies avec le reste de l'interface.
+
+---
+
 ## 0.2.26 — la mémoire se lit et se règle dans l'administration (11/11/2026)
 
 ### Administration › Système

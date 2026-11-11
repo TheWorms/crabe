@@ -225,6 +225,27 @@ const KEYS = {
    */
   'home.connecteurs.tri': 'nom',
   'home.sync.tri': 'nom',
+  /**
+   * Accueil : COMBIEN de lignes montrent « Suivi d'actions » et « Mes
+   * connecteurs » (0.2.29).
+   *
+   * Ce ne sont pas des tailles de page : ces deux blocs ne se feuillettent
+   * pas, ils montrent le début de leur liste et disent ce qu'ils ne montrent
+   * pas. Le choix se fait dans le panneau de l'accueil, sous la ligne du
+   * bloc, parmi `LIGNES_BLOC`.
+   *
+   * ─── Deux défauts, pour ne rien retirer à qui n'a rien demandé ───────────
+   *
+   * « Suivi d'actions » montrait ce qui demande un geste et six réussites :
+   * une dizaine de lignes sur un compte ordinaire — le défaut est 10.
+   * « Mes connecteurs » montrait toutes ses vignettes : son défaut est le plus
+   * grand des choix.
+   *
+   * Par compte, comme les tris : un accueil réglé sur le poste fixe est le
+   * même sur le téléphone.
+   */
+  'home.suivi.lignes': 10,
+  'home.connecteurs.lignes': 50,
   'home.stats.type.mois': 'barres',
   'home.stats.type.connecteurs': 'barres',
   /**
@@ -269,6 +290,22 @@ const KEYS = {
  * personne n'a réclamé plus court que dix.
  */
 const PAGE_SIZES = [10, 15, 20, 25, 30, 50];
+
+/**
+ * Combien de lignes un bloc de l'accueil peut montrer (0.2.29) — « Suivi
+ * d'actions » et « Mes connecteurs ».
+ *
+ * Une liste à part des tailles de page, et le 5 y revient : ces deux blocs ne
+ * sont pas des pages. Cinq lignes de suivi, c'est « ce qui presse » ; cinq
+ * vignettes, c'est une rangée.
+ */
+const LIGNES_BLOC = [5, 10, 15, 20, 50];
+
+/** Les clés que `LIGNES_BLOC` borne, et le nom que le refus donne à chacune. */
+const CLES_LIGNES = {
+  'home.suivi.lignes': 'Nombre de lignes',
+  'home.connecteurs.lignes': 'Nombre de connecteurs',
+};
 
 /**
  * Les graphiques du bloc « Statistiques », dans leur ordre d'affichage.
@@ -350,7 +387,10 @@ function coerce(key, value) {
   // ligne n'afficherait rien, et une page de 10 000 n'est plus une page.
   if (typeof attendu === 'number') {
     const n = Number.parseInt(value, 10);
-    return PAGE_SIZES.includes(n) ? n : attendu;
+    // Chaque clé a SA liste : le 5 n'est pas une taille de page, le 25 n'est
+    // pas un nombre de lignes de bloc.
+    const permis = key in CLES_LIGNES ? LIGNES_BLOC : PAGE_SIZES;
+    return permis.includes(n) ? n : attendu;
   }
 
   // Liste bornée, dédoublonnée, débarrassée de ce qui n'est pas une chaîne.
@@ -426,6 +466,17 @@ function refus(key, value) {
       return (
         `Nombre de lignes par page impossible : « ${String(value)} ». ` +
         `Choisissez ${PAGE_SIZES.slice(0, -1).join(', ')} ou ${PAGE_SIZES.at(-1)}.`
+      );
+    }
+  }
+
+  // Même règle pour le nombre de lignes des deux blocs qui ne se feuillettent
+  // pas (0.2.29) : refusé, jamais rangé en douce sur le choix voisin.
+  if (key in CLES_LIGNES) {
+    if (!LIGNES_BLOC.includes(Number(value))) {
+      return (
+        `${CLES_LIGNES[key]} impossible : « ${String(value)} ». ` +
+        `Choisissez ${LIGNES_BLOC.slice(0, -1).join(', ')} ou ${LIGNES_BLOC.at(-1)}.`
       );
     }
   }
@@ -571,6 +622,7 @@ module.exports = {
   VIEW_MODES,
   LOGO_FILTERS,
   PAGE_SIZES,
+  LIGNES_BLOC,
   STATS_CHARTS,
   STATS_CHART_TYPES,
   STATS_TYPE_LABELS,

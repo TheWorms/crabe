@@ -745,6 +745,12 @@ function syncRows(user) {
 const LIMITE_DEFAUTS = 100;
 
 /**
+ * Combien de réussites l'accueil reçoit : le plus grand nombre de lignes que
+ * le bloc sache montrer (0.2.29). La page « Suivi d'actions » les a toutes.
+ */
+const LIGNES_MAX = Math.max(...preferences.LIGNES_BLOC);
+
+/**
  * Bloc « Suivi actions » : les services en défaut, chacun avec SA cause.
  *
  * Chaque ligne porte l'action qui RÉSOUT son échec, pas un bouton générique :
@@ -1172,10 +1178,15 @@ async function dashboard(user) {
     errors: recentErrors(user),
     pendingActions: pendingActions(user),
     // Les récupérations qui se sont bien passées — y compris à zéro document.
-    successes: recentSuccesses(user),
+    // Autant que le bloc sait en montrer (0.2.29) : le nombre de lignes se
+    // choisit dans le panneau de l'accueil et l'écran coupe sans rappeler le
+    // serveur ; au-delà du plus grand choix, une ligne ne serait jamais
+    // affichée.
+    // La borne se pose APRÈS la lecture (`-1` : sans limite, en SQLite) : un
+    // service en pause, écarté de la liste, n'y prend la place de personne.
+    successes: recentSuccesses(user, -1).slice(0, LIGNES_MAX),
     // TOUS les services à jour, pour le bilan du bloc (lot 97) : la liste
-    // n'en montre que six, et le bilan disait « 6 à jour » pour 41. `-1` :
-    // sans limite, en SQLite.
+    // n'en montre qu'une partie, et le bilan disait « 6 à jour » pour 41.
     aJour: recentSuccesses(user, -1).map((r) => r.connectorId),
     // Copies vers un cloud restées en échec : sans reprise automatique, elles
     // le resteraient indéfiniment si personne ne les voyait.
@@ -1199,6 +1210,11 @@ async function dashboard(user) {
     connecteursTri: preferences.get(user.id, 'home.connecteurs.tri'),
     syncTri: preferences.get(user.id, 'home.sync.tri'),
     trisCatalog: tri.ORDRES,
+    // Combien de lignes montrent « Suivi d'actions » et « Mes connecteurs »
+    // (0.2.29), et les choix possibles — du serveur, pour la même raison.
+    suiviLignes: preferences.get(user.id, 'home.suivi.lignes'),
+    connecteursLignes: preferences.get(user.id, 'home.connecteurs.lignes'),
+    lignesCatalog: preferences.LIGNES_BLOC,
     // Les tailles proposées viennent du serveur, qui est aussi celui qui les
     // refuse : le menu déroulant ne peut donc pas proposer une valeur que
     // l'enregistrement rejetterait.

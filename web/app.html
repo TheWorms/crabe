@@ -8,15 +8,26 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/style.css">
-<link rel="icon" href="/favicon.png" type="image/png">
+<link rel="icon" id="icone-onglet" href="/favicon.png" type="image/png">
 </head>
 <body>
 
 <div id="app" style="display:flex;">
   <div class="topbar">
-    <div class="tb-logo" onclick="showView('home')">
-      <img class="tb-crab" src="/crabe.png" alt="">
+    <!-- Le témoin d'activité (0.2.27) : au repos, le logo entier. Quand crabe
+         travaille, trois calques du même dessin — le corps, chaque pince — et
+         les pinces s'agitent ; quand la file attend la mémoire, le logo reste
+         immobile et un point bleu suit le nom (voir majTemoin, web/app.js). -->
+    <div class="tb-logo" id="tb-logo" onclick="showView('home')">
+      <span class="tb-crabe">
+        <img class="tb-crab" src="/crabe.png" alt="">
+        <img class="tb-calque tb-corps" src="/crabe.png" alt="" aria-hidden="true">
+        <img class="tb-calque tb-pince-g" src="/crabe.png" alt="" aria-hidden="true">
+        <img class="tb-calque tb-pince-d" src="/crabe.png" alt="" aria-hidden="true">
+        <i class="tb-point" aria-hidden="true"></i>
+      </span>
       <span>Crabe</span>
+      <i class="tb-file" aria-hidden="true"></i>
     </div>
 
     <!-- Bandeau des opérations (lot 59, refondu au lot 65, replacé au lot 70) :
@@ -1231,6 +1242,25 @@
     <div class="modal-actions">
       <button class="btn-secondary" onclick="saveDisplaySettings()">Enregistrer</button>
     </div>
+  </div>
+</div>
+
+<!-- 0.2.27 : la mémoire d'Administration › Système, en fenêtre (admin.js). -->
+<div class="modal-overlay" id="memoire-overlay">
+  <div class="modal modale-memoire" role="dialog" aria-modal="true" aria-labelledby="memoire-titre">
+    <div class="modal-head">
+      <div>
+        <div style="font-weight:500;font-size:15px;" id="memoire-titre">Mémoire</div>
+        <div class="modal-sub">Ce qu'il reste à crabe, et la réserve qu'il garde avant d'ouvrir un navigateur</div>
+      </div>
+      <button class="modal-close" id="memoire-fermer" aria-label="Fermer" onclick="fermerMemoire()">✕</button>
+    </div>
+    <div class="memoire-jauge" id="memoire-jauge"></div>
+    <div class="memoire-colonnes">
+      <div id="memoire-mesures"></div>
+      <div class="memoire-reglages" id="memoire-reglages"></div>
+    </div>
+    <div class="modal-actions" id="memoire-actions"></div>
   </div>
 </div>
 

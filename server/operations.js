@@ -258,6 +258,12 @@ function recuperationsPour(user, ops) {
   // disent, avec combien passent avant elles — sinon l'écran ressemble à une
   // panne (« j'ai cliqué, rien ne se passe »). Le détail est une phrase, pas
   // un jargon : la cible de crabe n'est pas technique.
+  //
+  // 0.2.27 : la file peut aussi attendre la MÉMOIRE (0.2.23) — jusqu'à trois
+  // minutes pendant lesquelles la demande de tête annonçait « elle démarre
+  // dans un instant ». `memoire` le dit à l'écran (le logo de l'en-tête et le
+  // titre de l'onglet le montrent), et la phrase de la demande de tête aussi.
+  const attendLaMemoire = Boolean(scheduler.attenteDeMemoire());
   for (const paire of scheduler.pairesEnAttente()) {
     if (paire.userId !== user.id) continue;
     // Sa fin précédente n'est plus « ce qui vient de se passer » : l'attente
@@ -272,12 +278,15 @@ function recuperationsPour(user, ops) {
       // Le chiffre nu en plus de la phrase : les cartes de l'accueil s'en
       // servent pour redire l'attente avec leurs propres mots.
       devant: paire.devant,
+      memoire: attendLaMemoire,
       detail:
         paire.devant > 1
           ? `${paire.devant} récupérations passent avant elle`
           : paire.devant === 1
             ? 'une récupération passe avant elle'
-            : 'elle démarre dans un instant',
+            : attendLaMemoire
+              ? 'elle attend que la mémoire revienne'
+              : 'elle démarre dans un instant',
       faites: null,
       total: null,
       ecran: 'home',

@@ -65,6 +65,36 @@
   .tb-logo{display:flex;align-items:center;gap:8px;cursor:pointer;}
   .tb-logo span{font-size:16px;font-weight:700;}
   .tb-crab{width:24px;height:24px;}
+  /* Le témoin d'activité (0.2.27). Le logo est découpé à l'affichage, pas en
+     fichiers : trois calques de la même image, chacun réduit à sa part par
+     `clip-path` — le corps avec les pattes, la pince gauche, la pince droite.
+     Les pinces pivotent autour de leur attache et ne s'ouvrent que vers
+     l'extérieur : vers l'intérieur, elles passeraient sur les yeux. Au repos
+     les calques sont masqués et le logo entier reste seul. */
+  .tb-crabe{position:relative;display:block;width:24px;height:24px;flex-shrink:0;}
+  .tb-crabe img{display:block;width:24px;height:24px;}
+  .tb-calque{position:absolute;left:0;top:0;visibility:hidden;}
+  .tb-corps{clip-path:polygon(0% 50%,31.05% 50%,31.45% 48.44%,33.2% 46.09%,33.01% 44.14%,34.77% 41.41%,36.33% 39.06%,38.67% 36.72%,40.63% 35.16%,45.31% 31.25%,45.31% 0%,55.47% 0%,55.47% 31.25%,60.94% 35.16%,62.5% 36.72%,64.45% 39.06%,66.02% 41.41%,67.58% 44.14%,67.19% 46.09%,68.95% 48.44%,69.53% 50%,100% 50%,100% 100%,0% 100%);}
+  .tb-pince-g{clip-path:polygon(0% 0%,45.31% 0%,45.31% 31.25%,40.63% 35.16%,38.67% 36.72%,36.33% 39.06%,34.77% 41.41%,33.01% 44.14%,33.2% 46.09%,31.45% 48.44%,31.05% 50%,32.42% 54.69%,0% 54.69%);transform-origin:23.2% 50%;}
+  .tb-pince-d{clip-path:polygon(100% 0%,55.47% 0%,55.47% 31.25%,60.94% 35.16%,62.5% 36.72%,64.45% 39.06%,66.02% 41.41%,67.58% 44.14%,67.19% 46.09%,68.95% 48.44%,69.53% 50%,68.36% 54.69%,100% 54.69%);transform-origin:77.3% 50%;}
+  .tb-logo.tb-travaille .tb-crab{visibility:hidden;}
+  .tb-logo.tb-travaille .tb-calque{visibility:visible;}
+  .tb-logo.tb-travaille .tb-pince-g{animation:tb-pince-g 1.6s ease-in-out infinite;}
+  .tb-logo.tb-travaille .tb-pince-d{animation:tb-pince-d 1.6s ease-in-out infinite;}
+  @keyframes tb-pince-g{0%,30%,60%,100%{transform:rotate(0deg);}15%,45%{transform:rotate(-18deg);}}
+  @keyframes tb-pince-d{0%,30%,60%,100%{transform:rotate(0deg);}15%,45%{transform:rotate(18deg);}}
+  /* Deux points : celui du logo ne sert qu'au mouvement réduit (le crabe ne
+     bouge pas, le point dit qu'il travaille) ; celui d'après le nom dit que la
+     file attend la mémoire — bleu, l'état calme du bandeau. */
+  .tb-point,.tb-file{display:none;border-radius:50%;}
+  .tb-point{position:absolute;right:-3px;bottom:-2px;width:9px;height:9px;box-sizing:border-box;background:var(--amber);border:2px solid var(--bg);}
+  .tb-logo.tb-attente .tb-file{display:block;width:9px;height:9px;flex-shrink:0;margin-left:4px;background:var(--blue);animation:op-pulse 1.6s ease-in-out infinite;}
+  @media (prefers-reduced-motion:reduce){
+    .tb-logo.tb-travaille .tb-crab{visibility:visible;}
+    .tb-logo.tb-travaille .tb-calque{visibility:hidden;animation:none;}
+    .tb-logo.tb-travaille .tb-point{display:block;}
+    .tb-logo.tb-attente .tb-file{animation:none;}
+  }
   .tb-right{margin-left:auto;display:flex;align-items:center;gap:6px;}
   .tb-btn{width:36px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;background:transparent;border:1px solid transparent;color:var(--text-dim);position:relative;}
   .tb-btn:hover{background:var(--bg-elev-2);color:var(--text);}
@@ -93,7 +123,7 @@
   .op-box.encours{background:var(--amber-bg);color:var(--amber);}
   /* « en attente » (lot 90) : un état calme — bleu, jamais l'allure d'une
      erreur, et aucune animation : rien ne presse. */
-  .op-box.attente{background:var(--blue-bg);color:var(--blue);}
+  .op-box.enattente{background:var(--blue-bg);color:var(--blue);}
   .op-box.succes{background:var(--green-bg);color:var(--green);}
   .op-box.echec{background:var(--red-bg);color:var(--cause-refus);}
   /* Lot 91 : une session expirée arrête la récupération, mais se dit en orange. */
@@ -129,7 +159,7 @@
     background:transparent;border:none;border-radius:8px;padding:7px 9px;
     font:inherit;font-size:12.5px;line-height:1.4;cursor:pointer;}
   .op-item.encours{color:var(--amber);}
-  .op-item.attente{color:var(--blue);}
+  .op-item.enattente{color:var(--blue);}
   .op-item.succes{color:var(--green);}
   .op-item.echec{color:var(--cause-refus);}
   .op-item.echec.session{color:var(--cause-session);}
@@ -1162,6 +1192,50 @@ body.light .conn-icon .badge.amber{color:var(--text);}
   .chart-svg{height:96px;}
 }
 
+/* --- b quater. L'entrée des statistiques (0.2.28) ------------------------
+   À l'ouverture de l'accueil, le bloc arrive en mouvement : les compteurs
+   montent (app.js les réécrit image par image), les cadres se posent, les
+   barres poussent, les courbes se tracent. Tout ce qui suit est suspendu à
+   `.stats-entree`, qu'app.js pose sur le bloc à l'ouverture et retire une
+   seconde plus tard (animerStatistiques) : hors de cette seconde, aucune de
+   ces règles ne s'applique, et le bloc est celui d'avant.
+
+   `--i` est le rang d'un compteur ou d'un cadre (les barres d'un cadre en
+   héritent : elles attendent qu'il soit là), `--p` la place d'une barre dans
+   sa série, de 0 à 1 — douze mois ou trois services, la série met le même
+   temps. `--stats-ecoule` est le temps déjà joué : l'accueil est redessiné
+   quand /home répond, et ce retard négatif fait reprendre l'entrée là où elle
+   en était au lieu de la rejouer. Le plafond de 275 ms tient sept cadres dans
+   la seconde : tout finit avant que la classe ne s'en aille. */
+.widget.stats-entree .stat-box,
+.widget.stats-entree .chart{animation:stats-pose .38s cubic-bezier(.2,.8,.2,1) both;}
+.widget.stats-entree .stat-box{animation-delay:calc(var(--i,0) * 55ms - var(--stats-ecoule,0ms));}
+.widget.stats-entree .chart{
+  animation-delay:calc(120ms + min(var(--i,0) * 55ms,275ms) - var(--stats-ecoule,0ms));}
+/* Une barre pousse depuis l'axe ; `fill-box` : l'origine est celle de la barre,
+   pas celle du dessin. */
+.widget.stats-entree .chart-svg rect{transform-box:fill-box;transform-origin:50% 100%;
+  animation:stats-pousse .36s cubic-bezier(.2,.8,.2,1) both;
+  animation-delay:calc(180ms + min(var(--i,0) * 55ms,275ms) + var(--p,0) * 160ms - var(--stats-ecoule,0ms));}
+.widget.stats-entree .chart-row-bar{transform-origin:0 50%;
+  animation:stats-etire .36s cubic-bezier(.2,.8,.2,1) both;
+  animation-delay:calc(180ms + min(var(--i,0) * 55ms,275ms) + var(--p,0) * 160ms - var(--stats-ecoule,0ms));}
+/* Une courbe se découvre de gauche à droite, ses points avec elle. Pas de
+   tirets sur le trait : il garde son épaisseur quand le dessin s'étire
+   (`non-scaling-stroke`), et sa longueur à l'écran n'est pas celle du tracé. */
+.widget.stats-entree .chart-svg.stats-trace{animation:stats-trace .52s cubic-bezier(.4,.1,.3,1) both;
+  animation-delay:calc(180ms + min(var(--i,0) * 55ms,275ms) - var(--stats-ecoule,0ms));}
+@keyframes stats-pose{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
+@keyframes stats-pousse{from{transform:scaleY(0);}to{transform:scaleY(1);}}
+@keyframes stats-etire{from{transform:scaleX(0);}to{transform:scaleX(1);}}
+@keyframes stats-trace{from{clip-path:inset(0 100% 0 0);}to{clip-path:inset(0 0 0 0);}}
+/* app.js ne pose pas la classe quand le système demande moins de mouvement ;
+   ceci couvre le réglage changé pendant la seconde. */
+@media (prefers-reduced-motion:reduce){
+  .widget.stats-entree .stat-box,.widget.stats-entree .chart,.widget.stats-entree .chart-svg,
+  .widget.stats-entree .chart-svg rect,.widget.stats-entree .chart-row-bar{animation:none;}
+}
+
 /* --- Pagination des blocs de l'accueil (lot 17) ------------------------- */
 .pager{display:flex;align-items:center;justify-content:center;gap:10px;
   margin-top:12px;padding-top:10px;border-top:1px solid var(--border);flex-wrap:wrap;}
@@ -1190,6 +1264,10 @@ body.light .conn-icon .badge.amber{color:var(--text);}
   .widget-tools{flex-direction:column;align-items:stretch;}
   .tri-select{margin-left:0;justify-content:space-between;}
 }
+
+/* Les vignettes que « Mes connecteurs » ne montre pas, dites en une ligne
+   (0.2.29) — même encre que la ligne du suivi (.err-plus). */
+.conn-plus{margin-top:14px;font-size:12px;color:var(--text-dim);}
 
 /* --- c. Synchronisation ------------------------------------------------ */
 .sync-all-btn{width:100%;background:var(--accent-dim);border:1px solid transparent;
@@ -2089,6 +2167,12 @@ summary.sync-ligne:hover > .sync-resume{text-decoration:underline;}
 .modal-actions .btn-remote{margin-top:0;}
 .modal-actions .rb-note{flex:1 1 100%;margin-top:0;}
 .modal-actions .btn-secondary{flex:1 1 160px;}
+/* 0.2.27 : sous 768 px le rang d'actions est une colonne, et ces 160 px de
+   base y devenaient une HAUTEUR — « Enregistrer » haut de 160 px dans chaque
+   fenêtre, mesuré sur celle de l'heure. En colonne, le bouton garde la sienne. */
+@media (max-width:767px){
+  .modal-actions .btn-secondary{flex:0 0 auto;}
+}
 
 /* --- Le geste attendu reste atteignable, quelle que soit la longueur du texte
    ------------------------------------------------------------------------
@@ -2947,14 +3031,38 @@ h2.sec-block-title{font-size:15px;font-weight:600;}
    — titre, note, filtres — quand la liste est elle-même faite de cartes). */
 #view-admin .carte{margin-bottom:18px;}
 #view-admin .split-2 > .carte{margin-bottom:0;}
-/* 0.2.26 — Système : la carte « Mémoire », sous les deux colonnes (les
-   mesures à gauche, les réserves à droite). */
-#view-admin #systeme-memoire{margin-top:18px;}
+/* 0.2.27 — Système : la mémoire en fenêtre. La jauge dit ce qu'il reste à
+   crabe sur ce dont il dispose ; ses deux repères sont les réserves (la
+   fenêtre de connexion au-dessus, les récupérations en dessous), chacun sous
+   son étiquette — décalée d'autant qu'elle avance, elle ne sort jamais de la
+   jauge. Puis les mesures à gauche, les réserves à droite. */
+.modal.modale-memoire{width:min(720px,100%);}
+.memoire-jauge{margin-bottom:18px;}
+.memoire-jauge-tete{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 10px;margin-bottom:6px;}
+.memoire-jauge-nom{font-size:13.5px;font-weight:500;}
+.memoire-jauge-chiffre{margin-left:auto;display:flex;align-items:baseline;gap:10px;white-space:nowrap;}
+.memoire-jauge-libre{font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:600;}
+.memoire-repere-nom{position:relative;height:18px;font-size:11.5px;color:var(--text-dim);}
+.memoire-repere-nom span{position:absolute;top:1px;white-space:nowrap;}
+.memoire-barre{position:relative;height:10px;margin:5px 0;background:var(--bg-elev-2);
+  border:1px solid var(--border);border-radius:5px;}
+.memoire-plein{position:absolute;left:0;top:0;bottom:0;border-radius:4px;background:var(--green);}
+.memoire-plein.amber{background:var(--amber);}
+.memoire-plein.red{background:var(--red);}
+.memoire-repere{position:absolute;top:0;bottom:0;width:2px;margin-left:-1px;background:var(--text);}
+.memoire-repere.haut{top:-6px;}
+.memoire-repere.bas{bottom:-6px;}
+.memoire-colonnes{display:flex;flex-wrap:wrap;gap:18px 28px;align-items:flex-start;}
+.memoire-colonnes>div{flex:1 1 280px;min-width:0;}
+.memoire-colonnes .storage-rows{max-width:none;}
+.memoire-colonnes .storage-row-name{flex:none;}
+.memoire-colonnes .storage-row-val{flex:1;min-width:0;text-align:right;}
 .memoire-reglages .field{margin-bottom:14px;}
 .memoire-reglages .field input{max-width:200px;}
-.memoire-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:4px;}
+.memoire-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:10px;}
 .memoire-lue{font-size:11.5px;}
 .memoire-actions .btn-mini{margin-right:0;}
+.memoire-note{font-size:11.5px;color:var(--text-faint);line-height:1.45;margin-top:10px;}
 #view-admin .carte .toolbar:last-child,#view-admin .carte .sec-note:last-child{margin-bottom:0;}
 #view-admin .admin-entete{margin-bottom:16px;}
 .carte .block-head .carte-titre,.admin-entete .carte-titre{margin-bottom:2px;}
