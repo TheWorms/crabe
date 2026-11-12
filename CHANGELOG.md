@@ -6,6 +6,18 @@ Pour mettre à jour votre crabe : [docs/MISE-A-JOUR.md](docs/MISE-A-JOUR.md) (En
 
 ---
 
+## 1.0.2 — BlaBlaCar, Galaxus, Les Thés de la Pagode et PayByPhone sont fonctionnels (12/11/2026)
+
+### Connecteurs
+- **Quatre connecteurs passent « fonctionnels »** : BlaBlaCar (un reçu reconstitué par trajet), Galaxus (factures et confirmations de commande), Les Thés de la Pagode (les factures de vos commandes) et PayByPhone (vos relevés de stationnement). Ils ont tourné sur un compte réel : BlaBlaCar, Galaxus et Les Thés de la Pagode y ont rangé leurs documents ; PayByPhone s'y connecte et lit à chaque passage.
+- La fiche des Thés de la Pagode ne dit plus « Pas encore essayé sur un vrai compte ».
+- La page des connecteurs (`docs/CONNECTEURS.md`) suit : 54 fonctionnels, 2 en cours (Recraft, TotalEnergies), classement du 12 novembre 2026.
+
+### Pour les mainteneurs
+- `scripts/lot97-page-connecteurs.js` : les quatre quittent `EN_COURS` pour `FONCTIONNELS`, la date du classement change. Leurs notes techniques disent ce qui a été mesuré. Le statut du catalogue (`connector_catalog`) n'est pas touché : sur un crabe déjà installé, un connecteur se rend disponible par « Approuver », dans Administration › Applications. Pas de migration.
+
+---
+
 ## 1.0.1 — votre nom n'entre plus dans l'archive, même quand le site l'affiche (12/11/2026)
 
 ### Proposer un service

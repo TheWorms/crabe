@@ -18,13 +18,13 @@ où en est chacun, en cinq groupes :
 Un site peut changer ses pages du jour au lendemain : un connecteur
 fonctionnel peut cesser de l'être, et crabe le dit alors sur sa fiche.
 
-État au 18 octobre 2026, version 1.0.1. Il vous manque un service ? Dans crabe,
+État au 12 novembre 2026, version 1.0.2. Il vous manque un service ? Dans crabe,
 Administration › Applications › « Proposer un service » : vous relevez le site
 en quelques minutes, guidé pas à pas, et crabe envoie la demande pour vous. Sans crabe sous la
 main, ouvrez une *issue* en indiquant le site et le
 type de document voulu (facture, reçu, attestation…).
 
-## Fonctionnels (50)
+## Fonctionnels (54)
 
 | | Service | Ce qu'il récupère |
 |---|---|---|
@@ -40,6 +40,7 @@ type de document voulu (facture, reçu, attestation…).
 | <img src="icones/autodoc.png" width="24" height="24" alt=""> | AutoDoc | Les factures de vos achats de pièces auto AutoDoc. |
 | <img src="icones/battle-net.png" width="24" height="24" alt=""> | Battle.net | Le détail de chacun de vos achats Battle.net, enregistré en PDF — Battle.net ne fournit pas de facture. |
 | <img src="icones/bitstamp.png" width="24" height="24" alt=""> | Bitstamp | Reconstitue vos relevés mensuels d'opérations Bitstamp à partir de votre historique de compte. |
+| <img src="icones/blablacar.png" width="24" height="24" alt=""> | BlaBlaCar | Reconstitue un reçu pour chacun de vos trajets BlaBlaCar, à partir de vos paiements et remboursements. |
 | <img src="icones/boulanger.png" width="24" height="24" alt=""> | Boulanger | Les factures de vos achats Boulanger. |
 | <img src="icones/bricomarche.png" width="24" height="24" alt=""> | Bricomarché | Lit vos achats Bricomarché, en ligne et en magasin, récupère le ticket de caisse de chaque achat en magasin, et vous signale quand une facture y est proposée. |
 | <img src="icones/bunny-net.png" width="24" height="24" alt=""> | Bunny.net | Vos factures d'hébergement et de diffusion Bunny.net. |
@@ -54,6 +55,7 @@ type de document voulu (facture, reçu, attestation…).
 | <img src="icones/fantazia.png" width="24" height="24" alt=""> | Fantazia | Les factures de vos achats Fantazia. |
 | <img src="icones/free.png" width="24" height="24" alt=""> | Free Internet | Vos factures Freebox. |
 | <img src="icones/free-mobile.png" width="24" height="24" alt=""> | Free Mobile | Vos factures Free Mobile, toutes vos lignes comprises. |
+| <img src="icones/galaxus.png" width="24" height="24" alt=""> | Galaxus | Les documents de vos commandes Galaxus : factures et confirmations de commande. |
 | <img src="icones/gandi.png" width="24" height="24" alt=""> | Gandi | Les factures de vos organisations Gandi — noms de domaine, hébergement, messagerie — et les range organisation par organisation. |
 | <img src="icones/hetzner.png" width="24" height="24" alt=""> | Hetzner | Vos factures de serveurs et de services Hetzner. |
 | <img src="icones/impots.png" width="24" height="24" alt=""> | Impots.gouv.fr | Vos avis d'impôt et déclarations. |
@@ -63,10 +65,12 @@ type de document voulu (facture, reçu, attestation…).
 | <img src="icones/ile-aux-epices.png" width="24" height="24" alt=""> | L'Île aux Épices | Les factures de vos achats d'épices. |
 | <img src="icones/ldlc.png" width="24" height="24" alt=""> | LDLC | Les factures de vos achats LDLC. |
 | <img src="icones/le-petit-vapoteur.png" width="24" height="24" alt=""> | Le Petit Vapoteur | Les factures de vos achats Le Petit Vapoteur. |
+| <img src="icones/thesdelapagode.png" width="24" height="24" alt=""> | Les Thés de la Pagode | Les factures de vos commandes Les Thés de la Pagode. |
 | <img src="icones/materiel-net.png" width="24" height="24" alt=""> | Materiel.net | Les factures de vos commandes de matériel informatique. |
 | <img src="icones/mistral.png" width="24" height="24" alt=""> | Mistral | Vos factures d'abonnement et d'usage Mistral. |
 | <img src="icones/ouigo.png" width="24" height="24" alt=""> | OUIGO | Les justificatifs de vos réservations OUIGO passées. |
 | <img src="icones/ovh.png" width="24" height="24" alt=""> | OVH | Vos factures OVHcloud. |
+| <img src="icones/paybyphone.png" width="24" height="24" alt=""> | PayByPhone | Vos relevés de stationnement payé depuis votre mobile. |
 | <img src="icones/paypal.png" width="24" height="24" alt=""> | PayPal | Reconstitue vos relevés mensuels d'opérations PayPal à partir de votre historique de transactions. |
 | <img src="icones/addons-prestashop.png" width="24" height="24" alt=""> | PrestaShop Addons | Les factures de vos achats de modules et thèmes sur la marketplace PrestaShop Addons. |
 | <img src="icones/private-sport-shop.png" width="24" height="24" alt=""> | Private Sport Shop | Les factures de vos commandes Private Sport Shop. |
@@ -79,14 +83,10 @@ type de document voulu (facture, reçu, attestation…).
 | <img src="icones/uber.png" width="24" height="24" alt=""> | Uber | Les reçus de vos trajets Uber (Uber Eats et Location à l'étude). |
 | <img src="icones/vistaprint.png" width="24" height="24" alt=""> | VistaPrint | Les factures de vos commandes d'impression VistaPrint. |
 
-## En cours (6)
+## En cours (2)
 
 | | Service | Ce qu'il récupérera |
 |---|---|---|
-| <img src="icones/blablacar.png" width="24" height="24" alt=""> | BlaBlaCar | Reconstitue un reçu pour chacun de vos trajets BlaBlaCar, à partir de vos paiements et remboursements. |
-| <img src="icones/galaxus.png" width="24" height="24" alt=""> | Galaxus | Les documents de vos commandes Galaxus : factures et confirmations de commande. |
-| <img src="icones/thesdelapagode.png" width="24" height="24" alt=""> | Les Thés de la Pagode | Les factures de vos commandes Les Thés de la Pagode. |
-| <img src="icones/paybyphone.png" width="24" height="24" alt=""> | PayByPhone | Vos relevés de stationnement payé depuis votre mobile. |
 | <img src="icones/recraft.png" width="24" height="24" alt=""> | Recraft | Vos factures d'abonnement Recraft. |
 | <img src="icones/totalenergies.png" width="24" height="24" alt=""> | TotalEnergies | Vos factures d'électricité et de gaz TotalEnergies. |
 
