@@ -270,6 +270,115 @@ function retirerMots(texte, mots) {
   return s;
 }
 
+// ---------------------------------------------------------------------------
+// Un nom que le site affiche près du compte, retiré d'office (1.0.1)
+// ---------------------------------------------------------------------------
+//
+// Mesuré sur le premier relevé réel (une boutique PrestaShop, 12/11/2026) : elle
+// écrit le prénom et le nom du compte dans le lien « Voir mon compte » de son
+// en-tête, et dans le bouton de son menu de déconnexion. Un lien PARLE : son
+// texte était gardé, et le nom avec lui — le champ « votre nom » n'avait pas
+// été rempli. crabe ne connaît pas ce nom, mais il sait où le chercher : dans
+// la ZONE DU COMPTE, un élément dont la classe, l'identifiant, l'infobulle,
+// l'étiquette ou le chemin du lien parlent de compte, d'utilisateur, de
+// connexion — lui ou l'un de ses trois ancêtres les plus proches (jamais la
+// page entière : PrestaShop marque tout le corps de « page-customer-account »).
+// Là, un libellé n'a que des mots ordinaires (« Mon profil », « Se
+// déconnecter », « Retour à votre compte ») ; un mot qui n'en est pas un est
+// celui du compte : le texte devient « … », et ce mot est retiré de toute
+// l'archive, comme un mot donné à retirer.
+
+/**
+ * Les MOTS qui désignent la zone du compte, dans une classe, un identifiant,
+ * une infobulle ou un chemin : des mots entiers, seuls ou accolés à leur
+ * voisin (« sign-in », « user_info », « myAccount ») — « connecteurs » ou
+ * « compteur » n'en sont pas. « client » seul n'en est pas un non plus : chez
+ * cette boutique, c'est le service client et la fenêtre de discussion.
+ */
+const SIGNAUX_COMPTE = new Set(`
+  account myaccount compte moncompte user username userinfo usermenu customer espaceclient clientarea
+  profil profile member membre signin signout signup login logout connexion deconnexion connecter connectez
+  deconnecter connected disconnect identity identite avatar utilisateur greeting welcome bienvenue
+  myspace espaceperso monespace
+`.split(/\s+/).filter(Boolean));
+/** Au-delà de l'élément et de ses trois ancêtres, la zone du compte s'arrête. */
+const ZONE_COMPTE_PROFONDEUR = 4;
+/** Les mots détectés d'office : huit au plus, comme ceux que le compte donne. */
+const MOTS_DU_SITE_MAX = 8;
+/** Les mots ordinaires d'une zone de compte, sans accents. */
+const MOTS_DE_COMPTE = new Set(`
+  mon ma mes votre vos ton ta tes notre nos le la les l un une des de du d a au aux et ou en sur pour par avec sans
+  se s me m vous tu il elle on y ne pas plus ici ce cet cette ces qui que quoi etes est suis avez ai
+  compte comptes espace client cliente clients personnel personnelle perso prive privee particulier particuliers
+  professionnel professionnels professionnelle pro entreprise entreprises societe administration admin
+  connecter connectez connexion deconnecter deconnectez deconnexion reconnecter reconnectez
+  identifier identifiez identification identifiant identifiants inscription inscrire inscrivez creer creez enregistrer
+  mot mots passe oublie oubliez oublies
+  profil informations information infos donnees adresse adresses parametres reglages preferences securite
+  commande commandes facture factures achat achats historique detail details suivi retour retours avoir avoirs
+  bon bons reduction reductions fidelite point points cadeau cadeaux alerte alertes favori favoris liste listes
+  envie envies souhait souhaits panier abonnement abonnements newsletter lettre
+  accueil aide contact contacts menu ouvrir fermer voir acceder afficher gerer modifier deroulante tableau bord
+  bonjour bonsoir bienvenue salut
+  my your our the an of to in on for and or with
+  account accounts sign signin signout signup in out up log login logout register registration create forgot
+  forgotten password email e-mail mail username user users profile settings preferences information
+  orders order history invoices invoice billing returns wishlist favorites favourites cart basket
+  dashboard overview home help open close view manage edit hello hi welcome personal business company
+  customer customers member members area dropdown
+`.split(/\s+/).filter(Boolean));
+
+/** Un mot de la zone du compte est-il ordinaire ? « connectez-vous », « s'inscrire » le sont, morceau par morceau. */
+function motOrdinaire(mot) {
+  const m = sansAccents(mot).toLowerCase();
+  return MOTS_DE_COMPTE.has(m) || m.split(/['’-]/).filter(Boolean).every((p) => MOTS_DE_COMPTE.has(p));
+}
+
+/**
+ * Les mots d'un libellé de la zone du compte qui n'y sont pas ordinaires —
+ * ceux d'un nom. Une lettre seule (une initiale), « # » et « … » ne comptent
+ * pas. Pure.
+ */
+function motsDuCompte(libelle) {
+  return (String(libelle ?? '').normalize('NFC').match(/[\p{L}\p{N}][\p{L}\p{N}\p{M}'’-]*/gu) || [])
+    .map((m) => m.replace(/['’-]+$/, ''))
+    .filter((m) => [...m].length >= 2 && !/^\p{N}+$/u.test(m) && !motOrdinaire(m));
+}
+
+/** Les attributs d'un élément disent-ils la zone du compte ? Le chemin d'un lien compte, jamais sa requête. */
+function signaleLeCompte(attributs) {
+  let signes = '';
+  for (const cle of ['class', 'id', 'title', 'aria-label', 'name', 'data-testid', 'href']) {
+    let v = String(attributs.get(cle) ?? '');
+    if (!v) continue;
+    // Le CHEMIN d'un lien, sans son hôte : « espace-client.exemple.fr » ne fait pas de tout lien un lien du compte.
+    if (cle === 'href') v = v.replace(/^(?:[a-z][a-z0-9+.-]*:)?\/\/[^/]*/i, '').split(/[?#]/)[0];
+    signes += ` ${v.slice(0, 400)}`;
+  }
+  return signeDuCompte(signes);
+}
+
+/** Des attributs mis bout à bout parlent-ils du compte ? Mot à mot, et chaque mot accolé au suivant. */
+function signeDuCompte(signes) {
+  const mots = sansAccents(String(signes).slice(0, 4000))
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean);
+  const connu = (m) => SIGNAUX_COMPTE.has(m) || (m.endsWith('s') && SIGNAUX_COMPTE.has(m.slice(0, -1)));
+  return mots.some((m, i) => connu(m) || (i + 1 < mots.length && connu(m + mots[i + 1])));
+}
+
+/** Note des mots détectés d'office (sous la forme d'un mot à retirer), dans la limite. */
+function noterMotsDuSite(trouves, mots) {
+  if (!trouves) return;
+  for (const m of mots) {
+    if (trouves.size >= MOTS_DU_SITE_MAX) return;
+    const mot = String(m).normalize('NFC').toLowerCase();
+    if (/^[\p{L}\p{N}'’-]{2,40}$/u.test(mot)) trouves.add(mot);
+  }
+}
+
 /** Applique une fonction à chaque chaîne d'une valeur (objets et tableaux compris), clés à la demande. */
 function partout(valeur, f, { cles = false } = {}) {
   if (typeof valeur === 'string') return f(valeur);
@@ -448,9 +557,14 @@ function estDocument(enTetes, url = '') {
  * à nouveau, longueurs bornées, mots à retirer retirés, et le HTML
  * RECONSTRUIT (`nettoyerHtml`). Pure.
  */
-function nettoyerInstantane(brut, adresse, { mots = [] } = {}) {
+function nettoyerInstantane(brut, adresse, { mots: demandes = [], trouves = null } = {}) {
   const r = brut && typeof brut === 'object' ? brut : {};
   const liste = (v, n) => (Array.isArray(v) ? v.slice(0, n) : []);
+  // Un nom dans la zone du compte est cherché d'abord, sur toute la page :
+  // ailleurs dans la copie (le titre, un autre lien), il est déjà retiré.
+  const duSite = trouves || new Set();
+  nettoyerHtml(r.squelette, { mots: demandes, base: adresse, trouves: duSite });
+  const mots = duSite.size ? [...new Set([...demandes, ...duSite])] : demandes;
   const sans = (t) => (mots.length ? retirerMots(t, mots) : t);
   const texte = (v, n = 120) => sans(masquerTexte(v, n));
   const libelle = (v, n = 120) => sans(masquerLibelle(v, n));
@@ -488,7 +602,7 @@ function nettoyerInstantane(brut, adresse, { mots = [] } = {}) {
     iframes: liste(r.iframes, 8).map(adr),
     liens: Number(r.liens) || 0,
     boutons: Number(r.boutons) || 0,
-    squelette: nettoyerHtml(r.squelette, { mots, base: adresse }),
+    squelette: nettoyerHtml(r.squelette, { mots, base: adresse, trouves: duSite }),
   };
 }
 
@@ -589,7 +703,7 @@ function lireAttributs(source) {
  * à retirer des textes et des valeurs d'attribut ; `base` : l'adresse de la
  * page, pour un lien relatif.
  */
-function nettoyerHtml(html, { mots = [], base = undefined } = {}) {
+function nettoyerHtml(html, { mots = [], base = undefined, trouves = null } = {}) {
   let s = String(html ?? '');
   let tronquee = false;
   if (s.length > SQUELETTE_MAX_OCTETS) {
@@ -605,9 +719,26 @@ function nettoyerHtml(html, { mots = [], base = undefined } = {}) {
     poids += morceau.length;
     sortie.push(morceau);
   };
-  /** Les éléments ouverts : { nom, parlant, muet }. */
+  /** Les éléments ouverts : { nom, parlant, muet, compte }. */
   const pile = [];
   const dessus = () => pile[pile.length - 1];
+  /** L'élément du dessus, ou l'un de ses trois ancêtres, dit-il la zone du compte ? */
+  const dansLeCompte = (k = pile.length) => {
+    for (let j = k - 1; j >= 0 && j >= k - ZONE_COMPTE_PROFONDEUR; j--) if (pile[j].compte) return true;
+    return false;
+  };
+  /**
+   * Un libellé de la zone du compte qui a des mots d'un nom : « … », et ces
+   * mots notés. Il arrive ici déjà privé des mots donnés à retirer : ceux-là
+   * ne sont pas comptés deux fois.
+   */
+  const sansLeNom = (t, zone) => {
+    if (!zone) return t;
+    const inconnus = motsDuCompte(t);
+    if (!inconnus.length) return t;
+    noterMotsDuSite(trouves, inconnus);
+    return '…';
+  };
 
   const texte = (brut) => {
     const haut = dessus();
@@ -615,7 +746,7 @@ function nettoyerHtml(html, { mots = [], base = undefined } = {}) {
     const t = masquerLibelle(decoderEntites(borner(brut, 200)), 200);
     if (!t) return;
     // Un « @ » resté là est la moitié d'un courriel, coupé par une balise.
-    ecrire(haut && haut.parlant && t.length <= 60 && !t.includes('@') ? echapperTexte(sans(t)) : '…');
+    ecrire(haut && haut.parlant && t.length <= 60 && !t.includes('@') ? echapperTexte(sansLeNom(sans(t), dansLeCompte())) : '…');
   };
 
   const n = s.length;
@@ -682,10 +813,12 @@ function nettoyerHtml(html, { mots = [], base = undefined } = {}) {
     // Un élément muet (une liste, ses options) ne parle pas : ni par son texte, ni par ses attributs.
     const muet = BALISES_MUETTES.has(nom) || !!(haut && haut.muet);
     const parlant = !muet && (BALISES_PARLANTES.has(nom) || /^(button|link|menuitem|tab)$/i.test(attributs.get('role') || '') || !!(haut && haut.parlant));
-    ecrire(`<${nom}${ecrireAttributs(nom, attributs, parlant, sans, base)}>`);
+    const compte = signaleLeCompte(attributs);
+    const zone = compte || dansLeCompte();
+    ecrire(`<${nom}${ecrireAttributs(nom, attributs, parlant, sans, base, zone ? (t) => sansLeNom(t, true) : null)}>`);
     // Au-delà de cinq cents niveaux, la page n'est plus une page : la copie reste à plat.
     if (!BALISES_VIDES.has(nom) && pile.length < 500) {
-      pile.push({ nom, parlant, muet });
+      pile.push({ nom, parlant, muet, compte });
     }
     i = fin;
   }
@@ -694,7 +827,7 @@ function nettoyerHtml(html, { mots = [], base = undefined } = {}) {
 }
 
 /** Les attributs qu'une copie garde, réécrits : la structure telle quelle (masquée), ce qui parle comme un texte, un lien comme une adresse relevée. */
-function ecrireAttributs(nom, attributs, parlant, sans, base) {
+function ecrireAttributs(nom, attributs, parlant, sans, base, duCompte = null) {
   let ecrits = '';
   for (const [cle, brut] of attributs) {
     const valeur = decoderEntites(String(brut ?? '').slice(0, 4000));
@@ -704,7 +837,8 @@ function ecrireAttributs(nom, attributs, parlant, sans, base) {
     } else if (ATTRIBUTS_PARLANTS.has(cle)) {
       if (!parlant && !CHAMPS.has(nom)) continue;
       const t = masquerLibelle(valeur, 80);
-      ecrits += ` ${cle}="${echapperAttribut(t.length <= 60 ? sans(t) : '…')}"`;
+      // Dans la zone du compte, une infobulle qui porte un nom le perd, comme un texte.
+      ecrits += ` ${cle}="${echapperAttribut(t.length <= 60 ? (duCompte ? duCompte(sans(t)) : sans(t)) : '…')}"`;
     } else if (ATTRIBUTS_DE_STRUCTURE.has(cle)) {
       // Une liste de classes se coupe au MOT, et le dit : un morceau de classe n'est pas une classe.
       let v = masquerTexte(valeur, cle === 'class' ? 81 : 80);
@@ -1066,6 +1200,13 @@ function sansLever(fn) {
   };
 }
 
+/** Tous les mots à retirer d'un relevé : ceux du compte, puis ceux que crabe a vus. La liste change quand elle grandit. */
+function motsDe(etat) {
+  const n = etat.aRetirer.length + etat.motsDuSite.size;
+  if (!etat.motsTous || etat.motsTous.length !== n) etat.motsTous = [...new Set([...etat.aRetirer, ...etat.motsDuSite])];
+  return etat.motsTous;
+}
+
 /** Un relevé neuf, en mémoire. */
 function nouvelEtat({ userId, url, masquer = '', maintenant = Date.now() }) {
   let hote = '';
@@ -1102,6 +1243,8 @@ function nouvelEtat({ userId, url, masquer = '', maintenant = Date.now() }) {
     etapes: { connexion: null, connecte: null, liste: null, document: null },
     // Les mots à retirer de l'archive : en mémoire seulement, jamais écrits.
     aRetirer: motsARetirer(masquer),
+    // Ceux que crabe retire d'office : un nom vu dans la zone du compte (`motsDuCompte`).
+    motsDuSite: new Set(),
     delaiCopieMs: DELAI_INSTANTANE_MS,
     termine: false,
   };
@@ -1323,7 +1466,7 @@ async function prendreCopie(etat, page, onglet, raison) {
     return null;
   }
   if (!brut || etat.termine) return null;
-  const copie = nettoyerInstantane(brut, url, { mots: etat.aRetirer });
+  const copie = nettoyerInstantane(brut, url, { mots: motsDe(etat), trouves: etat.motsDuSite });
   const cadres = [];
   // Vingt cadres interrogés au plus, et pas plus de DELAI_COPIE_MS pour eux tous.
   const limiteCadres = Date.now() + DELAI_COPIE_MS;
@@ -1334,7 +1477,7 @@ async function prendreCopie(etat, page, onglet, raison) {
       if (!/^https?:/i.test(adresseCadre)) continue;
       const brutCadre = await avecDelai(cadre.evaluate(squeletteDeLaPage), DELAI_COPIE_MS / 2);
       if (!brutCadre) continue;
-      const c = nettoyerInstantane(brutCadre, adresseCadre, { mots: etat.aRetirer });
+      const c = nettoyerInstantane(brutCadre, adresseCadre, { mots: motsDe(etat), trouves: etat.motsDuSite });
       if (c.formulaires.length || c.liensUtiles.length) cadres.push(c);
     } catch {
       /* cadre parti entre-temps */
@@ -1363,7 +1506,7 @@ async function prendreCopie(etat, page, onglet, raison) {
   etat.empreintesDuReleve.add(empreinteDuReleve);
 
   const numero = etat.copies.length + 1;
-  const nom = nomDeCopie(numero, url, etat.aRetirer);
+  const nom = nomDeCopie(numero, url, motsDe(etat));
   const retenue = {
     numero,
     nom,
@@ -1636,6 +1779,17 @@ function ligneDocument(d) {
 }
 
 /** Un message de console : seul le guet des clics est lu, tout le reste est ignoré. */
+/** L'élément cliqué, ou l'un de ses trois parents, dit-il la zone du compte ? */
+function clicDuCompte(desc) {
+  const e = desc && typeof desc === 'object' ? desc : {};
+  const signes = [
+    e.id, ...(Array.isArray(e.classes) ? e.classes.slice(0, 8) : []), e.aria, e.testid, e.nom,
+    String(e.href || '').replace(/^(?:[a-z][a-z0-9+.-]*:)?\/\/[^/]*/i, '').split(/[?#]/)[0],
+    ...String(e.chemin || '').slice(0, 400).split('>').slice(-3),
+  ].filter(Boolean).map((v) => String(v).slice(0, 400)).join(' ');
+  return signeDuCompte(signes);
+}
+
 function surConsole(etat, page, onglet, message) {
   if (etat.termine) return;
   let texte;
@@ -1657,6 +1811,8 @@ function surConsole(etat, page, onglet, message) {
     return;
   }
   etat.clics++;
+  // Un clic sur le lien du compte peut en dire le nom : il est retiré d'office, comme dans une copie.
+  if (clicDuCompte(desc)) noterMotsDuSite(etat.motsDuSite, motsDuCompte(masquerLibelle(desc?.texte, 60)));
   const ligne = ligneDeClic(desc);
   etat.dernierClic = { quand: etat.maintenant(), ligne };
   noter(etat, 'clic', `clic dans l'onglet ${onglet.numero}${desc?.cadre ? ' (dans un cadre)' : ''} : ${ligne}`, { onglet: onglet.numero });
@@ -1753,6 +1909,9 @@ function texteLisezMoi(etat, version, sans = (t) => t) {
       ? `  ${etat.aRetirer.length} mot(s) retiré(s) de l'archive à la demande du compte`
         + (sans(etat.hote) !== etat.hote ? ' — sauf du nom du site, gardé tel quel ici, dans releve.json et dans le nom de l\'archive.' : '.')
       : '',
+    etat.motsDuSite.size
+      ? `  ${etat.motsDuSite.size} mot(s) retiré(s) d'office : un nom que le site affiche près du compte (son lien, son menu).`
+      : '',
     '',
     'parcours.txt   chaque étape, dans l\'ordre : onglets, pages, réponses de navigation',
     '               (statut, renvoi, NOMS des cookies), clics, documents, appels',
@@ -1766,8 +1925,9 @@ function texteLisezMoi(etat, version, sans = (t) => t) {
     'aucune valeur de cookie ni d\'en-tête, aucune adresse complète (les identifiants des',
     'chemins sont masqués, les paramètres réduits à leur nom), aucun texte de page hors des',
     'liens, boutons, titres et étiquettes (masqués eux aussi : courriels, tous les chiffres),',
-    'aucune valeur JSON, aucun document. Un nom écrit par le site dans un lien ou un titre',
-    'y resterait, sauf s\'il a été donné à retirer avant le relevé : ouvrez les fichiers pour',
+    'aucune valeur JSON, aucun document. Le nom que le site affiche près du compte (son lien',
+    '« Mon compte », son menu) est retiré d\'office ; écrit ailleurs dans un lien ou un titre,',
+    'il ne l\'est que s\'il a été donné à retirer avant le relevé : ouvrez les fichiers pour',
     'vérifier avant d\'envoyer.',
     '',
   ].filter((l, i, t) => l !== '' || t[i - 1] !== '').join('\n');
@@ -1815,7 +1975,7 @@ function ecrireLeReleve(etat, { dossier, duCompte, id, version }) {
   // fichier assemblé : un mot qui serait aussi une clé de releve.json ou une
   // balise n'abîme rien. Les copies de page et leurs noms l'ont été à la
   // source (`prendreCopie`), et ne sont pas retouchées ici.
-  const sans = (texte) => retirerMots(texte, etat.aRetirer);
+  const sans = (texte) => retirerMots(texte, motsDe(etat));
   const bilan = bilanDesEtapes(etat);
   ecrire(dossier, 'LISEZ-MOI.txt', texteLisezMoi(etat, version, sans));
   ecrire(dossier, 'parcours.txt', sans(texteDuParcours(etat)));
@@ -2172,6 +2332,8 @@ function vider(etat) {
   etat.requetes = [];
   etat.orphelines = [];
   etat.aRetirer = [];
+  etat.motsDuSite.clear();
+  etat.motsTous = null;
   etat.octetsCopies = 0;
   etat.empreintes.clear();
   etat.empreintesDuReleve.clear();
@@ -2394,6 +2556,7 @@ module.exports = {
   masquerLibelle,
   motsARetirer,
   retirerMots,
+  motsDuCompte,
   partout,
   decoderEntites,
   adresseReleve,

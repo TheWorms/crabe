@@ -18,7 +18,7 @@ où en est chacun, en cinq groupes :
 Un site peut changer ses pages du jour au lendemain : un connecteur
 fonctionnel peut cesser de l'être, et crabe le dit alors sur sa fiche.
 
-État au 18 octobre 2026, version 1.0.0. Il vous manque un service ? Dans crabe,
+État au 18 octobre 2026, version 1.0.1. Il vous manque un service ? Dans crabe,
 Administration › Applications › « Proposer un service » : vous relevez le site
 en quelques minutes, guidé pas à pas, et crabe envoie la demande pour vous. Sans crabe sous la
 main, ouvrez une *issue* en indiquant le site et le

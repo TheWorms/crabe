@@ -6,6 +6,18 @@ Pour mettre à jour votre crabe : [docs/MISE-A-JOUR.md](docs/MISE-A-JOUR.md) (En
 
 ---
 
+## 1.0.1 — votre nom n'entre plus dans l'archive, même quand le site l'affiche (12/11/2026)
+
+### Proposer un service
+- **crabe retire de lui-même le nom que le site affiche près du compte.** Mesuré sur le premier relevé réel : une boutique écrivait le prénom et le nom du compte dans le lien « Voir mon compte » de son en-tête, et dans le bouton de son menu de déconnexion. Le texte d'un lien est gardé — il dit le chemin —, et le nom l'était avec lui quand le champ facultatif « votre nom » restait vide. Désormais, dans la zone du compte (un lien, un bouton, une infobulle dont la classe, l'identifiant, l'étiquette ou le chemin parlent de compte, d'utilisateur, de connexion, ou ceux de leurs trois parents les plus proches), un libellé n'a que des mots ordinaires — « Mon profil », « Se déconnecter », « Retour à votre compte » ; un mot qui n'en est pas un est celui du compte. Il devient « … », et il est retiré de toute l'archive : les autres copies, le titre des pages, le parcours, les clics, les noms de fichiers. Le LISEZ-MOI dit combien de mots ont été retirés ainsi, jamais lesquels.
+- Sur les quatre pages de ce relevé, seul le nom a été retiré : le menu des catégories, les liens de la liste des commandes, « Mon profil » et « Se déconnecter » restent lisibles.
+- Ce que la règle ne voit pas. Un nom écrit hors de la zone du compte — un titre « Les commandes de Camille », un lien ordinaire — n'est retiré que s'il a été donné dans le champ « votre nom » : l'aide du champ le dit. Les mots détectés ne sont écrits nulle part, ni dans l'archive, ni au journal ; huit au plus par relevé.
+
+### Pour les mainteneurs
+- `server/releve-site.js` : `SIGNAUX_COMPTE` (des mots entiers, seuls ou accolés à leur voisin — « connecteurs » ou « compteur » n'en sont pas, « client » seul non plus), `MOTS_DE_COMPTE`, `motsDuCompte`, la zone suivie dans `nettoyerHtml` (l'élément et ses trois ancêtres), deux passes dans `nettoyerInstantane` (le nom cherché sur toute la page, puis retiré partout), `etat.motsDuSite` à côté des mots donnés (`motsDe`), et le clic sur le lien du compte (`clicDuCompte`). Pas de migration.
+
+---
+
 ## 1.0.0 — il vous manque un service ? Relevez son site (12/11/2026)
 
 ### Proposer un service
