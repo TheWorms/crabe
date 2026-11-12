@@ -2024,6 +2024,12 @@ function startMaintenance() {
           applog.warn('scheduler', `${done.length} compte(s) purgé(s) définitivement (RGPD).`);
         }
 
+        // 1.0.0 : les relevés de site de plus de trente jours, pour TOUS les
+        // comptes — sans ce passage, la limite ne vaudrait que pour qui
+        // rouvre « Proposer un service ». Ne lève jamais.
+        const releves = require('./releve-site').purgerTout();
+        if (releves) applog.info('scheduler', `Entretien : ${releves} relevé(s) de site effacé(s) au-delà de trente jours.`);
+
         // Optimisation (lot 60) : le filet au seuil d'espace libre, puis les
         // volets en mode automatique dont la récurrence est échue. Tout naît
         // en manuel : tant que l'administrateur n'a rien choisi, seul le

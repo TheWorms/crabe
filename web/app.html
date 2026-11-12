@@ -208,6 +208,7 @@
       <div id="store-grid"></div>
     </div>
 
+
     <!-- ================= Vos notifications =================
          Lot 76. Les e-mails partaient (lot 66), mais rien DANS l'application
          ne les rattrapait : quinze notifications écrites en base, toutes non
@@ -629,7 +630,7 @@
                    l'alimentent vivent derrière la permission « apps.manage » :
                    un compte ordinaire ne voit ni cet onglet, ni les archives,
                    ni même qu'il en existe. -->
-              <button class="pill" id="apps-tab-diagnostic" onclick="setAppsTab('diagnostic')">Diagnostic</button>
+              <button class="pill" id="apps-tab-diagnostic" onclick="setAppsTab('diagnostic')">Diagnostic</button><button class="pill" id="apps-tab-releve" onclick="setAppsTab('releve')">Proposer un service</button>
             </div>
 
             <div id="apps-pane-catalogue">
@@ -706,7 +707,62 @@
               <div id="diag-list"></div>
             </section>
 
-            <div id="apps-pane-logos" style="display:none;">
+            <div id="apps-pane-releve" style="display:none;">
+    <section class="carte releve-carte">
+            <h2 class="carte-titre">Proposer un service</h2>
+            <p class="releve-intro">Il vous manque un service ? Relevez son site. Vous le parcourez dans une fenêtre de
+              crabe, guidé pas à pas ; crabe en tire une archive qui décrit le chemin jusqu'à vos factures, sans rien
+              de personnel. À la fin, crabe l'envoie pour vous — ou vous la téléchargez : elle suffit pour écrire le connecteur.</p>
+
+            <h2 class="releve-sous-titre">Avant de commencer, ayez sous la main</h2>
+            <ul class="releve-prerequis">
+              <li>vos identifiants du site, et votre téléphone si le site envoie un code ;</li>
+              <li>un compte qui a déjà au moins une facture (ou un reçu, une attestation…) ;</li>
+              <li>une dizaine de minutes.</li>
+            </ul>
+
+            <ol class="releve-etapes">
+              <li><span class="releve-num">1</span><span class="releve-etape-titre">La page de connexion</span><span class="releve-etape-aide">crabe l'ouvre et la relève.</span></li>
+              <li><span class="releve-num">2</span><span class="releve-etape-titre">Connectez-vous</span><span class="releve-etape-aide">comme d'habitude, code compris.</span></li>
+              <li><span class="releve-num">3</span><span class="releve-etape-titre">Allez à vos factures</span><span class="releve-etape-aide">par le chemin habituel du site.</span></li>
+              <li><span class="releve-num">4</span><span class="releve-etape-titre">Ouvrez-en une</span><span class="releve-etape-aide">cliquez comme pour la télécharger.</span></li>
+              <li><span class="releve-num">5</span><span class="releve-etape-titre">Envoyez la demande</span><span class="releve-etape-aide">d'un clic : crabe joint l'archive.</span></li>
+            </ol>
+
+            <form class="releve-form" id="releve-form" onsubmit="demarrerReleve(event)" novalidate>
+              <div class="field">
+                <label for="releve-adresse">Adresse du site (sa page d'accueil ou de connexion)</label>
+                <input id="releve-adresse" type="text" inputmode="url" placeholder="https://www.exemple.fr"
+                       autocomplete="off" autocapitalize="off" spellcheck="false">
+              </div>
+              <div class="field">
+                <label for="releve-masquer">Votre nom et votre prénom, tels que le site les affiche <span class="field-opt">(facultatif)</span></label>
+                <input id="releve-masquer" type="text" autocomplete="off" spellcheck="false">
+                <div class="field-help">crabe ne peut pas deviner un nom : si le site l'écrit dans un lien ou un titre, il le retire de l'archive. Le nom du site, lui, reste tel quel. Il n'est ni enregistré, ni journalisé.</div>
+              </div>
+              <div class="releve-form-pied">
+                <button type="submit" class="btn-primary" id="releve-commencer">Commencer le relevé</button>
+                <span class="releve-indisponible" id="releve-indisponible" role="status"></span>
+              </div>
+            </form>
+
+            <div class="releve-garantie">
+              <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg>
+              <div><strong>Aucune donnée personnelle n'est enregistrée ni transférée dans le zip :</strong> ni ce que vous tapez (aucun champ n'est lu), ni vos
+                cookies, ni vos adresses ou vos montants (seuls les textes des liens, boutons et titres sont gardés,
+                sans courriel ni chiffre), ni vos factures (crabe note seulement qu'il y en a une, son nombre de pages
+                et son poids). Tout est du texte : vous pouvez l'ouvrir pour vérifier avant d'envoyer.</div>
+            </div>
+          </section>
+
+          <section class="releve-mes-releves">
+            <div class="releve-liste-tete">
+              <h2 class="releve-sous-titre" id="releve-liste-titre">Vos relevés</h2>
+              <span class="releve-limites" id="releve-limites"></span>
+            </div>
+            <div id="releve-liste"></div>
+          </section>
+            </div><div id="apps-pane-logos" style="display:none;">
               <section class="carte carte-entete">
               <div class="block-head">
                 <div>
@@ -1072,6 +1128,20 @@
       </div>
     </div>
 
+    <!-- 1.0.0 — le relevé d'un site : ses étapes, cochées par le serveur à
+         mesure qu'il les voit, ses compteurs et ses deux gestes. Caché hors
+         d'un relevé : la fenêtre d'une connexion ou d'un stockage ne change pas. -->
+    <aside class="rb-releve" id="rb-releve" aria-label="Les étapes du relevé" hidden>
+      <div class="rb-releve-titre">Les étapes</div>
+      <ol class="rb-releve-etapes" id="rb-releve-etapes"></ol>
+      <div class="rb-releve-compteurs" id="rb-releve-compteurs"></div>
+      <button type="button" class="btn-secondary" id="rb-releve-copie"
+              onclick="releverPageMaintenant()">Relever cette page maintenant</button>
+      <button type="button" class="btn-primary" id="rb-releve-terminer"
+              onclick="terminerReleve()">Terminer le relevé</button>
+      <div class="rb-releve-note" id="rb-releve-note" role="status"></div>
+    </aside>
+
     <!-- Coller un texte — VISIBLE EN PERMANENCE.
          Ctrl+V directement dans la fenêtre distante ne produit rien : le
          navigateur du poste ne laisse pas noVNC lire le presse-papiers sur une
@@ -1132,6 +1202,46 @@
            éteint le navigateur côté serveur, libère l'affichage et le verrou
            de profil — la fenêtre ne retient jamais l'utilisateur. -->
       <button class="btn-danger" onclick="cancelRemoteLogin()" id="rb-cancel">Fermer / Abandonner</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= Relevé terminé : envoyer ou télécharger (1.0.0) =================
+     « Envoyer » : crabe envoie lui-même la demande d'ajout d'un connecteur —
+     l'archive, qui demande, le site, le message — par le SMTP du serveur.
+     Où elle part n'est écrit nulle part à l'écran. « Télécharger » rend
+     l'archive, sans rien envoyer.
+     L'écran du relevé lui-même est un onglet d'Administration › Applications
+     (#apps-tab-releve, à droite de « Diagnostic ») et son volet
+     (#apps-pane-releve) : accolés à leurs voisins dans le gabarit, sans
+     commentaire autour, pour que l'essai d'empreinte de la section
+     (lot108b-commun) les retire sans blanc. -->
+<div class="modal-overlay" id="releve-envoi-overlay">
+  <div class="modal releve-envoi" role="dialog" aria-modal="true" aria-labelledby="releve-envoi-titre">
+    <div class="modal-head">
+      <div>
+        <div class="releve-envoi-titre" id="releve-envoi-titre"></div>
+        <div class="modal-sub" id="releve-envoi-sub"></div>
+      </div>
+      <button class="modal-close" aria-label="Fermer" onclick="fermerEnvoiReleve()">✕</button>
+    </div>
+    <div class="releve-envoi-bilan" id="releve-envoi-bilan"></div>
+    <div class="field">
+      <label for="releve-envoi-message">Un message pour accompagner la demande <span class="field-opt">(facultatif)</span></label>
+      <textarea id="releve-envoi-message" rows="4" maxlength="2000"
+                placeholder="Les documents voulus (factures, reçus, attestations…), le code que le site envoie à la connexion, toute remarque utile."></textarea>
+    </div>
+    <div class="field-help">« Envoyer » fait partir de crabe une demande d'ajout d'un connecteur : l'archive, le nom du site, votre nom de compte et votre adresse de courriel (pour vous répondre), et ce message. « Télécharger » vous donne l'archive, sans rien envoyer.</div>
+    <div class="releve-envoi-etat" id="releve-envoi-etat" role="status"></div>
+    <div class="releve-garantie" id="releve-envoi-garantie">
+      <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg>
+      <div><strong>Aucune donnée personnelle n'est enregistrée ni transférée dans le zip :</strong> ni ce que vous avez tapé, ni vos
+        cookies, ni vos adresses, vos montants ou vos factures. Il reste dans « Proposer un service » pendant trente jours.</div>
+    </div>
+    <div class="modal-actions releve-envoi-gestes">
+      <button class="btn-secondary" onclick="fermerEnvoiReleve()">Fermer</button>
+      <a class="btn-secondary" id="releve-envoi-telecharger" download>Télécharger</a>
+      <button class="btn-primary" id="releve-envoi-envoyer" onclick="envoyerReleve()">Envoyer</button>
     </div>
   </div>
 </div>

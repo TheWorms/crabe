@@ -305,6 +305,14 @@ async function finalizeDeletion(userId) {
     /* store non initialisé (tests) */
   }
 
+  // 1.0.0 : ses relevés de site partent avec lui. Un dossier qui résiste ne
+  // retient pas la suppression — la purge des trente jours le reprendrait.
+  try {
+    require('./releve-site').effacerTout(userId);
+  } catch (err) {
+    require('./applog').warn('deletion', `Relevés de site du compte ${userId} non effacés : ${err.message}`, { userId });
+  }
+
   // `user_connector_schedules` a suivi la suppression (ON DELETE CASCADE) ;
   // les tâches cron déjà armées, elles, doivent être retirées explicitement.
   require('./scheduler').reload();

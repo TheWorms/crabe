@@ -3109,3 +3109,121 @@ h2.sec-block-title{font-size:15px;font-weight:600;}
   #view-profil .profil-aside{margin-top:22px;}
   #view-profil:not([data-section="general"]) .profil-aside{display:none;}
 }
+
+/* =====================================================================
+   Proposer un service — relever un site (1.0.0)
+
+   Trois lieux : le volet (Administration › Applications › Proposer un service), le panneau des
+   étapes dans la fenêtre de connexion, et la fenêtre d'envoi de l'archive.
+   Aucune teinte nouvelle : celles du thème, clair et sombre.
+   ===================================================================== */
+/* 1.0.0 — l'onglet se tient à droite de la rangée d'Administration › Applications. */
+#apps-tab-releve{margin-left:auto;}
+.releve-carte{display:flex;flex-direction:column;gap:18px;background:var(--bg-elev);
+  border:1px solid var(--border);border-radius:var(--radius);padding:22px;}
+.releve-intro{font-size:13.5px;color:var(--text-dim);line-height:1.6;max-width:720px;}
+.releve-intro strong,.releve-garantie strong{color:var(--text);font-weight:500;}
+.releve-sous-titre{font-size:14px;font-weight:600;margin:0;}
+.releve-prerequis{margin:-8px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:4px;
+  font-size:13px;color:var(--text-dim);}
+.releve-etapes{list-style:none;display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;}
+.releve-etapes li{background:var(--bg-elev-2);border-radius:8px;padding:12px 14px;display:flex;
+  flex-direction:column;gap:4px;}
+.releve-num{font-family:'Space Grotesk',sans-serif;font-weight:700;color:var(--accent-text);}
+.releve-etape-titre{font-size:13px;font-weight:500;}
+.releve-etape-aide{font-size:12px;color:var(--text-dim);overflow-wrap:anywhere;}
+.releve-form{display:flex;flex-direction:column;max-width:720px;}
+.releve-form .field input{min-height:44px;}
+.releve-form-pied{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+.releve-form-pied .btn-primary{width:auto;margin-top:0;padding:11px 18px;min-height:44px;}
+.releve-form-pied .btn-primary:disabled{opacity:.5;cursor:not-allowed;}
+.releve-indisponible{font-size:12.5px;color:var(--cause-session);flex:1 1 260px;min-width:0;}
+.releve-indisponible:empty{display:none;}
+.releve-garantie{display:flex;gap:10px;align-items:flex-start;background:var(--bg-elev-2);border-radius:8px;
+  padding:12px 14px;font-size:12.5px;color:var(--text-dim);line-height:1.55;}
+.releve-garantie svg{flex:none;margin-top:2px;color:var(--green);}
+
+.releve-mes-releves{margin-top:26px;display:flex;flex-direction:column;gap:10px;}
+.releve-liste-tete{display:flex;align-items:baseline;justify-content:space-between;gap:8px;flex-wrap:wrap;}
+.releve-limites{font-size:12px;color:var(--text-dim);}
+/* La liste vide se lit dans les deux thèmes (le gris des « rien ici » du reste
+   de crabe passe sous 4,5:1 en clair). */
+.releve-vide{font-size:13px;color:var(--text-dim);padding:14px 0;}
+.releve-ligne{background:var(--bg-elev);border:1px solid var(--border);border-radius:var(--radius);
+  padding:16px 18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:10px;}
+.releve-ligne-texte{flex:1 1 300px;min-width:0;}
+.releve-ligne-site{font-size:14px;font-weight:500;overflow-wrap:anywhere;}
+.releve-ligne-faits{font-size:12px;color:var(--text-dim);margin-top:2px;}
+.releve-ligne-texte .badge-pill{margin-top:6px;}
+/* En clair, l'ambre et le vert du thème sont trop pâles pour une phrase
+   (2,90:1 et 3,50:1 sur leur fond) : le texte prend une teinte du thème qui
+   se lit, le fond garde la sienne. */
+.releve-ligne-texte .badge-pill.amber{color:var(--cause-session);}
+body.light .releve-ligne-texte .badge-pill.green,body.light .releve-envoi-bilan.complet{color:var(--text);}
+.releve-ligne-gestes{display:flex;gap:8px;flex-wrap:wrap;}
+.releve-ligne-gestes button{min-height:44px;padding:10px 14px;border-radius:8px;font-size:13px;}
+.releve-ligne-gestes .btn-primary{width:auto;margin-top:0;}
+.releve-ligne-gestes .btn-secondary{flex:0 0 auto;color:var(--text);}
+
+/* ─── Dans la fenêtre : le panneau des étapes, à droite de l'écran ─── */
+.rb-releve[hidden]{display:none;}
+.rb-releve{background:var(--bg-elev-2);border:1px solid var(--border-strong);border-radius:10px;padding:14px 16px;
+  display:flex;flex-direction:column;gap:12px;margin-top:12px;}
+.rb-releve-titre{font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:600;}
+.rb-releve-etapes{list-style:none;display:flex;flex-direction:column;gap:10px;}
+.rb-releve-etapes li{display:flex;gap:10px;align-items:flex-start;}
+.rb-releve-puce{flex:none;width:22px;height:22px;border-radius:11px;display:flex;align-items:center;
+  justify-content:center;font-size:12px;font-weight:600;border:1px dashed var(--text-faint);color:var(--text-dim);}
+.rb-releve-etapes li.fait .rb-releve-puce{background:var(--green-bg);color:var(--green);border:1px solid transparent;}
+.rb-releve-etapes li.courante{background:var(--accent-dim);border-radius:8px;padding:10px;margin:0 -6px;}
+.rb-releve-etapes li.courante .rb-releve-puce{border:2px solid var(--accent);color:var(--accent-text);}
+.rb-releve-nom{font-size:13px;font-weight:500;}
+.rb-releve-etapes li.courante .rb-releve-nom{font-weight:600;color:var(--accent-text);}
+.rb-releve-etapes li.plus .rb-releve-nom{color:var(--text-dim);}
+.rb-releve-detail{font-size:12px;color:var(--text-dim);line-height:1.45;}
+.rb-releve-etapes li.courante .rb-releve-detail{color:var(--text);}
+.rb-releve-compteurs{display:flex;gap:6px;flex-wrap:wrap;}
+.rb-releve-compteurs span{font-size:11.5px;padding:2px 8px;border-radius:10px;background:var(--bg-elev);color:var(--text-dim);}
+.rb-releve .btn-secondary,.rb-releve .btn-primary{width:100%;flex:none;margin-top:0;min-height:44px;padding:10px 14px;
+  border-radius:8px;font-size:13.5px;}
+.rb-releve .btn-secondary{background:var(--bg-elev);color:var(--text);}
+.rb-releve button:disabled{opacity:.5;cursor:not-allowed;}
+.rb-releve-note{font-size:11.5px;color:var(--text-dim);line-height:1.5;}
+@media (min-width:1200px){
+  /* Deux colonnes : l'écran du site, puis le panneau. Tout le reste de la
+     fenêtre garde toute la largeur. */
+  .modal-overlay.rb-mode-releve .modal.modal-wide{width:min(1480px,100%);display:grid;
+    grid-template-columns:minmax(0,1fr) 330px;column-gap:16px;align-content:start;}
+  .modal-overlay.rb-mode-releve .modal.modal-wide > *{grid-column:1 / -1;min-width:0;}
+  .modal-overlay.rb-mode-releve .modal.modal-wide > .rb-screen{grid-column:1;align-self:start;}
+  .modal-overlay.rb-mode-releve .modal.modal-wide > .rb-releve{grid-column:2;align-self:start;margin-top:0;
+    max-height:max(66vh,420px);overflow-y:auto;}
+}
+
+/* ─── Relevé terminé : envoyer l'archive ─── */
+.modal.releve-envoi{width:min(640px,100%);}
+.releve-envoi-titre{font-weight:500;font-size:15px;overflow-wrap:anywhere;}
+.releve-envoi-bilan{border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:16px;}
+.releve-envoi-bilan.complet{background:var(--green-bg);color:var(--green);}
+.releve-envoi-bilan.incomplet{background:var(--amber-bg);color:var(--cause-session);}
+.releve-envoi .field textarea{min-height:96px;resize:vertical;}
+.releve-envoi-etat{font-size:13px;line-height:1.5;color:var(--text-dim);margin:10px 0;min-height:20px;overflow-wrap:anywhere;}
+.releve-envoi-etat:empty{display:none;}
+.releve-envoi-etat.ok{color:var(--green);}
+.releve-envoi-etat.refus{color:var(--cause-session);}
+body.light .releve-envoi-etat.ok{color:var(--text);}
+.releve-envoi .releve-garantie{margin-top:4px;}
+.releve-envoi-gestes{flex-wrap:wrap;}
+.releve-envoi-gestes a.btn-secondary{display:inline-flex;align-items:center;justify-content:center;text-decoration:none;color:var(--text);}
+.releve-envoi-gestes .btn-primary{width:auto;margin-top:0;}
+.releve-envoi-gestes .btn-primary:disabled{opacity:.55;cursor:default;}
+/* Chaque geste neuf a son focus visible, celui du thème. */
+#apps-tab-releve:focus-visible,.releve-form-pied .btn-primary:focus-visible,
+.releve-ligne-gestes button:focus-visible,.rb-releve button:focus-visible,
+.releve-envoi-gestes a:focus-visible,.releve-envoi-gestes button:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+@media (max-width:639px){
+  .releve-carte{padding:16px 14px;}
+  .releve-envoi-gestes>*{flex:1 1 100%;min-height:44px;}
+  .releve-ligne-gestes,.releve-ligne-gestes button{width:100%;}
+  .releve-form-pied .btn-primary{width:100%;}
+}

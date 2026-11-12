@@ -1101,7 +1101,7 @@ function createManager(overrides = {}) {
         'cancelled',
         'Fenêtre fermée — le navigateur a été arrêté et rien n\'a été enregistré.'
       );
-    }, DETACH_GRACE_MS);
+    }, session.sursisDetachementMs || DETACH_GRACE_MS);
     session.graceTimer.unref?.();
   }
 
@@ -1310,6 +1310,29 @@ function createManager(overrides = {}) {
     // la cloison : le serveur de retour d'`rclone authorize`, pour la seule
     // autorisation d'un stockage (voir cloison-navigateur.originePermise).
     adressesLocalesPermises = [],
+    // 1.0.0 — appelé avec le contexte du navigateur AVANT la première
+    // navigation, juste après la cloison : le relevé d'un site (releve-site.js)
+    // y branche ses écoutes, pour ne rien manquer de la toute première page.
+    // Rien d'autre ne s'en sert ; une erreur ici empêche l'ouverture.
+    avantNavigation = null,
+    // 1.0.0 — « connexion » : la fenêtre ne recadre (défilement, curseur posé
+    // dans le premier champ) que les écrans qui portent un mot de passe. Le
+    // relevé d'un site parcourt aussi des pages ordinaires : y sauter d'office
+    // sur le premier champ venu (une recherche, une lettre d'information en
+    // pied de page) ferait défiler la page sous les yeux de la personne.
+    // Par défaut, rien ne change : tout nouveau formulaire est recadré.
+    recadrage = 'toujours',
+    // 1.0.0 — false : les onglets de même origine et de même chemin ne sont
+    // pas refermés. Le relevé d'un site en ouvre exprès (/#/factures/42,
+    // index.php?page=pdf), que la garde du lot 71 prendrait pour des doubles.
+    // Par défaut, rien ne change.
+    doublons = true,
+    // 1.0.0 — le sursis accordé à la fenêtre quand son flux tombe (un onglet
+    // fermé, une coupure) avant qu'elle s'éteigne : une minute par défaut
+    // (`DETACH_GRACE_MS`). Le relevé d'un site en demande cinq — dix minutes
+    // de parcours ne se perdent pas pour un onglet fermé par mégarde. Borné :
+    // jamais plus que le délai d'inactivité, qui continue de courir.
+    sursisDetachementMs = DETACH_GRACE_MS,
     onDetected = async () => ({}),
   }) {
     // La garde du lot 77, avant TOUT le reste : une adresse d'ouverture absente
@@ -1464,6 +1487,10 @@ function createManager(overrides = {}) {
         .filter(Boolean),
       onFin: typeof onFin === 'function' ? onFin : null,
       adressesLocalesPermises: Array.isArray(adressesLocalesPermises) ? [...adressesLocalesPermises] : [],
+      avantNavigation: typeof avantNavigation === 'function' ? avantNavigation : null,
+      recadrage: recadrage === 'connexion' ? 'connexion' : 'toujours',
+      doublons: doublons !== false,
+      sursisDetachementMs: Math.max(1000, Math.min(Number(sursisDetachementMs) || DETACH_GRACE_MS, timeoutMs)),
       display,
       vncPort: vncPortFor(display),
       wsPort: wsPortFor(display),
@@ -1667,6 +1694,7 @@ function createManager(overrides = {}) {
         profil: session.profil || null,
         langueNative: !!session.langueNative,
         permises: session.adressesLocalesPermises || [],
+        avantNavigation: session.avantNavigation || null,
       });
     } catch (err) {
       // Filet sous le verrou de profil : si un Chromium tient ENCORE le
@@ -1950,7 +1978,8 @@ function createManager(overrides = {}) {
     if (!session.capture) {
       while (session === current && session.state === 'running') {
         await fermerOngletsVides(session, ongletsVides);
-        await fermerOngletsDoublons(session, ongletsDoubles);
+        // 1.0.0 : le relevé d'un site garde ses onglets de même chemin (`doublons`).
+        if (session.doublons) await fermerOngletsDoublons(session, ongletsDoubles);
         // L'indice de région (lot 34, pCloud) : la redirection de retour vers
         // le serveur local d'rclone porte `hostname=eapi.pcloud.com` pour un
         // compte européen — une information que le jeton imprimé ne porte pas
@@ -1971,7 +2000,11 @@ function createManager(overrides = {}) {
         if (signature && signature !== derniereSignature) {
           if (derniereSignature) noterActivite(session);
           derniereSignature = signature;
-          await detection.focusForm(page).catch(() => {});
+          // 1.0.0 : en recadrage « connexion », seul un écran à mot de passe
+          // est recadré (la signature porte le type de chaque champ visible).
+          if (session.recadrage !== 'connexion' || /(^|\|)password/.test(signature)) {
+            await detection.focusForm(page).catch(() => {});
+          }
           await remplirAuNouveauFormulaire(session);
         }
         await releverIdentifiants(session);
@@ -2163,7 +2196,9 @@ function createManager(overrides = {}) {
       );
     }
 
-    if (!prerempli.motDePasseVise) await detection.focusForm(page);
+    // 1.0.0 : en recadrage « connexion », la première page n'est pas recadrée
+    // d'office non plus — la boucle le fera si elle porte un mot de passe.
+    if (!prerempli.motDePasseVise && session.recadrage !== 'connexion') await detection.focusForm(page);
   }
 
   /**
@@ -3640,7 +3675,7 @@ function browserLaunchOptions({ display, screen, home, env = process.env, langue
  *
  * Il pèse quelques mégaoctets, contre quelques kilo-octets pour une session.
  */
-async function persistentLauncher({ display, url, screen, home, profil, langueNative = false, permises = [] }) {
+async function persistentLauncher({ display, url, screen, home, profil, langueNative = false, permises = [], avantNavigation = null }) {
   const { chromium } = require('playwright');
 
   // 0700, et créé avant le lancement : Chromium ne crée pas l'arborescence.
@@ -3670,6 +3705,7 @@ async function persistentLauncher({ display, url, screen, home, profil, langueNa
   try {
     // Avant la première navigation : la fenêtre n'ouvre jamais rien hors cloison.
     await cloison.cloisonner(context, { journal: journalDeCloison, permises });
+    if (avantNavigation) await avantNavigation(context);
 
     page = context.pages()[0] || (await context.newPage());
     await page.goto(url, { waitUntil: 'domcontentloaded' }).catch(() => {});
@@ -3725,10 +3761,10 @@ function journalDeCloison(texte) {
   require('./applog').warn('remote-browser', texte);
 }
 
-async function defaultLauncher({ display, url, screen, home, profil, langueNative = false, permises = [] }) {
+async function defaultLauncher({ display, url, screen, home, profil, langueNative = false, permises = [], avantNavigation = null }) {
   // Un connecteur qui déclare `remoteLogin.persistent` passe par le profil
   // persistant : sa session ne survivrait pas autrement.
-  if (profil) return persistentLauncher({ display, url, screen, home, profil, langueNative, permises });
+  if (profil) return persistentLauncher({ display, url, screen, home, profil, langueNative, permises, avantNavigation });
 
   const { chromium } = require('playwright');
   const browser = await chromium.launch(browserLaunchOptions({ display, screen, home, langueNative }));
@@ -3751,6 +3787,7 @@ async function defaultLauncher({ display, url, screen, home, profil, langueNativ
     );
     // Avant la première navigation : la fenêtre n'ouvre jamais rien hors cloison.
     await cloison.cloisonner(context, { journal: journalDeCloison, permises });
+    if (avantNavigation) await avantNavigation(context);
     page = await context.newPage();
     await page.goto(url, { waitUntil: 'domcontentloaded' });
   } catch (err) {

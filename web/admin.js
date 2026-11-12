@@ -1207,13 +1207,15 @@ function appsTable(items) {
 
 function setAppsTab(tab) {
   admin.appsTab = tab;
-  for (const nom of ['catalogue', 'logos', 'diagnostic']) {
+  for (const nom of ['catalogue', 'logos', 'diagnostic', 'releve']) {
     $(`apps-tab-${nom}`)?.classList.toggle('active', tab === nom);
     const pane = $(`apps-pane-${nom}`);
     if (pane) pane.style.display = tab === nom ? 'block' : 'none';
   }
   if (tab === 'logos') renderLogos();
   if (tab === 'diagnostic') renderDiagnosticPane();
+  // 1.0.0 — « Proposer un service » : le relevé d'un site (app.js).
+  if (tab === 'releve') renderReleve();
 }
 
 // ===========================================================================

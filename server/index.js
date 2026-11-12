@@ -230,6 +230,8 @@ function createApp() {
   // sur le routeur suivant.
   app.use('/api/connectors', require('./routes/remote-login').router);
   app.use('/api/connectors', require('./routes/connectors').router);
+  // 1.0.0 : relever un site pour proposer un service — à chaque compte les siens.
+  app.use('/api/releves', require('./routes/releves').router);
   app.use('/api/admin/connectors', require('./routes/connectors').adminRouter);
   app.use('/api/admin/schedules', require('./routes/connectors').scheduleRouter);
   app.use('/api/admin/destinations', require('./routes/destinations').router);

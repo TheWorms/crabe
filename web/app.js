@@ -7899,6 +7899,25 @@ async function retryRemoteLogin() {
     await api(`/admin/destinations/${id}/autorisation`, { method: 'DELETE' }).catch(() => {});
     return void openAutorisationStockage(id, infos || {});
   }
+  // 1.0.0 — le relevé d'un site repart sur la même adresse.
+  if (rb().mode === 'releve') {
+    // Une coupure passagère n'a pas éteint le relevé (échec non fatal : sa vue
+    // est restée) : on le reprend avec un jeton neuf, on ne l'efface pas.
+    if (rb().view && !rb().view.done) return void reprendreReleve(rb().view);
+    const demande = rb().releveDemande;
+    if (!demande) return void closeRemoteLogin();
+    // Un second clic pendant que le premier part ne relance rien.
+    if (rb().releveEnRelance) return;
+    rb().releveEnRelance = true;
+    $('rb-retry').style.display = 'none';
+    try {
+      await api('/releves/fenetre', { method: 'DELETE' }).catch(() => {});
+      await openReleveFenetre(demande);
+    } finally {
+      rb().releveEnRelance = false;
+    }
+    return;
+  }
   const id = rb().connectorId;
   if (!id) return void closeRemoteLogin();
   await api(`/connectors/${id}/remote-login`, { method: 'DELETE' }).catch(() => {});
@@ -7967,6 +7986,9 @@ function showRemoteVeil(texte, { echec = false } = {}) {
 }
 
 function hideRemoteVeil() {
+  // 1.0.0 : le voile « Enregistrement du relevé… » tient jusqu'à la réponse de
+  // « Terminer » — un relevé d'état arrivé entre-temps ne le lève pas.
+  if (rb().releveFin) return;
   $('rb-veil').className = 'rb-veil hidden';
 }
 
@@ -8009,6 +8031,8 @@ async function attachRemoteScreen(view) {
     }
   });
   rfb.addEventListener('disconnect', () => {
+    // 1.0.0 : un flux déjà remplacé (une reprise en a branché un autre) ne rebranche rien.
+    if (rb().rfb && rb().rfb !== rfb) return;
     // Le serveur ferme le navigateur dès la connexion détectée : une
     // déconnexion pendant « saving » est normale, pas un incident.
     if (rb().view?.state === 'running') {
@@ -8236,7 +8260,7 @@ async function pasteIntoRemote() {
   // Le connecteur, pas le flux d'affichage : c'est le SERVEUR qui frappe. Un
   // écran qui n'a pas fini de se brancher ne doit pas empêcher une saisie qui
   // ne passe pas par lui — c'est ce que le lot 12 interdisait sans raison.
-  if (!rb().connectorId && !rb().stockageId) {
+  if (!rb().connectorId && !rb().stockageId && rb().mode !== 'releve') {
     note.textContent = 'La fenêtre n\'est pas ouverte.';
     return;
   }
@@ -8472,7 +8496,7 @@ function applyRemoteView(view) {
   // Le bouton « Saisir mes identifiants » n'est cliquable que s'il y a
   // quelque chose à saisir — et il dit pourquoi quand ce n'est pas le cas.
   const bouton = $('rb-fill');
-  if (bouton && view.identifiantsDisponibles !== undefined) {
+  if (bouton && rb().connectorId && view.identifiantsDisponibles !== undefined) {
     bouton.disabled = !view.identifiantsDisponibles;
     const auto = view.remplissageAuto;
     $('rb-fill-note').textContent = !view.identifiantsDisponibles
@@ -8482,6 +8506,9 @@ function applyRemoteView(view) {
           + 'vérifiez, cochez la case du site si elle est demandée, puis validez.'
         : 'crabe remplit l\'identifiant et le mot de passe dans le formulaire du site.';
   }
+
+  // 1.0.0 — le relevé d'un site : ses étapes et ses compteurs suivent le serveur.
+  if (rb().mode === 'releve') dessinerEtapesReleve(view.releve);
 }
 
 /**
@@ -8720,7 +8747,21 @@ async function finishRemoteLogin(view) {
   detachRemoteScreen();
 
   if (view.state !== 'saved') {
-    return void failRemoteLogin(view.error || view.message, { fatal: true, explique: !!view.erreurExpliquee });
+    // 1.0.0 : les fins d'un relevé (délai, plafond) sont des phrases pour la personne.
+    return void failRemoteLogin(view.error || view.message, {
+      fatal: true,
+      explique: !!view.erreurExpliquee || rb().mode === 'releve',
+    });
+  }
+
+  // 1.0.0 — le relevé d'un site : « Terminer le relevé » conclut lui-même
+  // (terminerReleve). Vue d'ici, une fin heureuse n'a plus rien à faire.
+  if (rb().mode === 'releve') {
+    if (!rb().releveFin) {
+      closeRemoteLogin();
+      renderReleve().catch(() => {});
+    }
+    return;
   }
 
   // L'autorisation d'un espace de stockage (lot 34) : pas de découverte à
@@ -8822,8 +8863,11 @@ function failRemoteLogin(cause, { fatal = false, explique = false } = {}) {
   $('rb-result').className = 'test-result show fail';
   $('rb-result').textContent = texte;
   $('rb-cancel').textContent = 'Fermer';
-  $('rb-retry').style.display = (rb().connectorId || rb().stockageId) ? 'block' : 'none';
+  $('rb-retry').style.display = (rb().connectorId || rb().stockageId || rb().releveDemande
+    || (rb().mode === 'releve' && !fatal && rb().view && !rb().view.done)) ? 'block' : 'none';
   $('rb-countdown').textContent = '';
+  // 1.0.0 : un relevé en échec n'a plus rien à relever ni à terminer.
+  if (rb().mode === 'releve') $('rb-releve').hidden = true;
   if (fatal) rb().view = null;
 }
 
@@ -8835,6 +8879,15 @@ function failRemoteLogin(cause, { fatal = false, explique = false } = {}) {
  * parce qu'un DELETE a répondu 404 serait absurde.
  */
 async function cancelRemoteLogin() {
+  // 1.0.0 — l'enregistrement d'un relevé est en cours : il n'y a plus rien à abandonner.
+  if (rb().mode === 'releve' && rb().releveFin) return;
+  // 1.0.0 — un relevé commencé ne se perd pas d'un clic malheureux sur la
+  // croix : dix minutes de parcours valent une question.
+  if (rb().mode === 'releve' && rb().view && !rb().view.done && (rb().view.releve?.pages || 0) > 0
+    && !confirm('Abandonner ce relevé ? Rien n\'en sera gardé.\n\nPour le garder, annulez puis cliquez '
+      + ($('rb-releve').hidden ? '« Réessayer ».' : '« Terminer le relevé ».'))) {
+    return;
+  }
   const base = rbBase();
   const mode = rb().mode;
   stopRemoteTimers();
@@ -8847,6 +8900,8 @@ async function cancelRemoteLogin() {
       if (typeof renderAdminStorage === 'function') {
         Promise.resolve(renderAdminStorage()).catch(() => {});
       }
+    } else if (mode === 'releve') {
+      await renderReleve().catch(() => {});
     } else {
       await loadConnectors().catch(() => {});
     }
@@ -8870,6 +8925,491 @@ function closeRemoteLogin() {
   rb().view = null;
   rb().deadline = 0;
   rb().remoteClipboard = '';
+  // 1.0.0 — le relevé d'un site rend la fenêtre telle qu'il l'a trouvée.
+  rb().releveDemande = null;
+  rb().releveFin = false;
+  rb().releveEnRelance = false;
+  $('rb-overlay').classList.remove('rb-mode-releve');
+  $('rb-releve').hidden = true;
+  $('rb-fill').style.display = '';
+  $('rb-logo').style.display = '';
+}
+
+// ===========================================================================
+// Proposer un service — relever un site (1.0.0)
+//
+// La personne tape l'adresse d'un site ; crabe ouvre SA fenêtre (la même que
+// celle d'une connexion, sans capture de session) et relève le passage : les
+// pages, masquées ; ce que chaque clic déclenche ; chaque document servi. Le
+// serveur coche quatre étapes à mesure qu'il les voit — des indices, jamais
+// une garde : on peut terminer à tout moment, l'archive dit ce qui lui manque.
+// À la fin (1.0.0) : « Envoyer » — crabe envoie lui-même la demande, archive
+// jointe, par le SMTP du serveur — ou « Télécharger ». Où la demande part
+// n'est écrit nulle part à l'écran.
+//
+// L'écran est un volet d'Administration › Applications (`setAppsTab('releve')`,
+// admin.js), réservé à qui gère les applications.
+//
+// Rien de ce qui est tapé ici ne reste : l'adresse et les mots à retirer ne
+// vivent que le temps du relevé, côté serveur, en mémoire.
+// ===========================================================================
+
+/** Ce que la page sait des relevés du compte : la dernière réponse de /api/releves. */
+const releves = { donnees: null, envoi: null };
+
+/**
+ * Les quatre étapes, telles que le panneau les dit : le nom de ce qu'il reste
+ * à faire, celui de ce qui est fait, et la consigne de l'étape en cours.
+ */
+const RELEVE_ETAPES = {
+  connexion: {
+    aFaire: 'Ouvrez la page de connexion',
+    fait: 'La page de connexion',
+    aide: 'Affichez la page où l\'on se connecte au site. crabe la relève dès qu\'elle est à l\'écran.',
+  },
+  connecte: {
+    aFaire: 'Connectez-vous',
+    fait: 'Vous êtes connecté',
+    aide: 'Connectez-vous comme d\'habitude, code reçu compris. Rien de ce que vous tapez n\'est relevé. '
+      + 'Si l\'étape ne se coche pas, continuez jusqu\'à vos factures et ouvrez-en une : les étapes se cocheront ensemble.',
+  },
+  liste: {
+    aFaire: 'Allez à vos factures',
+    fait: 'La liste des factures',
+    aide: 'Allez jusqu\'à la page qui liste vos factures (ou vos reçus, vos attestations), par le chemin habituel du site.',
+  },
+  document: {
+    aFaire: 'Ouvrez une facture',
+    fait: 'Une facture ouverte',
+    aide: 'Cliquez sur « Télécharger », ou sur la ligne qui mène au document, comme pour la garder. '
+      + 'crabe note comment le site la sert — il ne la garde pas.',
+  },
+};
+
+/** « 3 pages » / « 1 page ». */
+function pluriel(n, mot) {
+  return `${n} ${mot}${n > 1 ? 's' : ''}`;
+}
+
+/** Le volet « Proposer un service » : le formulaire, et les relevés du compte. */
+async function renderReleve() {
+  const zone = $('releve-liste');
+  if (!zone) return;
+  let donnees;
+  let caps;
+  try {
+    [donnees, caps] = await Promise.all([
+      api('/releves'),
+      api('/connectors/remote-login/capabilities').catch(() => ({ available: false, busy: false, reason: '' })),
+    ]);
+  } catch (err) {
+    zone.innerHTML = `<div class="releve-vide">${esc(err.message)}</div>`;
+    return;
+  }
+  releves.donnees = donnees;
+  $('releve-limites').textContent = `Gardés ${donnees.limites.jours} jours, les ${donnees.limites.releves} derniers`;
+  $('releve-liste-titre').textContent = `Vos relevés${donnees.releves.length ? ` (${donnees.releves.length})` : ''}`;
+
+  // Le bouton dit POURQUOI il ne répond pas, plutôt que d'échouer au clic : la
+  // fenêtre de crabe manque sur ce serveur, ou elle est déjà prise.
+  const bouton = $('releve-commencer');
+  const raison = donnees.enCours
+    ? ''
+    : !caps.available
+      ? 'La fenêtre de crabe n\'est pas disponible sur ce serveur'
+        + `${caps.missing?.length ? ` (il manque : ${caps.missing.map((m) => m.label || m.id).join(', ')})` : ''}`
+        + ' : le relevé ne peut pas s\'ouvrir. Voyez avec la personne qui administre ce crabe.'
+      : caps.busy
+        ? 'Une fenêtre de crabe est déjà ouverte sur ce serveur (une connexion ou un autre relevé) : réessayez dans quelques minutes.'
+        : '';
+  bouton.disabled = !!raison || !!donnees.enCours;
+  $('releve-indisponible').textContent = raison;
+
+  const enCours = donnees.enCours
+    ? `<div class="releve-ligne">
+        <div class="releve-ligne-texte">
+          <div class="releve-ligne-site">Un relevé est en cours</div>
+          <div class="releve-ligne-faits">Sa fenêtre reste ouverte sur le serveur cinq minutes après la fermeture de l'onglet : reprenez-la, ou abandonnez-la.</div>
+        </div>
+        <div class="releve-ligne-gestes">
+          <button type="button" class="btn-primary" onclick="reprendreReleve()">Reprendre le relevé</button>
+          <button type="button" class="btn-ghost" onclick="abandonnerReleveEnCours()">Abandonner</button>
+        </div>
+      </div>`
+    : '';
+  zone.innerHTML = enCours + (donnees.releves.length
+    ? donnees.releves.map(ligneDeReleve).join('')
+    : (enCours ? '' : '<div class="releve-vide">Aucun relevé pour l\'instant. Le premier apparaîtra ici, prêt à être envoyé.</div>'));
+}
+
+/** Les faits d'un relevé, en une ligne : sa date, ses pages, ses documents, son poids. */
+function faitsDeReleve(r) {
+  const documents = !r.documents
+    ? ''
+    : r.documentsPdf === r.documents
+      ? `${pluriel(r.documents, 'facture')} PDF`
+      : `${pluriel(r.documents, 'document')}${r.documentsPdf ? `, dont ${r.documentsPdf} PDF` : ''}`;
+  const envoi = r.envois?.length ? `envoyé le ${fmt.date(r.envois[r.envois.length - 1])}` : '';
+  return [r.debut ? fmt.dateTime(r.debut) : '', pluriel(r.pages, 'page'), documents, fmt.bytes(r.octets), envoi]
+    .filter(Boolean).join(' · ');
+}
+
+/** Ce que dit le bilan d'un relevé : complet, ou ce qui lui manque. */
+function bilanDeReleve(r) {
+  return r.complet
+    ? 'Complet : la connexion, la liste et une facture ouverte sont relevées'
+    : `Incomplet : ${(r.manque || []).join(' ; ') || 'une étape manque'}`;
+}
+
+function ligneDeReleve(r) {
+  const id = esc(r.id);
+  return `
+  <div class="releve-ligne">
+    <div class="releve-ligne-texte">
+      <div class="releve-ligne-site">${esc(r.site)}</div>
+      <div class="releve-ligne-faits">${esc(faitsDeReleve(r))}</div>
+      <span class="badge-pill ${r.complet ? 'green' : 'amber'}">${esc(bilanDeReleve(r))}</span>
+    </div>
+    <div class="releve-ligne-gestes">
+      ${r.complet
+        ? `<button type="button" class="${r.envois?.length ? 'btn-secondary' : 'btn-primary'}" onclick="ouvrirEnvoiReleve('${id}')">Envoyer ou télécharger</button>`
+        : `<button type="button" class="btn-secondary" onclick="recommencerReleve('${id}')">Recommencer</button>
+           <button type="button" class="btn-secondary" onclick="ouvrirEnvoiReleve('${id}')">Envoyer quand même</button>`}
+      <button type="button" class="btn-ghost" onclick="supprimerReleve('${id}')">Supprimer</button>
+    </div>
+  </div>`;
+}
+
+/** « Commencer le relevé ». */
+function demarrerReleve(event) {
+  event?.preventDefault?.();
+  const adresse = $('releve-adresse').value.trim();
+  if (!adresse) {
+    $('releve-indisponible').textContent = 'Indiquez l\'adresse du site à relever.';
+    $('releve-adresse').focus();
+    return;
+  }
+  $('releve-indisponible').textContent = '';
+  openReleveFenetre({ adresse, masquer: $('releve-masquer').value });
+}
+
+/** « Recommencer » un relevé incomplet : son site revient dans le champ, prêt à repartir. */
+function recommencerReleve(id) {
+  const r = (releves.donnees?.releves || []).find((x) => x.id === id);
+  if (!r) return;
+  // L'adresse de départ est gardée MASQUÉE : entière, elle resservira ; avec
+  // un segment masqué, c'est l'accueil du site qui revient.
+  let adresse = `https://${r.site}/`;
+  try {
+    const depart = new URL(String(r.depart || '').split('?')[0].split('#')[0]);
+    if (!decodeURIComponent(depart.pathname).includes('…')) adresse = depart.origin + depart.pathname;
+  } catch {
+    /* l'accueil du site */
+  }
+  $('releve-adresse').value = adresse;
+  $('releve-adresse').focus();
+  window.scrollTo?.(0, 0);
+}
+
+/** Habille la fenêtre de connexion pour un relevé : ni identifiants, ni bandeau — le panneau dit tout. */
+function habillerFenetreReleve(titre) {
+  rb().mode = 'releve';
+  rb().base = '/releves/fenetre';
+  rb().connectorId = null;
+  rb().stockageId = null;
+  rb().stockageInfos = null;
+  rb().releveFin = false;
+  // Un relevé d'état d'une fenêtre d'avant, arrivé après sa fermeture, ne parle pas pour celle-ci.
+  rb().view = null;
+  // Pas de service, donc pas de logo : le titre suffit.
+  $('rb-logo').style.display = 'none';
+  $('rb-name').textContent = titre;
+  $('rb-state').textContent = 'Préparation…';
+  $('rb-bandeau').hidden = true;
+  $('rb-aide').hidden = true;
+  $('rb-result').className = 'test-result';
+  $('rb-result').textContent = '';
+  $('rb-cancel').textContent = 'Fermer / Abandonner';
+  $('rb-retry').style.display = 'none';
+  $('rb-save-row').style.display = 'none';
+  $('rb-renoncer-row').style.display = 'none';
+  $('rb-fill').style.display = 'none';
+  $('rb-fill-note').textContent = '';
+  resetRemotePaste();
+  clearTimeout(rb().releveNote);
+  delete $('rb-releve-note').dataset.message;
+  dessinerEtapesReleve(null);
+  // Rien à relever ni à terminer tant que le serveur n'a pas ouvert la fenêtre.
+  for (const id of ['rb-releve-terminer', 'rb-releve-copie']) $(id).disabled = true;
+  $('rb-releve').hidden = false;
+  $('rb-overlay').classList.add('show', 'rb-open', 'rb-mode-releve');
+}
+
+/**
+ * Ouvre la fenêtre sur le site et commence le relevé. Même ordre que pour une
+ * connexion : la fenêtre s'affiche avant que le serveur ait lancé le navigateur.
+ */
+async function openReleveFenetre(demande) {
+  habillerFenetreReleve('Relever un site');
+  rb().releveDemande = demande;
+  startRemoteStages();
+  try {
+    const view = await api('/releves', { method: 'POST', body: demande });
+    // La fenêtre a été refermée pendant que le serveur l'ouvrait : celle du
+    // serveur ne reste pas ouverte hors de vue.
+    if (rb().mode !== 'releve' || rb().releveDemande !== demande) {
+      api('/releves/fenetre', { method: 'DELETE' }).catch(() => {});
+      return;
+    }
+    stopRemoteStages();
+    rb().view = view;
+    for (const id of ['rb-releve-terminer', 'rb-releve-copie']) $(id).disabled = false;
+    $('rb-name').textContent = `Relever ${view.releve?.hote || 'un site'}`;
+    applyRemoteView(view);
+    await attachRemoteScreen(view);
+    startRemotePolling();
+  } catch (err) {
+    if (rb().mode !== 'releve' || rb().releveDemande !== demande) return;
+    stopRemoteStages();
+    failRemoteLogin(err);
+  }
+}
+
+/** « Reprendre le relevé » : sa fenêtre tourne encore sur le serveur, un jeton neuf la rebranche. */
+async function reprendreReleve(avant = null) {
+  // Un seul flux d'écran : celui qu'une coupure a laissé (ou rebranché) est détaché d'abord.
+  detachRemoteScreen();
+  habillerFenetreReleve('Relever un site');
+  showRemoteVeil('Reprise du relevé…');
+  try {
+    const view = await api('/releves/fenetre/ticket', { method: 'POST' });
+    rb().view = view;
+    for (const id of ['rb-releve-terminer', 'rb-releve-copie']) $(id).disabled = false;
+    $('rb-name').textContent = `Relever ${view.releve?.hote || view.connectorName || 'un site'}`;
+    applyRemoteView(view);
+    await attachRemoteScreen(view);
+    startRemotePolling();
+  } catch (err) {
+    // Seul un verdict du serveur dit que le relevé n'est plus : 404 (disparu), 409 (terminé).
+    const mort = err?.status === 404 || err?.status === 409;
+    if (!mort && !avant) {
+      // Reprise demandée depuis la page, restée sans réponse : la fenêtre se
+      // referme sans abandonner le relevé, qui reste à reprendre.
+      closeRemoteLogin();
+      showToast('La reprise n\'a pas abouti. Le relevé reste en cours : réessayez dans un instant.');
+      return void renderReleve().catch(() => {});
+    }
+    // Une coupure de plus : le relevé vit encore, « Réessayer » le reprendra.
+    if (!mort) rb().view = avant;
+    failRemoteLogin(err, { fatal: mort });
+  }
+}
+
+/** « Abandonner » un relevé resté ouvert, depuis la page. */
+async function abandonnerReleveEnCours() {
+  if (!confirm('Abandonner le relevé en cours ? Rien n\'en sera gardé.')) return;
+  await api('/releves/fenetre', { method: 'DELETE' }).catch(() => {});
+  await renderReleve();
+}
+
+/**
+ * Le panneau de la fenêtre : les étapes (faites, en cours, à venir), une
+ * dernière ligne facultative, les compteurs. `releve` vient du serveur à
+ * chaque relevé d'état ; `null` : rien n'est encore vu.
+ */
+function dessinerEtapesReleve(releve) {
+  const liste = releve?.etapes?.liste || Object.keys(RELEVE_ETAPES).map((cle) => ({ cle, fait: false, detail: '' }));
+  const courante = releve ? releve.etapes?.courante : 'connexion';
+  $('rb-releve-etapes').innerHTML = liste.map((e, i) => {
+    const textes = RELEVE_ETAPES[e.cle] || { aFaire: e.cle, fait: e.cle, aide: '' };
+    const enCours = !e.fait && e.cle === courante;
+    return `<li class="${e.fait ? 'fait' : enCours ? 'courante' : ''}"${enCours ? ' aria-current="step"' : ''}>
+      <span class="rb-releve-puce" aria-hidden="true">${e.fait ? '✓' : i + 1}</span>
+      <div>
+        <div class="rb-releve-nom">${esc(e.fait ? textes.fait : textes.aFaire)}${e.fait ? '<span class="visually-hidden"> — fait</span>' : ''}</div>
+        <div class="rb-releve-detail">${esc(e.fait ? e.detail : enCours ? textes.aide : '')}</div>
+      </div>
+    </li>`;
+  }).join('') + `<li class="plus">
+      <span class="rb-releve-puce" aria-hidden="true">+</span>
+      <div>
+        <div class="rb-releve-nom">Facultatif, mais précieux</div>
+        <div class="rb-releve-detail">La page suivante, une autre année, un autre type de document (avoir, attestation) : chaque page vue complète l'archive.</div>
+      </div>
+    </li>`;
+  $('rb-releve-compteurs').innerHTML = releve
+    ? [pluriel(releve.pages, 'page'), pluriel(releve.documents, 'document'), pluriel(releve.appels, 'appel'), pluriel(releve.clics, 'clic')]
+      .map((t) => `<span>${esc(t)}</span>`).join('')
+    : '';
+  const note = $('rb-releve-note');
+  if (!note.dataset.message) {
+    note.textContent = releve?.complet
+      ? 'Tout y est. Vous pouvez terminer, ou compléter avec d\'autres pages.'
+      : 'Terminer avant la fin reste possible : l\'archive dira ce qui lui manque.';
+  }
+}
+
+/** Un mot du panneau, qui s'efface de lui-même ; un refus (`tient`) reste jusqu'au mot suivant. */
+function noteDuReleve(texte, { tient = false } = {}) {
+  const note = $('rb-releve-note');
+  note.dataset.message = '1';
+  note.textContent = texte;
+  clearTimeout(rb().releveNote);
+  if (tient) return;
+  rb().releveNote = setTimeout(() => {
+    delete note.dataset.message;
+    if (rb().mode === 'releve') dessinerEtapesReleve(rb().view?.releve || null);
+  }, 4000);
+}
+
+/** « Relever cette page maintenant » — une liste lente à se charger, une page qui a changé sans changer d'adresse. */
+async function releverPageMaintenant() {
+  const bouton = $('rb-releve-copie');
+  bouton.disabled = true;
+  try {
+    const res = await api('/releves/fenetre/copie', { method: 'POST' });
+    if (rb().view) rb().view.releve = res.releve;
+    dessinerEtapesReleve(res.releve);
+    noteDuReleve(res.nouvelles ? 'Page relevée.' : 'Cette page est déjà relevée telle qu\'elle est.');
+  } catch (err) {
+    noteDuReleve(err.message);
+  } finally {
+    bouton.disabled = false;
+  }
+}
+
+/** « Terminer le relevé » : la fenêtre se ferme, l'archive est rangée, l'envoi s'ouvre. */
+async function terminerReleve() {
+  const releve = rb().view?.releve;
+  if (releve && !releve.complet
+    && !confirm(`Il manque : ${(releve.manque || []).join(' ; ')}.\n\nTerminer quand même ? L'archive sera marquée incomplète.`)) {
+    return;
+  }
+  const boutons = [$('rb-releve-terminer'), $('rb-releve-copie')];
+  boutons.forEach((b) => { b.disabled = true; });
+  rb().releveFin = true;
+  showRemoteVeil('Enregistrement du relevé…');
+  try {
+    const res = await api('/releves/fenetre/terminer', { method: 'POST' });
+    stopRemoteTimers();
+    detachRemoteScreen();
+    // Un relevé d'état parti avant cette réponse peut revenir après la
+    // fermeture, la session « saved » : sa fin est jouée ici, une fois
+    // (voir finishRemoteLogin).
+    rb().finiPour = rb().view?.sessionId || rb().finiPour;
+    closeRemoteLogin();
+    await renderReleve().catch(() => {});
+    ouvrirEnvoiReleve(res.releve.id, res.releve);
+  } catch (err) {
+    rb().releveFin = false;
+    // La fenêtre a pu se fermer entre-temps (délai d'inactivité) : rien n'est gardé.
+    if (err?.status === 404) failRemoteLogin('La fenêtre du relevé s\'est fermée avant la fin : rien n\'a été enregistré.', { fatal: true, explique: true });
+    else {
+      hideRemoteVeil();
+      noteDuReleve(err.message, { tient: true });
+    }
+  } finally {
+    boutons.forEach((b) => { b.disabled = false; });
+  }
+}
+
+/** Le nom du fichier que le navigateur enregistre pour un relevé. */
+function nomArchiveReleve(r) {
+  return `releve-${r.site}-${String(r.id).slice(0, 10)}.zip`;
+}
+
+/** Ce que la fenêtre d'envoi dit sous le message : rien, un empêchement, ou un envoi déjà fait. */
+function etatDEnvoi(r) {
+  const envoi = releves.donnees?.envoi || {};
+  const fois = r.envois?.length || 0;
+  if (!envoi.possible) {
+    return {
+      bloque: true,
+      texte: 'crabe ne peut pas envoyer : aucun serveur d\'envoi de courriels n\'est réglé (Administration › SMTP). Vous pouvez télécharger l\'archive.',
+    };
+  }
+  if (fois >= (envoi.fois || 3)) return { bloque: true, texte: `Ce relevé a déjà été envoyé ${fois} fois.` };
+  return { bloque: false, texte: fois ? `Déjà envoyé le ${fmt.date(r.envois[fois - 1])}. Un nouvel envoi reste possible.` : '' };
+}
+
+/** Pose l'état de la fenêtre d'envoi : sa phrase, sa couleur, le bouton. */
+function dessinerEtatDEnvoi({ texte, bloque = false, genre = '' }) {
+  const zone = $('releve-envoi-etat');
+  zone.className = `releve-envoi-etat${genre ? ` ${genre}` : ''}`;
+  zone.textContent = texte;
+  $('releve-envoi-envoyer').disabled = bloque;
+}
+
+/** « Envoyer ou télécharger » : le bilan du relevé, un message facultatif, les deux gestes. */
+function ouvrirEnvoiReleve(id, connu = null) {
+  const r = connu || (releves.donnees?.releves || []).find((x) => x.id === id);
+  if (!r) return;
+  releves.envoi = { id: r.id, retour: document.activeElement, enCours: false };
+  $('releve-envoi-titre').textContent = `${connu ? 'Relevé terminé' : 'Envoyer le relevé'} — ${r.site}`;
+  $('releve-envoi-sub').textContent = faitsDeReleve(r);
+  const bilan = $('releve-envoi-bilan');
+  bilan.className = `releve-envoi-bilan ${r.complet ? 'complet' : 'incomplet'}`;
+  bilan.textContent = r.complet
+    ? 'Complet : la connexion, la liste des factures et une facture ouverte sont relevées. Merci !'
+    : `${bilanDeReleve(r)}. Vous pouvez l'envoyer tel quel, ou recommencer le relevé pour le compléter.`;
+  const lien = $('releve-envoi-telecharger');
+  lien.href = `/api/releves/${encodeURIComponent(r.id)}/archive`;
+  lien.setAttribute('download', nomArchiveReleve(r));
+  const message = $('releve-envoi-message');
+  message.value = '';
+  message.maxLength = releves.donnees?.envoi?.message || 2000;
+  const etat = etatDEnvoi(r);
+  dessinerEtatDEnvoi(etat);
+  $('releve-envoi-envoyer').textContent = 'Envoyer';
+  $('releve-envoi-overlay').classList.add('show');
+  // Comme les autres fenêtres modales de crabe : le focus entre dans la fenêtre.
+  (etat.bloque ? lien : message).focus();
+}
+
+/**
+ * « Envoyer » : crabe envoie la demande, archive jointe. Réussie, la fenêtre se
+ * referme et le volet dit qu'elle est partie ; un refus se lit dans la fenêtre,
+ * qui reste ouverte.
+ */
+async function envoyerReleve() {
+  const envoi = releves.envoi;
+  if (!envoi?.id || envoi.enCours) return;
+  envoi.enCours = true;
+  const bouton = $('releve-envoi-envoyer');
+  dessinerEtatDEnvoi({ texte: 'Envoi en cours…', bloque: true });
+  try {
+    const res = await api(`/releves/${encodeURIComponent(envoi.id)}/envoyer`, {
+      method: 'POST',
+      body: { message: $('releve-envoi-message').value },
+    });
+    // La demande est partie : la fenêtre se referme sur le volet, qui le dit —
+    // sauf si elle a été rouverte sur un autre relevé entre-temps.
+    if (releves.envoi === envoi) fermerEnvoiReleve();
+    showToast(`Votre demande pour ${res.releve.site} a bien été envoyée. Aucune donnée personnelle dans le zip joint. Merci !`);
+    await renderReleve().catch(() => {});
+  } catch (err) {
+    if (releves.envoi === envoi) dessinerEtatDEnvoi({ texte: err.message, bloque: false, genre: 'refus' });
+    else showToast(err.message);
+  } finally {
+    envoi.enCours = false;
+  }
+}
+
+function fermerEnvoiReleve() {
+  $('releve-envoi-overlay').classList.remove('show');
+  const retour = releves.envoi?.retour;
+  releves.envoi = null;
+  if (retour && retour !== document.body && retour.isConnected) retour.focus?.();
+}
+
+async function supprimerReleve(id) {
+  if (!confirm('Supprimer ce relevé ? Son archive ne pourra plus être téléchargée.')) return;
+  try {
+    await api(`/releves/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  } catch (err) {
+    showToast(err.message);
+  }
+  await renderReleve();
 }
 
 /** Refaire une découverte depuis la fiche : une ligne ouverte depuis, par exemple. */
@@ -11843,7 +12383,7 @@ document.addEventListener('visibilitychange', () => {
 
 document.addEventListener('keydown', (event) => {
   if (event.key !== 'Escape') return;
-  for (const id of ['modal-overlay', 'qv-overlay', 'access-overlay', 'generic-overlay', 'info-config-overlay', 'dr-overlay', 'memoire-overlay']) {
+  for (const id of ['modal-overlay', 'qv-overlay', 'access-overlay', 'generic-overlay', 'info-config-overlay', 'dr-overlay', 'memoire-overlay', 'releve-envoi-overlay']) {
     $(id).classList.remove('show');
   }
   closeHomePanel();
@@ -11857,6 +12397,13 @@ $('info-config-overlay')?.addEventListener?.('keydown', clavierInformationConfig
 // enregistré AVANT le gestionnaire commun ci-dessous, qui ne fait que masquer.
 $('info-config-overlay')?.addEventListener?.('click', (event) => {
   if (event.target === event.currentTarget) fermerInformationConfiguration();
+});
+
+// 1.0.0 — un clic à côté de la fenêtre ne masque pas un relevé en cours : elle
+// continuerait de tourner sur le serveur, hors de vue. Enregistré AVANT le
+// gestionnaire commun ci-dessous, qu'il arrête pour ce seul cas.
+$('rb-overlay')?.addEventListener?.('click', (event) => {
+  if (event.target === event.currentTarget && rb().mode === 'releve') event.stopImmediatePropagation();
 });
 
 document.querySelectorAll('.modal-overlay').forEach((overlay) => {

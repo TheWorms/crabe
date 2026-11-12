@@ -144,11 +144,17 @@ function describeError(err, context = {}) {
 
 /**
  * Envoie un message.
- * @param {{to: string, subject: string, text: string}} message
+ *
+ * `attachments` (1.0.0) : des pièces jointes au format de nodemailer — l'archive
+ * d'un relevé de site. `replyTo` : à qui répondre, quand ce n'est pas
+ * l'expéditeur du serveur. `discret` : le journal dit que le message est parti,
+ * sans son destinataire.
+ *
+ * @param {{to: string, subject: string, text: string, attachments?: object[], replyTo?: string, discret?: boolean}} message
  * @returns {Promise<{ok: true}>}
  * @throws {Error} avec `code = 'SMTP_NOT_CONFIGURED'` si rien n'est configuré
  */
-async function send({ to, subject, text }) {
+async function send({ to, subject, text, attachments, replyTo, discret = false }) {
   const policy = settings.securityPolicy();
   const target = String(to || '').trim();
   if (!target) {
@@ -159,7 +165,14 @@ async function send({ to, subject, text }) {
 
   const mail = transport(policy);
   try {
-    await mail.sendMail({ from: sender(policy), to: target, subject, text });
+    await mail.sendMail({
+      from: sender(policy),
+      to: target,
+      subject,
+      text,
+      ...(replyTo ? { replyTo } : {}),
+      ...(attachments?.length ? { attachments } : {}),
+    });
   } catch (err) {
     // Le message brut de nodemailer reste dans le journal ; l'appelant, lui,
     // reçoit une phrase qui dit quoi corriger.
@@ -171,7 +184,7 @@ async function send({ to, subject, text }) {
     explained.cause = err;
     throw explained;
   }
-  applog.info('mailer', `E-mail « ${subject} » envoyé à ${target}.`);
+  applog.info('mailer', `E-mail « ${subject} » envoyé${discret ? '' : ` à ${target}`}.`);
   return { ok: true };
 }
 

@@ -130,6 +130,13 @@ const config = {
     ? path.resolve(process.env.CRABE_DIAGNOSTICS_DIR)
     : path.join(dataDir, 'diagnostics'),
 
+  // Les relevés de site (1.0.0, releve-site.js) : un dossier par compte, des
+  // archives sans rien de personnel, que chacun télécharge pour proposer un
+  // service. Sous `dataDir`, pour la même raison que les diagnostics.
+  relevesDir: process.env.CRABE_RELEVES_DIR
+    ? path.resolve(process.env.CRABE_RELEVES_DIR)
+    : path.join(dataDir, 'releves'),
+
   masterPassphrase: process.env.CRABE_MASTER_PASSPHRASE || '',
   sessionSecret: process.env.CRABE_SESSION_SECRET || '',
 
