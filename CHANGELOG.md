@@ -6,6 +6,23 @@ Pour mettre à jour votre crabe : [docs/MISE-A-JOUR.md](docs/MISE-A-JOUR.md) (En
 
 ---
 
+## 1.0.3 — Sofidial, et un relevé qui dit le mur anti-robot (27/11/2026)
+
+### Connecteurs
+- **Sofidial** (personnalisation textile) **entre « en cours »** : les factures de vos commandes. Vous vous connectez vous-même dans la fenêtre de crabe — cochez « Se souvenir de moi », la connexion tiendra plus longtemps — ; crabe lit la page de vos commandes, ouvre chacune et prend sa facture PDF, sans rien cliquer. Une commande qui a déjà donné sa facture n'est pas rouverte ; une commande sans facture encore l'est au passage suivant. Il a été écrit sur un relevé « Proposer un service » : la première récupération réelle reste à faire.
+
+### Proposer un service
+- **Un mur anti-robot est reconnu, et dit.** Certains sites (DataDome, Cloudflare) présentent une vérification à la place de leur page — Leroy Merlin dès son accueil. Le panneau du relevé le dit, avec le seul geste qui peut aider : faire l'épreuve si elle en propose une, recharger une fois si elle dit « bloqué ». L'archive le dit aussi : « la fenêtre de crabe n'est pas passée », plutôt que « la page de connexion n'a pas été relevée ».
+- **La fenêtre du relevé ouvre un vrai profil de navigateur**, comme celle des connecteurs qui passent ces vérifications (Darty), au lieu d'une navigation privée. Il est temporaire : effacé quand la fenêtre se ferme, avec les cookies du site visité ; un reste (un navigateur arrêté net) part avec l'entretien de la nuit, ou avec le compte.
+- **Une facture affichée dans l'onglet est reconnue comme un PDF.** Le navigateur l'affiche dans son lecteur, et ce que crabe lisait alors était la page de ce lecteur, pas le fichier : le relevé disait « le document ouvert n'est pas un PDF », et se marquait incomplet. Le type annoncé par le site fait désormais foi ; les pages ne se comptent pas.
+- **« Connecté en tant que … » ne retire plus que le nom.** Les mots ordinaires d'un menu de compte s'enrichissent (« connecté », « en tant que », « se souvenir de moi », « rester connecté »…), un formulaire ne désigne plus jamais la zone du compte (celui de connexion de Sofidial s'appelle `new_user`), et une étiquette de champ n'est jamais lue comme un nom. Les lignes d'étape que crabe écrit lui-même dans le parcours ne perdent plus aucun mot.
+
+### Pour les mainteneurs
+- `server/connectors/available/sofidial/` : le connecteur et son manifeste ; le PDF se télécharge par le contexte (`context.request`), dont les renvois vers Amazon S3 sont suivis — le `fetch` de la page ne lirait pas une autre origine. Ancre : `sofidial-<commande>-facture-<numéro>`.
+- `server/releve-site.js` : `noterMur` (la reconnaissance de `profil-marchand.estMurAntiRobot`, à chaque copie), `enveloppeDuLecteur`, `cheminDuProfilJetable` et `effacerProfilsJetables` (sous `<relevés>/.profils/`), le parcours écrit ligne par ligne. `server/remote-browser.js` : l'option `profilJetable` de `start()`, effacée à l'extinction. Pas de migration.
+
+---
+
 ## 1.0.2 — BlaBlaCar, Galaxus, Les Thés de la Pagode et PayByPhone sont fonctionnels (12/11/2026)
 
 ### Connecteurs

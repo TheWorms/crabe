@@ -312,6 +312,9 @@ const MOTS_DE_COMPTE = new Set(`
   compte comptes espace client cliente clients personnel personnelle perso prive privee particulier particuliers
   professionnel professionnels professionnelle pro entreprise entreprises societe administration admin
   connecter connectez connexion deconnecter deconnectez deconnexion reconnecter reconnectez
+  connecte connectee connectes connectees deconnecte deconnectee tant comme actuellement maintenant
+  souvenir souviens rester restez garder memoriser oublier encore deja inscrivez creez nouveau nouvelle
+  google apple facebook microsoft via code envoyer recevoir lien
   identifier identifiez identification identifiant identifiants inscription inscrire inscrivez creer creez enregistrer
   mot mots passe oublie oubliez oublies
   profil informations information infos donnees adresse adresses parametres reglages preferences securite
@@ -325,7 +328,7 @@ const MOTS_DE_COMPTE = new Set(`
   forgotten password email e-mail mail username user users profile settings preferences information
   orders order history invoices invoice billing returns wishlist favorites favourites cart basket
   dashboard overview home help open close view manage edit hello hi welcome personal business company
-  customer customers member members area dropdown
+  customer customers member members area dropdown logged signed as currently remember me keep stay new
 `.split(/\s+/).filter(Boolean));
 
 /** Un mot de la zone du compte est-il ordinaire ? « connectez-vous », « s'inscrire » le sont, morceau par morceau. */
@@ -345,8 +348,16 @@ function motsDuCompte(libelle) {
     .filter((m) => [...m].length >= 2 && !/^\p{N}+$/u.test(m) && !motOrdinaire(m));
 }
 
-/** Les attributs d'un élément disent-ils la zone du compte ? Le chemin d'un lien compte, jamais sa requête. */
-function signaleLeCompte(attributs) {
+/**
+ * Les attributs d'un élément disent-ils la zone du compte ? Le chemin d'un
+ * lien compte, jamais sa requête. Un FORMULAIRE ne la dit jamais (1.0.3) :
+ * mesuré sur un relevé réel, `form#new_user` — le formulaire de connexion de
+ * Devise — faisait de toutes ses étiquettes une zone de compte, et « Se
+ * souvenir de moi » y était pris pour un nom. Un formulaire n'affiche pas le
+ * nom du compte ; son lien et son menu, si.
+ */
+function signaleLeCompte(attributs, nom = '') {
+  if (nom === 'form') return false;
   let signes = '';
   for (const cle of ['class', 'id', 'title', 'aria-label', 'name', 'data-testid', 'href']) {
     let v = String(attributs.get(cle) ?? '');
@@ -516,6 +527,24 @@ function decrireDocument(corps, octets = null) {
     }
   }
   return { pdf, pages, octets: Number.isFinite(octets) ? octets : tampon.length };
+}
+
+/**
+ * Le corps lu est-il la page que le lecteur PDF du navigateur bâtit autour
+ * du fichier, et non le fichier ? (1.0.3) Mesuré sur un relevé réel : une
+ * facture servie `application/pdf` et ouverte dans l'onglet rendait, à la
+ * lecture de sa réponse, un petit document HTML qui l'ENVELOPPE — le relevé
+ * l'avait jugée « pas un PDF », et l'avait dit incomplet. Une page HTML
+ * courte dont l'`<embed>` porte le type d'un PDF, et rien d'autre. Pure.
+ */
+function enveloppeDuLecteur(corps) {
+  const tampon = Buffer.isBuffer(corps) ? corps : Buffer.from(String(corps ?? ''), 'latin1');
+  if (!tampon.length || tampon.length > 64 * 1024) return false;
+  const texte = tampon.toString('latin1');
+  // Mesuré au vrai Chromium (1.0.3) : treize kilo-octets, et
+  // `<embed type="application/x-google-chrome-pdf" … original-url="…">`.
+  return /^\s*</.test(texte) && !texte.includes('%PDF-')
+    && /<embed\b[^>]*\btype\s*=\s*["']?application\/(?:x-google-chrome-)?pdf\b/i.test(texte);
 }
 
 /** Le nom de fichier d'un `Content-Disposition`, masqué comme un libellé. Pure. */
@@ -745,8 +774,10 @@ function nettoyerHtml(html, { mots = [], base = undefined, trouves = null } = {}
     if (!brut || (haut && haut.muet)) return;
     const t = masquerLibelle(decoderEntites(borner(brut, 200)), 200);
     if (!t) return;
+    // Une étiquette de champ dit ce qu'on y tape, jamais qui est connecté (1.0.3).
+    const etiquette = pile.some((e) => e.nom === 'label');
     // Un « @ » resté là est la moitié d'un courriel, coupé par une balise.
-    ecrire(haut && haut.parlant && t.length <= 60 && !t.includes('@') ? echapperTexte(sansLeNom(sans(t), dansLeCompte())) : '…');
+    ecrire(haut && haut.parlant && t.length <= 60 && !t.includes('@') ? echapperTexte(sansLeNom(sans(t), !etiquette && dansLeCompte())) : '…');
   };
 
   const n = s.length;
@@ -813,7 +844,7 @@ function nettoyerHtml(html, { mots = [], base = undefined, trouves = null } = {}
     // Un élément muet (une liste, ses options) ne parle pas : ni par son texte, ni par ses attributs.
     const muet = BALISES_MUETTES.has(nom) || !!(haut && haut.muet);
     const parlant = !muet && (BALISES_PARLANTES.has(nom) || /^(button|link|menuitem|tab)$/i.test(attributs.get('role') || '') || !!(haut && haut.parlant));
-    const compte = signaleLeCompte(attributs);
+    const compte = signaleLeCompte(attributs, nom);
     const zone = compte || dansLeCompte();
     ecrire(`<${nom}${ecrireAttributs(nom, attributs, parlant, sans, base, zone ? (t) => sansLeNom(t, true) : null)}>`);
     // Au-delà de cinq cents niveaux, la page n'est plus une page : la copie reste à plat.
@@ -1246,6 +1277,8 @@ function nouvelEtat({ userId, url, masquer = '', maintenant = Date.now() }) {
     // Ceux que crabe retire d'office : un nom vu dans la zone du compte (`motsDuCompte`).
     motsDuSite: new Set(),
     delaiCopieMs: DELAI_INSTANTANE_MS,
+    // 1.0.3 — un mur anti-robot vu à la place d'une page (`noterMur`).
+    mur: null,
     termine: false,
   };
 }
@@ -1331,7 +1364,11 @@ function etapesPubliques(etat) {
 function bilanDesEtapes(etat) {
   const e = etat.etapes;
   const manque = [];
-  if (!e.connexion) manque.push('la page de connexion n\'a pas été relevée');
+  if (!e.connexion) {
+    manque.push(etat.mur?.actif
+      ? 'le site a présenté sa vérification anti-robot : la fenêtre de crabe n\'est pas passée'
+      : 'la page de connexion n\'a pas été relevée');
+  }
   if (!e.document) manque.push(etat.documents.length ? 'le document ouvert n\'est pas un PDF' : 'aucune facture ouverte');
   return { complet: !manque.length, manque };
 }
@@ -1466,6 +1503,12 @@ async function prendreCopie(etat, page, onglet, raison) {
     return null;
   }
   if (!brut || etat.termine) return null;
+  // 1.0.3 — un mur anti-robot (DataDome, Cloudflare) à la place de la page :
+  // mesuré sur leroymerlin.fr (27/11/2026), 403 dès l'accueil et l'écran
+  // « Vous avez été bloqué(e) ». Le relevé le note et le DIT, au lieu de
+  // laisser croire que la page de connexion se fait attendre.
+  const mur = await avecDelai(profilMarchand().estMurAntiRobot(page), DELAI_INSTANTANE_MS, false).catch(() => false);
+  noterMur(etat, !!mur, onglet);
   const copie = nettoyerInstantane(brut, url, { mots: motsDe(etat), trouves: etat.motsDuSite });
   const cadres = [];
   // Vingt cadres interrogés au plus, et pas plus de DELAI_COPIE_MS pour eux tous.
@@ -1532,6 +1575,33 @@ async function prendreCopie(etat, page, onglet, raison) {
     { onglet: onglet.numero }
   );
   return retenue;
+}
+
+/** Le module des boutiques, chargé à la demande : il tient la reconnaissance des murs anti-robot. */
+function profilMarchand() {
+  return require('./connectors/profil-marchand');
+}
+
+/**
+ * Ce que le relevé retient d'un mur anti-robot : sur combien de pages il est
+ * apparu, et s'il tient encore (la dernière page regardée en était un). Une
+ * ligne de parcours à la première apparition, et à sa levée.
+ */
+function noterMur(etat, present, onglet) {
+  if (!present) {
+    if (etat.mur?.actif) {
+      etat.mur.actif = false;
+      noter(etat, 'mur', `la vérification anti-robot est franchie : la page du site s'affiche (onglet ${onglet.numero})`, { onglet: onglet.numero });
+    }
+    return;
+  }
+  if (!etat.mur) etat.mur = { pages: 0, actif: false };
+  etat.mur.pages++;
+  if (!etat.mur.actif) {
+    etat.mur.actif = true;
+    noter(etat, 'mur', `le site présente sa vérification anti-robot à la place de sa page (onglet ${onglet.numero}) : `
+      + 'elle juge le navigateur, pas le compte', { onglet: onglet.numero });
+  }
 }
 
 /** Une réponse : navigation du cadre principal, document, ou appel de la page. */
@@ -1746,7 +1816,14 @@ async function noterDocument(etat, { voie, cle, adresse, statut, type, nomFichie
   } catch {
     corps = null;
   }
-  if (corps && corps.length) Object.assign(document, decrireDocument(corps, octetsAnnonces || corps.length));
+  if (corps && corps.length) {
+    if (document.pdf && enveloppeDuLecteur(corps)) {
+      // Le PDF affiché dans l'onglet : le corps rendu est la page que le
+      // lecteur du navigateur bâtit autour, pas le fichier. Le type annoncé
+      // fait foi ; les pages ne se comptent pas.
+      document.lecteur = true;
+    } else Object.assign(document, decrireDocument(corps, octetsAnnonces || corps.length));
+  }
   noter(etat, 'document', `document ${document.numero} — ${ligneDocument(document)}`);
   if (document.pdf && !etat.etapes.document) {
     const e = etat.etapes;
@@ -1770,7 +1847,9 @@ async function noterDocument(etat, { voie, cle, adresse, statut, type, nomFichie
 }
 
 function ligneDocument(d) {
-  const nature = d.pdf ? `PDF${d.pages ? `, ${d.pages} page${d.pages > 1 ? 's' : ''}` : ''}` : (d.type || 'type inconnu');
+  const nature = d.pdf
+    ? `PDF${d.pages ? `, ${d.pages} page${d.pages > 1 ? 's' : ''}` : ''}${d.lecteur ? ' (affiché par le lecteur du navigateur : pages non comptées)' : ''}`
+    : (d.type || 'type inconnu');
   return `${d.voie} : ${nature}, ${poids(d.octets)}`
     + (d.nomFichier ? `, fichier « ${d.nomFichier} »` : '')
     + (d.adresse ? ` — ${d.adresse}` : '')
@@ -1835,6 +1914,8 @@ function resume(etat) {
     pagesMax: PAGES_MAX,
     etapes: etapesPubliques(etat),
     ...bilanDesEtapes(etat),
+    // 1.0.3 — le mur anti-robot, s'il tient : le panneau le dit.
+    mur: etat.mur ? { actif: !!etat.mur.actif, pages: etat.mur.pages } : null,
   };
 }
 
@@ -1863,10 +1944,17 @@ function horodatage(date) {
 }
 
 /** Le texte du parcours, une ligne par évènement. Pure. */
-function texteDuParcours(etat) {
-  const lignes = etat.evenements.map((e) => `${ecoule(e.t)}  ${e.texte}`);
+/**
+ * Le parcours, une ligne par évènement. Les mots à retirer le sont ligne par
+ * ligne (`sans`), sauf des lignes d'ÉTAPE : celles-là, crabe les écrit
+ * lui-même, sans rien de la page (1.0.3 — mesuré sur un relevé réel : « Connecté
+ * en tant que … » près du compte avait fait retirer « connecté » d'office, et la
+ * ligne de l'étape 2 en avait perdu son premier mot).
+ */
+function texteDuParcours(etat, sans = (t) => t) {
+  const lignes = etat.evenements.map((e) => `${ecoule(e.t)}  ${e.type === 'etape' ? e.texte : sans(e.texte)}`);
   if (etat.tronque.evenements) lignes.push(`… le parcours s'arrête là : ${EVENEMENTS_MAX} évènements au plus.`);
-  return `Parcours relevé sur ${etat.hote}, depuis ${etat.depart}\n\n${lignes.join('\n')}\n`;
+  return `Parcours relevé sur ${sans(etat.hote)}, depuis ${sans(etat.depart)}\n\n${lignes.join('\n')}\n`;
 }
 
 function texteDesDocuments(etat) {
@@ -1911,6 +1999,10 @@ function texteLisezMoi(etat, version, sans = (t) => t) {
       : '',
     etat.motsDuSite.size
       ? `  ${etat.motsDuSite.size} mot(s) retiré(s) d'office : un nom que le site affiche près du compte (son lien, son menu).`
+      : '',
+    etat.mur
+      ? `  Vérification anti-robot présentée par le site sur ${etat.mur.pages} page(s) — `
+        + (etat.mur.actif ? 'toujours à l\'écran à la fin : la fenêtre de crabe n\'est pas passée.' : 'franchie ensuite.')
       : '',
     '',
     'parcours.txt   chaque étape, dans l\'ordre : onglets, pages, réponses de navigation',
@@ -1978,7 +2070,7 @@ function ecrireLeReleve(etat, { dossier, duCompte, id, version }) {
   const sans = (texte) => retirerMots(texte, motsDe(etat));
   const bilan = bilanDesEtapes(etat);
   ecrire(dossier, 'LISEZ-MOI.txt', texteLisezMoi(etat, version, sans));
-  ecrire(dossier, 'parcours.txt', sans(texteDuParcours(etat)));
+  ecrire(dossier, 'parcours.txt', texteDuParcours(etat, sans));
   ecrire(dossier, 'documents.txt', sans(texteDesDocuments(etat)));
   ecrire(dossier, 'appels.txt', sans(texteDesAppels(etat)));
   for (const copie of etat.copies) ecrire(dossier, copie.nom, copie.html);
@@ -1991,13 +2083,14 @@ function ecrireLeReleve(etat, { dossier, duCompte, id, version }) {
     fin: new Date(etat.fin || etat.maintenant()).toISOString(),
     complet: bilan.complet,
     manque: bilan.manque,
+    mur: etat.mur ? { pages: etat.mur.pages, franchi: !etat.mur.actif } : null,
     etapes: etapesPubliques(etat).liste,
     tronque: etat.tronque,
     pages: etat.copies.map(({ html, ...c }) => c),
     documents: etat.documents.map(({ quand, ...d }) => ({ ...d, adresse: sans(d.adresse), nomFichier: sans(d.nomFichier), clic: sans(d.clic) })),
     appels: etat.requetes.map((r) => ({ ...r, adresse: sans(r.adresse), forme: partout(r.forme, sans, { cles: true }) })),
     clics: etat.clics,
-    parcours: etat.evenements.map((e) => ({ ...e, texte: sans(e.texte) })),
+    parcours: etat.evenements.map((e) => ({ ...e, texte: e.type === 'etape' ? e.texte : sans(e.texte) })),
   }, null, 1)}\n`);
   return entreeDe(duCompte, id);
 }
@@ -2097,6 +2190,7 @@ function effacer(userId, id, { dossierRacine = racine() } = {}) {
 /** Tous les relevés d'un compte, effacés d'un coup (la suppression du compte). */
 function effacerTout(userId, { dossierRacine = racine() } = {}) {
   fs.rmSync(dossierDuCompte(userId, dossierRacine), { recursive: true, force: true });
+  effacerProfilsJetables({ dossierRacine, userId });
 }
 
 /** L'archive `.zip` d'un relevé, assemblée en mémoire : du texte, borné à l'écriture. */
@@ -2253,6 +2347,8 @@ function purger(userId, { dossierRacine = racine(), maintenant = Date.now() } = 
  */
 function purgerTout({ dossierRacine = racine(), maintenant = Date.now() } = {}) {
   let effaces = 0;
+  // 1.0.3 — les profils temporaires restés là (un navigateur tué pendant l'effacement).
+  effacerProfilsJetables({ dossierRacine, maintenant });
   try {
     if (!fs.existsSync(dossierRacine)) return 0;
     for (const nom of fs.readdirSync(dossierRacine)) {
@@ -2268,6 +2364,42 @@ function purgerTout({ dossierRacine = racine(), maintenant = Date.now() } = {}) 
     }
   } catch {
     /* la purge suivante reprendra */
+  }
+  return effaces;
+}
+
+/** Le dossier des profils temporaires des fenêtres de relevé, sous la racine des relevés. */
+const DOSSIER_PROFILS = '.profils';
+/** Au-delà d'un jour, un profil temporaire est un reste (la fenêtre vit trente minutes au plus). */
+const PROFIL_RESTE_MS = 24 * 60 * 60 * 1000;
+
+/** Un profil neuf pour la fenêtre d'un relevé : un dossier à lui, jamais réutilisé. */
+function cheminDuProfilJetable(userId, { dossierRacine = racine() } = {}) {
+  return path.join(dossierRacine, DOSSIER_PROFILS, `u${Number(userId) || 0}-${crypto.randomBytes(8).toString('hex')}`);
+}
+
+/** Efface les profils temporaires restés là — ceux d'un compte, ou ceux de plus d'un jour. */
+function effacerProfilsJetables({ dossierRacine = racine(), userId = null, maintenant = Date.now() } = {}) {
+  const dossier = path.join(dossierRacine, DOSSIER_PROFILS);
+  let noms;
+  try {
+    noms = fs.readdirSync(dossier);
+  } catch {
+    return 0;
+  }
+  let effaces = 0;
+  for (const nom of noms) {
+    const m = /^u(\d{1,12})-[0-9a-f]{16}$/.exec(nom);
+    if (!m) continue;
+    const chemin = path.join(dossier, nom);
+    try {
+      const vieux = maintenant - fs.statSync(chemin).mtimeMs > PROFIL_RESTE_MS;
+      if (userId != null ? Number(m[1]) !== Number(userId) : !vieux) continue;
+      fs.rmSync(chemin, { recursive: true, force: true });
+      effaces++;
+    } catch {
+      /* il résiste : la purge suivante le reprendra */
+    }
   }
   return effaces;
 }
@@ -2381,6 +2513,10 @@ async function demarrer({ userId, adresse, masquer = '' }, dependances = {}) {
       doublons: false,
       // Un onglet fermé par mégarde : cinq minutes pour reprendre le relevé depuis la page.
       sursisDetachementMs: SURSIS_REPRISE_MS,
+      // 1.0.3 — un vrai profil de navigateur, effacé avec la fenêtre : celui
+      // des connecteurs qui passent DataDome (Darty), pas un contexte
+      // éphémère. Mesuré sur leroymerlin.fr le 27/11/2026 : refusé dès l'accueil.
+      profilJetable: cheminDuProfilJetable(userId, { dossierRacine: dependances.dossierRacine || racine() }),
       avantNavigation: (context) => brancher(etat, context),
       onFin: async () => {
         // Toute sortie qui n'est pas « Terminer » oublie le relevé : rien n'est
@@ -2565,6 +2701,7 @@ module.exports = {
   sansAdresses,
   formeJson,
   decrireDocument,
+  enveloppeDuLecteur,
   nomDeFichier,
   estDocument,
   nettoyerInstantane,
@@ -2592,6 +2729,8 @@ module.exports = {
   effacer,
   effacerTout,
   purger,
+  cheminDuProfilJetable,
+  effacerProfilsJetables,
   purgerTout,
   idValide,
   demarrer,

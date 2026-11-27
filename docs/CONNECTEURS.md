@@ -18,7 +18,7 @@ où en est chacun, en cinq groupes :
 Un site peut changer ses pages du jour au lendemain : un connecteur
 fonctionnel peut cesser de l'être, et crabe le dit alors sur sa fiche.
 
-État au 12 novembre 2026, version 1.0.2. Il vous manque un service ? Dans crabe,
+État au 12 novembre 2026, version 1.0.3. Il vous manque un service ? Dans crabe,
 Administration › Applications › « Proposer un service » : vous relevez le site
 en quelques minutes, guidé pas à pas, et crabe envoie la demande pour vous. Sans crabe sous la
 main, ouvrez une *issue* en indiquant le site et le
@@ -83,11 +83,12 @@ type de document voulu (facture, reçu, attestation…).
 | <img src="icones/uber.png" width="24" height="24" alt=""> | Uber | Les reçus de vos trajets Uber (Uber Eats et Location à l'étude). |
 | <img src="icones/vistaprint.png" width="24" height="24" alt=""> | VistaPrint | Les factures de vos commandes d'impression VistaPrint. |
 
-## En cours (2)
+## En cours (3)
 
 | | Service | Ce qu'il récupérera |
 |---|---|---|
 | <img src="icones/recraft.png" width="24" height="24" alt=""> | Recraft | Vos factures d'abonnement Recraft. |
+| <img src="icones/sofidial.png" width="24" height="24" alt=""> | Sofidial | Les factures de vos commandes de personnalisation textile Sofidial. |
 | <img src="icones/totalenergies.png" width="24" height="24" alt=""> | TotalEnergies | Vos factures d'électricité et de gaz TotalEnergies. |
 
 ## En attente (2)

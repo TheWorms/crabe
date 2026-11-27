@@ -1,0 +1,54 @@
+{
+  "id": "sofidial",
+  "name": "Sofidial",
+  "category": "shopping",
+  "color": "#1f1f1f",
+  "letters": "SO",
+  "site": "personnalisation-textile-en-ligne.sofidial.fr",
+  "implementation": "scraping",
+  "initialStatus": "pending",
+  "description": "Récupère automatiquement les factures de vos commandes de personnalisation textile Sofidial.",
+  "caveat": "Vous vous connectez vous-même, dans une fenêtre ; crabe lit vos commandes et prend leurs factures, sans rien cliquer.",
+  "technicalNote": "1.0.3 (27/11/2026) — CONNECTEUR NEUF, écrit sur le relevé « Proposer un service » du 24/11/2026, fait sur un compte réel (sept pages, trois factures ouvertes) ; la première récupération réelle reste à faire. Application Rails : connexion Devise /users/sign_in (e-mail, mot de passe, « Se souvenir de moi »), ouverte par la fenêtre de crabe ; /orders liste les commandes (cartes div#order_<n>, lien /orders/<id> titré « WEB-<n> », bouton « Déconnexion » = form /users/sign_out, la preuve de connexion) ; chaque commande s'ouvre sur /orders/<id>, où la facture est un lien « FACTURE F<n> » vers /rails/active_storage/blobs/redirect/…, qui renvoie vers une adresse pré-signée d'Amazon S3 (le PDF, « SOFIDIAL - F<n>.pdf »). Téléchargé par le contexte (context.request, renvois suivis) : le fetch de la page ne lirait pas S3, d'une autre origine. Le contenu fait foi (%PDF-). Ancre : sofidial-<commande>-facture-<numéro> ; une commande qui a déjà donné sa facture n'est pas rouverte. La date est lue dans la carte de la commande, puis dans sa page — le relevé ne disait pas sa forme ; illisible, la facture est rangée sans date. Rien n'est cliqué ni soumis : déconnexion, panier, profil, adresses, mot de passe, paiement sont refusés avant toute requête.",
+  "remoteLogin": {
+    "url": "https://personnalisation-textile-en-ligne.sofidial.fr/users/sign_in",
+    "marker": "",
+    "verifyUrl": "https://personnalisation-textile-en-ligne.sofidial.fr/orders",
+    "preuveSurFenetre": true,
+    "marqueursFenetre": [
+      {
+        "selecteur": "form[action*=\"/users/sign_out\"]"
+      }
+    ],
+    "hint": "Connectez-vous avec votre adresse e-mail et votre mot de passe Sofidial, et cochez « Se souvenir de moi » : la connexion tiendra plus longtemps. Quand la page de vos commandes s'affiche, cliquez sur Enregistrer : crabe vérifie alors la connexion sur cette page."
+  },
+  "fields": [
+    {
+      "key": "session",
+      "label": "Connexion à Sofidial",
+      "type": "session",
+      "required": false,
+      "accept": "application/json,.json",
+      "help": "Le bouton « Se connecter à Sofidial » ouvre une fenêtre de navigateur dans crabe : connectez-vous comme sur le site, avec votre adresse e-mail et votre mot de passe. La connexion est enregistrée, chiffrée, et n'est jamais réaffichée. Elle finira par expirer : crabe vous demandera alors de la rouvrir."
+    },
+    {
+      "key": "historique",
+      "label": "Historique à récupérer",
+      "type": "history",
+      "default": "depuis",
+      "help": "À chaque récupération, crabe lit la page de vos commandes Sofidial et prend les factures qui ne sont pas encore dans vos documents. La première récupération reprend tout l'historique ; si elle est trop longue pour un seul passage, la suite vient au passage suivant."
+    }
+  ],
+  "permissions": [
+    {
+      "key": "factures",
+      "scope": "read-write",
+      "description": "Lit la liste de vos commandes Sofidial, ouvre chacune et télécharge sa facture PDF, sans rien cliquer sur la boutique, puis la dépose sur vos destinations de stockage."
+    },
+    {
+      "key": "identifiants",
+      "scope": "read",
+      "description": "La connexion de navigateur que vous avez ouverte vous-même sur Sofidial : ses cookies, chiffrés au repos, rejoués uniquement pour lire vos commandes. Aucun mot de passe n'est stocké ici."
+    }
+  ]
+}

@@ -9243,9 +9243,14 @@ function dessinerEtapesReleve(releve) {
     : '';
   const note = $('rb-releve-note');
   if (!note.dataset.message) {
-    note.textContent = releve?.complet
-      ? 'Tout y est. Vous pouvez terminer, ou compléter avec d\'autres pages.'
-      : 'Terminer avant la fin reste possible : l\'archive dira ce qui lui manque.';
+    // 1.0.3 — un mur anti-robot à l'écran (DataDome, Cloudflare) : le dire,
+    // et le seul geste qui peut aider.
+    note.textContent = releve?.mur?.actif
+      ? 'Le site présente sa vérification anti-robot. S\'il propose une épreuve, faites-la ; s\'il dit « bloqué », '
+        + 'rechargez la page une fois. Si le blocage reste, le site refuse la fenêtre de crabe : terminez le relevé, l\'archive le dira.'
+      : releve?.complet
+        ? 'Tout y est. Vous pouvez terminer, ou compléter avec d\'autres pages.'
+        : 'Terminer avant la fin reste possible : l\'archive dira ce qui lui manque.';
   }
 }
 

@@ -1242,6 +1242,12 @@ function createManager(overrides = {}) {
     // NAVIGATEUR et pas seulement les cookies — Cloudflare en tête. Voir
     // `persistentLauncher`.
     persistent = false,
+    // 1.0.3 — un profil TEMPORAIRE, pour une fenêtre qui ne garde rien (le
+    // relevé d'un site) : un vrai profil de navigateur, comme celui des
+    // connecteurs qui passent DataDome ou Cloudflare, plutôt qu'un contexte
+    // éphémère — et effacé avec la fenêtre (`shutdown`). Un chemin absolu,
+    // propre à cette fenêtre ; sans effet quand `persistent` est déclaré.
+    profilJetable = '',
     // Lot 48 — la preuve de session se lit dans la FENÊTRE visible, jamais
     // dans un contrôle headless (`remoteLogin.preuveSurFenetre`). Pour les
     // sites dont la garde anti-robot juge le navigateur : Boulanger (Akamai)
@@ -1433,7 +1439,9 @@ function createManager(overrides = {}) {
       // Calculé ici, une fois : le lanceur et le connecteur doivent viser
       // EXACTEMENT le même répertoire, sans quoi la session ouverte à la main
       // ne servirait à rien.
-      profil: persistent ? profilPersistant.chemin(userId, connectorId) : null,
+      profil: persistent ? profilPersistant.chemin(userId, connectorId) : (profilJetable || null),
+      // 1.0.3 — effacé avec la fenêtre, sur tous les chemins de sortie.
+      profilJetable: !persistent && profilJetable ? profilJetable : null,
       // La clé du verrou de profil pris ci-dessus, rendue par `terminate` —
       // le point de sortie unique, quel que soit le chemin (succès, délai,
       // annulation, erreur de lancement).
@@ -2902,6 +2910,18 @@ function createManager(overrides = {}) {
       // nouvelle fenêtre. Idempotent : rendre un verrou déjà rendu est sans effet.
       inflight.profil.release(session.verrouProfil);
       session.verrouProfil = null;
+    }
+
+    if (session.profilJetable) {
+      // 1.0.3 — le profil temporaire ne survit pas à sa fenêtre : cookies et
+      // stockage du site visité partent avec elle. Un reste (navigateur tué
+      // pendant l'effacement) est repris par la purge de la nuit.
+      try {
+        runtime.fs.rmSync(session.profilJetable, { recursive: true, force: true });
+      } catch (err) {
+        runtime.log('warn', `Effacement du profil temporaire de ${session.connectorName} : ${err.message}`);
+      }
+      session.profilJetable = null;
     }
 
     if (current === session) {
